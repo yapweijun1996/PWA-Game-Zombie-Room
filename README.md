@@ -50,6 +50,14 @@ python -m http.server 8080
 
 Open <http://localhost:8080/> in a browser. Do not open `index.html` directly with `file:` when testing PWA behavior; service workers require a secure context such as HTTPS or localhost.
 
+## GitHub Pages Deployment
+
+The repository is a zero-build static site and includes `.github/workflows/deploy-pages.yml`. Pushes to `main` and manual workflow runs deploy the repository root through GitHub Pages.
+
+In the repository settings, open **Settings → Pages** and set the source to **GitHub Actions**. After the workflow completes, the project URL is:
+
+<https://yapweijun1996.github.io/PWA-Game-Zombie-Room/>
+
 ## Controls
 
 - **Desktop:** `W`, `A`, `S`, `D`, or the arrow keys.
