@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no" />
+  <meta name="theme-color" content="#09100c" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Zombie Room" />
+  <meta name="application-name" content="Zombie Room" />
+  <meta name="description" content="A fast offline survival game. Move with four directions. Shooting is automatic." />
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png" />
+  <link rel="apple-touch-icon" href="./icon-192.png" />
+  <link rel="stylesheet" href="./style.css" />
+  <title>Zombie Room</title>
+</head>
+<body>
+  <main id="app" data-i18n-aria="gameAria" aria-label="Zombie Room game">
+    <canvas id="game"></canvas>
+
+    <header class="appbar" id="appbar">
+      <div class="brand" data-i18n-aria="brandAria" aria-label="Zombie Room">
+        <div class="brand-mark" aria-hidden="true">ZR</div>
+        <div class="brand-copy">
+          <div class="brand-title" data-i18n="brandTitle">ZOMBIE ROOM</div>
+          <div class="brand-subtitle" data-i18n="brandSubtitle">Move only · Auto fire</div>
+        </div>
+      </div>
+      <div class="app-actions">
+        <label class="lang-select-wrap">
+          <span class="sr-only" data-i18n="languageLabel">Language</span>
+          <select class="lang-select" id="languageSelect" data-i18n-aria="languageLabel" aria-label="Language"></select>
+        </label>
+        <button class="install-button" id="installButton" type="button" data-i18n-aria="installAriaInstall" aria-label="Install Zombie Room PWA">
+          <svg class="install-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path fill="currentColor" d="M11 3h2v10.17l3.59-3.58L18 11l-6 6-6-6 1.41-1.41L11 13.17V3ZM5 19h14v2H5v-2Z"/>
+          </svg>
+          <span id="installLabel" data-i18n="installLabel">Install PWA</span>
+        </button>
+        <button class="update-button" id="updateButton" type="button" data-i18n-aria="updateAriaCheck" aria-label="Check for Zombie Room updates">
+          <span class="update-dot" aria-hidden="true"></span>
+          <span id="updateLabel">Update v1.4.0</span>
+        </button>
+      </div>
+    </header>
+    <div class="install-tip" id="installTip" role="status" aria-live="polite"></div>
+
+    <section class="hud" id="hud" aria-live="polite">
+      <div class="card status-card">
+        <div class="row"><span class="label" data-i18n="hudHealth">Health</span><span class="value" id="hpText">100 / 100</span></div>
+        <div class="bar"><i id="hpFill"></i></div>
+        <div class="row" style="margin-top:6px"><span class="label"><span data-i18n="hudXpLevelPrefix">XP · LV</span> <b id="levelText">1</b></span><span class="value" id="xpText">0 / 5</span></div>
+        <div class="bar"><i id="xpFill"></i></div>
+        <div class="meta-grid">
+          <div class="metric"><span data-i18n="hudWave">Wave</span><b id="waveText">1</b></div>
+          <div class="metric"><span data-i18n="hudKills">Kills</span><b id="killsText">0</b></div>
+          <div class="metric"><span data-i18n="hudTime">Time</span><b id="timeText">0:00</b></div>
+          <div class="metric"><span data-i18n="hudLevel">Level</span><b id="levelMetric">1</b></div>
+        </div>
+      </div>
+      <div class="card stats-card">
+        <div class="label" data-i18n="hudScore">Score</div>
+        <div class="score-value" id="scoreText">0</div>
+        <div class="best-line"><span data-i18n="hudBest">Best</span> <strong id="bestText">0</strong></div>
+        <div class="fps-line"><span data-i18n="hudFps">FPS</span> <strong id="fpsText">--</strong></div>
+        <div class="perf-line" id="perfLine"><span data-i18n="hudAuto">Auto</span> · <strong id="perfText">FULL</strong></div>
+      </div>
+    </section>
+
+    <div class="message" id="message" data-i18n="msgLevelUp">LEVEL UP</div>
+    <div class="hint-pill" id="hintPill" data-i18n="hintPill">Move · Auto fire · Collect blue XP</div>
+    <div class="damage-flash" id="damageFlash"></div>
+
+    <div class="center-overlay">
+      <div class="card gameover" id="gameover">
+        <div class="gameover-badge" aria-hidden="true">×</div>
+        <h1 data-i18n="gameoverTitle">ROOM LOST</h1>
+        <p id="gameoverStats"></p>
+        <p id="gameoverSurvived"></p>
+        <p class="restart" data-i18n="gameoverRestart">Press any direction / WASD to restart</p>
+      </div>
+    </div>
+
+    <div class="controls-wrap" id="controlsWrap" data-i18n-aria="controlsAria" aria-label="Movement controls">
+      <div class="dpad" id="dpad">
+        <button id="up" data-key="up" data-letter="W" data-i18n-aria="moveUp" aria-label="Move up">↑</button>
+        <button id="left" data-key="left" data-letter="A" data-i18n-aria="moveLeft" aria-label="Move left">←</button>
+        <button id="right" data-key="right" data-letter="D" data-i18n-aria="moveRight" aria-label="Move right">→</button>
+        <button id="down" data-key="down" data-letter="S" data-i18n-aria="moveDown" aria-label="Move down">↓</button>
+      </div>
+    </div>
+    <div class="desktop-hint" data-i18n="hintDesktop">WASD / Arrow Keys · shooting is automatic</div>
+  </main>
+
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>
