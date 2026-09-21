@@ -1,4 +1,4 @@
-export const APP_VERSION = '1.4.0';
+export const APP_VERSION = '1.5.0';
 
 export const dom = {
   canvas: document.getElementById('game'),
@@ -11,7 +11,8 @@ export const dom = {
   hud: document.getElementById('hud'),
   controlsWrap: document.getElementById('controlsWrap'),
   hintPill: document.getElementById('hintPill'),
-  languageSelect: document.getElementById('languageSelect')
+  languageSelect: document.getElementById('languageSelect'),
+  restartButton: document.getElementById('restartButton')
 };
 
 export const ctx = dom.canvas.getContext('2d');
@@ -34,8 +35,9 @@ export const ui = {
   message: document.getElementById('message'),
   damageFlash: document.getElementById('damageFlash'),
   gameover: document.getElementById('gameover'),
-  gameoverStats: document.getElementById('gameoverStats'),
-  gameoverSurvived: document.getElementById('gameoverSurvived')
+  gameoverScore: document.getElementById('gameoverScore'),
+  gameoverKills: document.getElementById('gameoverKills'),
+  gameoverTime: document.getElementById('gameoverTime')
 };
 
 export const input = { up: false, down: false, left: false, right: false };

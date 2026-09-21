@@ -15,6 +15,11 @@ Zombie Room is an offline-first, canvas-based survival game for desktop and mobi
 - Service-worker update detection with an explicit update action.
 - Adaptive visual performance mode based on measured frame rate.
 - Reduced-motion support through `prefers-reduced-motion`.
+- Localized UI in English, Simplified Chinese, Malay, Japanese, Korean, Vietnamese, and Thai.
+- Browser-language detection with a persisted language selection.
+- Merged single-card HUD (vitals, wave/kills/time/level, score/best/FPS) instead of two competing panels.
+- Collapsible settings menu (language, install, update) behind a single header trigger, with focus trap, outside-click, and Escape handling.
+- Full-screen defeat overlay: blurred/dimmed backdrop, hero score, icon-based stats, and a dedicated Restart button in addition to keyboard/D-pad restart.
 
 ## Project Structure
 
@@ -35,6 +40,9 @@ Zombie Room is an offline-first, canvas-based survival game for desktop and mobi
     ├── input.js            # Keyboard and pointer input
     ├── ui.js               # HUD and transient messages
     ├── pwa.js              # Install and service-worker update UX
+    ├── i18n.js             # Supported locales, translations, and locale persistence
+    ├── i18n-apply.js       # Translation application and language selector
+    ├── settings-menu.js    # Collapsible settings panel (open/close, focus, outside-click)
     └── utils.js             # Shared utility functions
 ```
 
@@ -109,12 +117,11 @@ The core loop is clear and immediately playable. The main improvement opportunit
 
 ### UI and UX
 
-- Keep Health, XP, wave, and score visible; move FPS and performance mode into a diagnostics/settings panel for normal players.
-- Add a visible pause/settings button with sound, reduced-motion, and control options.
-- Replace the text-only defeat instruction with a large restart button while retaining keyboard support.
+- Done: HUD merged into a single status bar; install/language/update moved into a collapsible settings menu; defeat screen now has a full-screen backdrop, hero score, and a dedicated Restart button alongside keyboard/D-pad restart.
+- Add sound and reduced-motion toggles to the settings menu.
 - Add stronger visual distinction between player, XP, bullets, runners, tanks, and bosses for color-blind users using shape, pattern, and animation in addition to color.
 - Add explicit focus-visible styles and test all controls with keyboard and switch-like pointer input.
-- Avoid placing install/update controls too prominently during active play; they are secondary actions.
+- Move FPS/performance-mode readout into the settings menu as a diagnostics toggle for normal players (currently still always visible in the HUD).
 
 ### Layout and map
 
@@ -176,7 +183,8 @@ Before release, verify the following on HTTPS and localhost:
 
 - [ ] Manifest is valid and has `name`, `short_name`, `start_url`, `scope`, `display`, theme/background colors, and icons.
 - [ ] Icons are valid PNGs at 192×192 and 512×512 and remain legible as maskable icons.
-- [ ] Service worker installs, activates, serves the shell offline, and removes old versioned caches.
+- [ ] Service worker installs, activates, serves the complete shell offline, and removes old versioned caches.
+- [ ] Every imported JavaScript module, including `src/i18n.js` and `src/i18n-apply.js`, is included in the app-shell cache.
 - [ ] A newly deployed version is detected and the update action reloads exactly once.
 - [ ] Navigation fallback works when offline.
 - [ ] No stale HTML or JavaScript remains after an update.
@@ -191,7 +199,6 @@ Before release, verify the following on HTTPS and localhost:
 ### P0 — Release safety and usability
 
 - Test the current PWA on real iOS and Android devices.
-- Add pause/settings and a visible restart button.
 - Reconsider global `user-scalable=no` and verify accessible zoom behavior.
 - Add focus-visible styles and non-color feedback for game states.
 - Add a basic automated smoke check for manifest, service-worker registration, and offline navigation.
@@ -212,4 +219,4 @@ Before release, verify the following on HTTPS and localhost:
 
 ## Verification Status
 
-No package manager manifest (`package.json`), build configuration, or test configuration was present in the inspected working tree. This README documents the source and static assets; runtime, real-device, accessibility, offline, and install/update behavior still require explicit verification.
+No package manager manifest (`package.json`), build configuration, or test configuration was present in the inspected working tree. The source includes seven UI locales, but translation completeness and language switching still require browser verification. The service-worker shell list also requires verification against all imported modules before claiming first-install offline support. This README documents the source and static assets; runtime, real-device, accessibility, offline, and install/update behavior still require explicit verification.

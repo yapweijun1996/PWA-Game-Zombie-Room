@@ -53,6 +53,7 @@ export function resetGame() {
   perf.recoveredFpsWindows = 0;
   perf.perfWarmupUntil = performance.now() + 2200;
   ui.gameover.classList.remove('show');
+  dom.canvas.classList.remove('game-blurred', 'game-dimmed');
   dom.hintPill.classList.remove('hide');
   setTimeout(() => dom.hintPill.classList.add('hide'), 4200);
   updateUI();
@@ -215,14 +216,12 @@ function endGame() {
   game.running = false;
   scoreState.best = Math.max(scoreState.best, Math.floor(game.score));
   localStorage.setItem('zombie-room-best', String(scoreState.best));
-  ui.gameoverStats.innerHTML = t('gameoverScoreKills', {
-    score: '<strong>' + Math.floor(game.score) + '</strong>',
-    kills: '<strong>' + game.kills + '</strong>'
-  });
-  ui.gameoverSurvived.innerHTML = t('gameoverSurvived', {
-    time: '<strong>' + formatTime(game.elapsed) + '</strong>'
-  });
+  ui.gameoverScore.textContent = Math.floor(game.score);
+  ui.gameoverKills.textContent = game.kills;
+  ui.gameoverTime.textContent = formatTime(game.elapsed);
+  dom.canvas.classList.add(game.performanceMode ? 'game-dimmed' : 'game-blurred');
   ui.gameover.classList.add('show');
+  ui.gameover.focus();
   updateUI();
 }
 

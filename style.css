@@ -46,7 +46,10 @@
       width: 100%;
       height: 100%;
       display: block;
+      transition: filter .35s ease;
     }
+    canvas.game-blurred { filter: blur(6px) brightness(.55); }
+    canvas.game-dimmed { filter: brightness(.45); }
 
     .appbar {
       position: absolute;
@@ -125,18 +128,75 @@
       border: 0;
     }
 
-    .lang-select-wrap { display: inline-flex; pointer-events: auto; }
-    .lang-select {
+    .settings-trigger {
+      width: 34px;
+      height: 34px;
       min-height: 34px;
-      max-width: 84px;
+      padding: 0;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(255,255,255,.055);
+      color: #dfe8e2;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: auto;
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+    .settings-trigger:active { transform: translateY(1px); background: rgba(255,255,255,.09); }
+    .settings-trigger[aria-expanded="true"] { border-color: rgba(121,242,154,.34); background: rgba(60,133,79,.16); }
+    .settings-icon { width: 18px; height: 18px; fill: currentColor; }
+
+    .settings-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 28;
+      background: rgba(0,0,0,.45);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .2s ease;
+    }
+    .settings-backdrop.show { opacity: 1; pointer-events: auto; }
+    .settings-backdrop[hidden] { display: none; }
+
+    .settings-panel {
+      position: absolute;
+      z-index: 30;
+      top: calc(58px + var(--safe-top));
+      right: max(10px, var(--safe-right));
+      width: min(240px, calc(100% - 20px));
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: var(--surface-strong);
+      -webkit-backdrop-filter: blur(14px);
+      backdrop-filter: blur(14px);
+      box-shadow: 0 18px 40px rgba(0,0,0,.38);
+      opacity: 0;
+      transform: translateY(-6px) scale(.97);
+      transition: opacity .18s ease, transform .18s ease;
+      pointer-events: none;
+    }
+    .settings-panel.show { opacity: 1; transform: translateY(0) scale(1); pointer-events: auto; }
+    .settings-panel[hidden] { display: none; }
+
+    .settings-row { display: flex; flex-direction: column; gap: 4px; }
+    .settings-label { font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; font-weight: 800; }
+
+    .lang-select {
+      width: 100%;
+      min-height: 34px;
       padding: 0 8px;
       border: 1px solid var(--line);
       border-radius: 999px;
       background: rgba(255,255,255,.055);
       color: #dfe8e2;
-      pointer-events: auto;
       cursor: pointer;
-      font-size: 10px;
+      font-size: 11px;
       font-weight: 850;
       letter-spacing: .025em;
     }
@@ -144,6 +204,7 @@
 
     .install-button,
     .update-button {
+      width: 100%;
       min-height: 34px;
       padding: 0 11px;
       border: 1px solid var(--line);
@@ -152,12 +213,11 @@
       color: #dfe8e2;
       display: inline-flex;
       align-items: center;
-      justify-content: center;
+      justify-content: flex-start;
       gap: 7px;
-      pointer-events: auto;
       cursor: pointer;
       touch-action: manipulation;
-      font-size: 10px;
+      font-size: 11px;
       font-weight: 850;
       letter-spacing: .025em;
       white-space: nowrap;
@@ -232,9 +292,6 @@
       top: calc(59px + var(--safe-top));
       left: max(10px, var(--safe-left));
       right: max(10px, var(--safe-right));
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) auto;
-      gap: 8px;
       pointer-events: none;
     }
 
@@ -247,8 +304,11 @@
       box-shadow: 0 12px 30px rgba(0,0,0,.22), inset 0 1px 0 rgba(255,255,255,.025);
     }
 
-    .status-card { padding: 8px 10px 9px; min-width: 0; }
-    .stats-card { padding: 8px 11px; min-width: 94px; text-align: right; }
+    .hud-bar { display: flex; align-items: stretch; }
+    .hud-divider { width: 1px; flex: 0 0 auto; align-self: stretch; margin: 4px 2px; background: var(--line); }
+
+    .status-card { flex: 1 1 auto; padding: 8px 10px 9px; min-width: 0; }
+    .stats-card { flex: 0 0 auto; padding: 8px 11px; min-width: 94px; text-align: right; }
 
     .row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
     .label { font-size: 9px; color: var(--muted); letter-spacing: .085em; text-transform: uppercase; font-weight: 800; }
@@ -355,15 +415,18 @@
     }
 
     .gameover {
-      width: min(360px, calc(100vw - 32px));
-      padding: 23px 20px 21px;
+      width: min(400px, calc(100vw - 32px));
+      padding: 28px 24px 26px;
       text-align: center;
-      background: rgba(11,19,14,.94);
+      background: rgba(9,16,12,.97);
+      box-shadow: 0 24px 60px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.03);
+      pointer-events: auto;
       opacity: 0;
-      transform: translateY(6px) scale(.965);
-      transition: opacity .18s ease, transform .18s ease;
+      transform: translateY(10px) scale(.96);
+      transition: opacity .22s ease, transform .22s ease;
     }
     .gameover.show { opacity: 1; transform: translateY(0) scale(1); }
+    .gameover:focus { outline: none; }
     .gameover-badge {
       width: 44px;
       height: 44px;
@@ -377,10 +440,59 @@
       font-size: 20px;
       font-weight: 950;
     }
-    .gameover h1 { margin: 0 0 7px; font-size: clamp(25px, 8vw, 38px); letter-spacing: -.045em; }
-    .gameover p { margin: 5px 0; color: var(--muted); font-size: 12px; }
-    .gameover strong { color: var(--text); }
-    .gameover .restart { margin-top: 14px; color: var(--good); font-weight: 900; font-size: 11px; letter-spacing: .035em; }
+    .gameover h1 { margin: 0 0 4px; font-size: clamp(26px, 8vw, 40px); letter-spacing: -.045em; }
+    .gameover-score-label {
+      margin-top: 16px;
+      font-size: 10px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .12em;
+      font-weight: 800;
+    }
+    .gameover-score {
+      margin-top: 2px;
+      font-size: clamp(42px, 14vw, 64px);
+      line-height: 1;
+      font-weight: 950;
+      letter-spacing: -.03em;
+      font-variant-numeric: tabular-nums;
+      color: var(--good);
+      text-shadow: 0 0 24px rgba(121,242,154,.25);
+    }
+    .gameover-stat-row {
+      margin-top: 16px;
+      display: flex;
+      justify-content: center;
+      gap: 24px;
+    }
+    .gameover-stat {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 15px;
+      font-weight: 900;
+      color: var(--text);
+      font-variant-numeric: tabular-nums;
+    }
+    .gameover-stat-icon { font-size: 16px; }
+    .restart-button {
+      display: block;
+      width: 100%;
+      margin-top: 22px;
+      min-height: 48px;
+      border: none;
+      border-radius: 14px;
+      background: linear-gradient(145deg, #8affaa, #4ecb78);
+      color: #07100b;
+      font-size: 14px;
+      font-weight: 950;
+      letter-spacing: .05em;
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+    .restart-button:active { transform: translateY(1px); }
+    .restart-button:focus-visible { outline: 2px solid rgba(255,255,255,.65); outline-offset: 3px; }
+    .gameover .restart { margin: 10px 0 0; color: var(--muted); font-weight: 800; font-size: 10px; letter-spacing: .03em; }
 
     .controls-wrap {
       position: absolute;
@@ -486,9 +598,6 @@
     @media (max-width: 370px) {
       .brand-subtitle { display: none; }
       .brand-mark { width: 30px; height: 30px; }
-      .install-button, .update-button { padding: 0 8px; font-size: 9px; gap: 5px; }
-      .lang-select { max-width: 58px; padding: 0 4px; font-size: 9px; }
-      .hud { gap: 6px; }
       .stats-card { min-width: 82px; padding-left: 8px; padding-right: 8px; }
       .status-card { padding-left: 8px; padding-right: 8px; }
       .metric { padding-left: 3px; padding-right: 3px; }
@@ -499,14 +608,24 @@
       .brand-title { font-size: 12px; }
       .brand-subtitle { font-size: 8px; }
       .app-actions { gap: 4px; }
-      .install-button, .update-button { min-height: 32px; padding: 0 8px; font-size: 9px; gap: 5px; }
-      .lang-select { min-height: 32px; }
       .install-icon { width: 11px; height: 11px; }
     }
 
     @media (max-width: 345px) {
       .brand-copy { display: none; }
-      .install-button, .update-button { padding: 0 7px; }
+    }
+
+    @media (max-width: 480px) {
+      .settings-panel {
+        left: max(10px, var(--safe-left));
+        right: max(10px, var(--safe-right));
+        top: auto;
+        bottom: max(10px, var(--safe-bottom));
+        width: auto;
+        border-radius: 18px;
+        transform: translateY(10px) scale(1);
+      }
+      .settings-panel.show { transform: translateY(0) scale(1); }
     }
 
     @media (max-height: 680px) {

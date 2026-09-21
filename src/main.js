@@ -6,6 +6,7 @@ import { draw } from './render.js';
 import { initPwa, refreshPwaLabels } from './pwa.js';
 import { initInput } from './input.js';
 import { initI18n } from './i18n-apply.js';
+import { initSettingsMenu } from './settings-menu.js';
 
 function resize() {
   viewport.W = Math.max(320, innerWidth);
@@ -75,4 +76,6 @@ ui.bestText.textContent = scoreState.best;
 resetGame();
 initPwa();
 initInput(resetGame);
+initSettingsMenu();
+dom.restartButton?.addEventListener('click', resetGame);
 requestAnimationFrame(now => { perf.last = now; requestAnimationFrame(frame); });

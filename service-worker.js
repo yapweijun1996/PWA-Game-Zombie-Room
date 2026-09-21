@@ -1,6 +1,6 @@
 'use strict';
 
-const APP_VERSION = '1.4.0';
+const APP_VERSION = '1.5.0';
 const CACHE_NAME = 'zombie-room-v' + APP_VERSION;
 const APP_SHELL = [
   './',
@@ -19,7 +19,8 @@ const APP_SHELL = [
   './src/pwa.js',
   './src/input.js',
   './src/i18n.js',
-  './src/i18n-apply.js'
+  './src/i18n-apply.js',
+  './src/settings-menu.js'
 ];
 
 self.addEventListener('install', event => {

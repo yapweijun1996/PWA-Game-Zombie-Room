@@ -29,43 +29,55 @@
         </div>
       </div>
       <div class="app-actions">
-        <label class="lang-select-wrap">
-          <span class="sr-only" data-i18n="languageLabel">Language</span>
-          <select class="lang-select" id="languageSelect" data-i18n-aria="languageLabel" aria-label="Language"></select>
-        </label>
-        <button class="install-button" id="installButton" type="button" data-i18n-aria="installAriaInstall" aria-label="Install Zombie Room PWA">
-          <svg class="install-icon" viewBox="0 0 24 24" aria-hidden="true">
-            <path fill="currentColor" d="M11 3h2v10.17l3.59-3.58L18 11l-6 6-6-6 1.41-1.41L11 13.17V3ZM5 19h14v2H5v-2Z"/>
+        <button class="settings-trigger" id="settingsTrigger" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="settingsPanel" data-i18n-aria="settingsTrigger" aria-label="More options">
+          <svg class="settings-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="5" cy="12" r="2.1"/><circle cx="12" cy="12" r="2.1"/><circle cx="19" cy="12" r="2.1"/>
           </svg>
-          <span id="installLabel" data-i18n="installLabel">Install PWA</span>
-        </button>
-        <button class="update-button" id="updateButton" type="button" data-i18n-aria="updateAriaCheck" aria-label="Check for Zombie Room updates">
-          <span class="update-dot" aria-hidden="true"></span>
-          <span id="updateLabel">Update v1.4.0</span>
         </button>
       </div>
     </header>
+
+    <div class="settings-backdrop" id="settingsBackdrop" hidden></div>
+    <div class="settings-panel" id="settingsPanel" role="menu" data-i18n-aria="settingsTrigger" aria-label="Settings" hidden>
+      <div class="settings-row">
+        <span class="settings-label" data-i18n="languageLabel">Language</span>
+        <select class="lang-select" id="languageSelect" data-i18n-aria="languageLabel" aria-label="Language"></select>
+      </div>
+      <button class="install-button settings-action" id="installButton" type="button" data-i18n-aria="installAriaInstall" aria-label="Install Zombie Room PWA">
+        <svg class="install-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <path fill="currentColor" d="M11 3h2v10.17l3.59-3.58L18 11l-6 6-6-6 1.41-1.41L11 13.17V3ZM5 19h14v2H5v-2Z"/>
+        </svg>
+        <span id="installLabel" data-i18n="installLabel">Install PWA</span>
+      </button>
+      <button class="update-button settings-action" id="updateButton" type="button" data-i18n-aria="updateAriaCheck" aria-label="Check for Zombie Room updates">
+        <span class="update-dot" aria-hidden="true"></span>
+        <span id="updateLabel">Update v1.5.0</span>
+      </button>
+    </div>
     <div class="install-tip" id="installTip" role="status" aria-live="polite"></div>
 
     <section class="hud" id="hud" aria-live="polite">
-      <div class="card status-card">
-        <div class="row"><span class="label" data-i18n="hudHealth">Health</span><span class="value" id="hpText">100 / 100</span></div>
-        <div class="bar"><i id="hpFill"></i></div>
-        <div class="row" style="margin-top:6px"><span class="label"><span data-i18n="hudXpLevelPrefix">XP · LV</span> <b id="levelText">1</b></span><span class="value" id="xpText">0 / 5</span></div>
-        <div class="bar"><i id="xpFill"></i></div>
-        <div class="meta-grid">
-          <div class="metric"><span data-i18n="hudWave">Wave</span><b id="waveText">1</b></div>
-          <div class="metric"><span data-i18n="hudKills">Kills</span><b id="killsText">0</b></div>
-          <div class="metric"><span data-i18n="hudTime">Time</span><b id="timeText">0:00</b></div>
-          <div class="metric"><span data-i18n="hudLevel">Level</span><b id="levelMetric">1</b></div>
+      <div class="card hud-bar">
+        <div class="hud-section status-card">
+          <div class="row"><span class="label" data-i18n="hudHealth">Health</span><span class="value" id="hpText">100 / 100</span></div>
+          <div class="bar"><i id="hpFill"></i></div>
+          <div class="row" style="margin-top:6px"><span class="label"><span data-i18n="hudXpLevelPrefix">XP · LV</span> <b id="levelText">1</b></span><span class="value" id="xpText">0 / 5</span></div>
+          <div class="bar"><i id="xpFill"></i></div>
+          <div class="meta-grid">
+            <div class="metric"><span data-i18n="hudWave">Wave</span><b id="waveText">1</b></div>
+            <div class="metric"><span data-i18n="hudKills">Kills</span><b id="killsText">0</b></div>
+            <div class="metric"><span data-i18n="hudTime">Time</span><b id="timeText">0:00</b></div>
+            <div class="metric"><span data-i18n="hudLevel">Level</span><b id="levelMetric">1</b></div>
+          </div>
         </div>
-      </div>
-      <div class="card stats-card">
-        <div class="label" data-i18n="hudScore">Score</div>
-        <div class="score-value" id="scoreText">0</div>
-        <div class="best-line"><span data-i18n="hudBest">Best</span> <strong id="bestText">0</strong></div>
-        <div class="fps-line"><span data-i18n="hudFps">FPS</span> <strong id="fpsText">--</strong></div>
-        <div class="perf-line" id="perfLine"><span data-i18n="hudAuto">Auto</span> · <strong id="perfText">FULL</strong></div>
+        <div class="hud-divider" aria-hidden="true"></div>
+        <div class="hud-section stats-card">
+          <div class="label" data-i18n="hudScore">Score</div>
+          <div class="score-value" id="scoreText">0</div>
+          <div class="best-line"><span data-i18n="hudBest">Best</span> <strong id="bestText">0</strong></div>
+          <div class="fps-line"><span data-i18n="hudFps">FPS</span> <strong id="fpsText">--</strong></div>
+          <div class="perf-line" id="perfLine"><span data-i18n="hudAuto">Auto</span> · <strong id="perfText">FULL</strong></div>
+        </div>
       </div>
     </section>
 
@@ -74,12 +86,21 @@
     <div class="damage-flash" id="damageFlash"></div>
 
     <div class="center-overlay">
-      <div class="card gameover" id="gameover">
+      <div class="card gameover" id="gameover" role="dialog" aria-modal="true" aria-labelledby="gameoverTitle" tabindex="-1">
         <div class="gameover-badge" aria-hidden="true">×</div>
-        <h1 data-i18n="gameoverTitle">ROOM LOST</h1>
-        <p id="gameoverStats"></p>
-        <p id="gameoverSurvived"></p>
-        <p class="restart" data-i18n="gameoverRestart">Press any direction / WASD to restart</p>
+        <h1 id="gameoverTitle" data-i18n="gameoverTitle">ROOM LOST</h1>
+        <div class="gameover-score-label" data-i18n="hudScore">Score</div>
+        <div class="gameover-score" id="gameoverScore">0</div>
+        <div class="gameover-stat-row">
+          <div class="gameover-stat" data-i18n-aria="hudKills" aria-label="Kills">
+            <span class="gameover-stat-icon" aria-hidden="true">💀</span><b id="gameoverKills">0</b>
+          </div>
+          <div class="gameover-stat" data-i18n-aria="hudTime" aria-label="Time">
+            <span class="gameover-stat-icon" aria-hidden="true">⏱</span><b id="gameoverTime">0:00</b>
+          </div>
+        </div>
+        <button class="restart-button" id="restartButton" type="button" data-i18n="restartButtonLabel">RESTART</button>
+        <p class="restart" data-i18n="gameoverRestart">Or press any direction / WASD</p>
       </div>
     </div>
 
