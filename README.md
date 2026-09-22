@@ -25,6 +25,7 @@ Zombie Room is an offline-first, canvas-based survival game for desktop and mobi
 - Tiered weapon audio synthesis with layered harmonic resonance for multi-shot volleys and heavy caliber sub-bass kick.
 - Roguelike 3-choice level-up upgrade system with 8 build-crafting abilities (Spread Shot, Rapid Fire, Heavy Ammo, Piercing Rounds, Field Medkit, Agility, Magnetic Collector, Critical Strike).
 - Super Weapon Synergy Evolutions (Tesla Chain-Lightning & Plasma Flak Cannon) unlocking devastating secondary electric chain arcs and shotgun knockback bursts.
+- Dynamic Reactor Blackout events with factory lights shutdown, tactical conical flashlight beam, glowing zombie predator eyes, and guaranteed dual-drop supply cache rewards.
 - Waves, experience orbs, automatic level upgrades, score, kills, and local best score.
 - Responsive HUD, safe-area handling, portrait and landscape mobile layouts.
 - Offline application shell through a service worker.

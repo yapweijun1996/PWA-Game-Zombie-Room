@@ -601,18 +601,31 @@ function drawZombie(z) {
   ctx.closePath();
   ctx.fill();
 
-  ctx.fillStyle = hit ? '#5f6560' : (isFrenzy ? '#ffd666' : (isBoss ? '#34151c' : '#1d271f'));
+  const isBlackout = game.blackoutTimer > 0;
   const eyeX = headX + headR * .38;
-  ctx.beginPath();
-  ctx.arc(eyeX, -headR * .28, Math.max(1.05, 1.15 * scale), 0, Math.PI * 2);
-  ctx.arc(eyeX, headR * .28, Math.max(1.05, 1.15 * scale), 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = hit ? '#777' : isBoss ? '#ff8a96' : '#526457';
-  ctx.lineWidth = Math.max(1, .9 * scale);
-  ctx.beginPath();
-  ctx.moveTo(headX + headR * .52, -headR * .1);
-  ctx.lineTo(headX + headR * .72, headR * .1);
-  ctx.stroke();
+
+  if (isBlackout) {
+    const eyeColor = isFrenzy ? '#ffd700' : (isBoss ? '#ff3344' : (isRunner ? '#ffd27a' : (isTank ? '#ff7d89' : '#79f29a')));
+    ctx.save();
+    ctx.fillStyle = eyeColor;
+    ctx.beginPath();
+    ctx.arc(eyeX, -headR * .28, Math.max(1.3, 1.45 * scale), 0, Math.PI * 2);
+    ctx.arc(eyeX, headR * .28, Math.max(1.3, 1.45 * scale), 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  } else {
+    ctx.fillStyle = hit ? '#5f6560' : (isFrenzy ? '#ffd666' : (isBoss ? '#34151c' : '#1d271f'));
+    ctx.beginPath();
+    ctx.arc(eyeX, -headR * .28, Math.max(1.05, 1.15 * scale), 0, Math.PI * 2);
+    ctx.arc(eyeX, headR * .28, Math.max(1.05, 1.15 * scale), 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = hit ? '#777' : isBoss ? '#ff8a96' : '#526457';
+    ctx.lineWidth = Math.max(1, .9 * scale);
+    ctx.beginPath();
+    ctx.moveTo(headX + headR * .52, -headR * .1);
+    ctx.lineTo(headX + headR * .72, headR * .1);
+    ctx.stroke();
+  }
 
   if (isRunner) {
     ctx.strokeStyle = hit ? '#ffffff' : '#e8b45c';
@@ -677,48 +690,80 @@ function drawRoomLighting() {
   const boss = game.zombies.find(z => z.type === 'boss');
   const p = game.player;
   const eco = game.performanceMode;
+  const isBlackout = game.blackoutTimer > 0;
 
   // Ambient darkness keeps sprites readable while letting local lights shape the room.
   ctx.save();
   ctx.beginPath();
   ctx.rect(room.x, room.y, room.w, room.h);
   ctx.clip();
-  ctx.fillStyle = 'rgba(0, 4, 2, .12)';
+  const ambientDarkness = isBlackout ? (game.blackoutTimer < 1 ? 0.25 + game.blackoutTimer * 0.6 : 0.86) : 0.12;
+  ctx.fillStyle = `rgba(0, 4, 2, ${ambientDarkness})`;
   ctx.fillRect(room.x, room.y, room.w, room.h);
 
   ctx.globalCompositeOperation = 'screen';
 
-  // Three ceiling lights; the middle unit flickers occasionally.
-  const lights = eco ? [
-    { x: room.x + room.w * .50, y: room.y + 24, r: 110, a: .065 }
-  ] : [
-    { x: room.x + room.w * .18, y: room.y + 24, r: 105, a: .11 },
-    { x: room.x + room.w * .50, y: room.y + 24, r: 120, a: .10 },
-    { x: room.x + room.w * .82, y: room.y + 24, r: 105, a: .11 }
-  ];
-  lights.forEach((light, idx) => {
-    let flicker = 1;
-    if (!eco && idx === 1) {
-      const f = Math.sin(game.roomPhase * 7.4) + Math.sin(game.roomPhase * 17.8) * .45;
-      flicker = f > 1.05 ? .38 : f < -1.15 ? .7 : 1;
-    }
-    const g = ctx.createRadialGradient(light.x, light.y, 4, light.x, light.y, light.r);
-    g.addColorStop(0, 'rgba(178,255,197,' + (light.a * 1.8 * flicker).toFixed(3) + ')');
-    g.addColorStop(.35, 'rgba(121,242,154,' + (light.a * flicker).toFixed(3) + ')');
-    g.addColorStop(1, 'rgba(121,242,154,0)');
-    ctx.fillStyle = g;
-    ctx.fillRect(light.x - light.r, light.y - 20, light.r * 2, light.r * 1.25);
-  });
+  // Three ceiling lights; shut off during blackout
+  if (!isBlackout) {
+    const lights = eco ? [
+      { x: room.x + room.w * .50, y: room.y + 24, r: 110, a: .065 }
+    ] : [
+      { x: room.x + room.w * .18, y: room.y + 24, r: 105, a: .11 },
+      { x: room.x + room.w * .50, y: room.y + 24, r: 120, a: .10 },
+      { x: room.x + room.w * .82, y: room.y + 24, r: 105, a: .11 }
+    ];
+    lights.forEach((light, idx) => {
+      let flicker = 1;
+      if (!eco && idx === 1) {
+        const f = Math.sin(game.roomPhase * 7.4) + Math.sin(game.roomPhase * 17.8) * .45;
+        flicker = f > 1.05 ? .38 : f < -1.15 ? .7 : 1;
+      }
+      const g = ctx.createRadialGradient(light.x, light.y, 4, light.x, light.y, light.r);
+      g.addColorStop(0, 'rgba(178,255,197,' + (light.a * 1.8 * flicker).toFixed(3) + ')');
+      g.addColorStop(.35, 'rgba(121,242,154,' + (light.a * flicker).toFixed(3) + ')');
+      g.addColorStop(1, 'rgba(121,242,154,0)');
+      ctx.fillStyle = g;
+      ctx.fillRect(light.x - light.r, light.y - 20, light.r * 2, light.r * 1.25);
+    });
+  }
 
-  // Player gets a restrained local visibility pool; muzzle flash briefly warms the area.
+  // Player tactical visibility:
   if (p) {
-    const pr = (eco ? 68 : 92) + (p.muzzleFlash > 0 ? (eco ? 22 : 38) : 0);
-    const pg = ctx.createRadialGradient(p.x, p.y, 10, p.x, p.y, pr);
-    pg.addColorStop(0, p.muzzleFlash > 0 ? 'rgba(255,219,142,.22)' : 'rgba(121,242,154,.09)');
-    pg.addColorStop(.45, p.muzzleFlash > 0 ? 'rgba(255,189,88,.09)' : 'rgba(121,242,154,.035)');
-    pg.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.fillStyle = pg;
-    ctx.fillRect(p.x - pr, p.y - pr, pr * 2, pr * 2);
+    if (isBlackout) {
+      // Conical tactical flashlight beam
+      const beamDist = eco ? 180 : 230;
+      const beamSpread = 0.52;
+      const fg = ctx.createRadialGradient(p.x, p.y, 8, p.x, p.y, beamDist);
+      fg.addColorStop(0, 'rgba(255, 248, 220, 0.45)');
+      fg.addColorStop(0.35, 'rgba(225, 245, 220, 0.22)');
+      fg.addColorStop(0.7, 'rgba(170, 220, 185, 0.08)');
+      fg.addColorStop(1, 'rgba(0, 0, 0, 0)');
+
+      ctx.fillStyle = fg;
+      ctx.beginPath();
+      ctx.moveTo(p.x, p.y);
+      ctx.arc(p.x, p.y, beamDist, p.aimAngle - beamSpread, p.aimAngle + beamSpread);
+      ctx.closePath();
+      ctx.fill();
+
+      // Local halo around the survivor
+      const pr = 40 + (p.muzzleFlash > 0 ? 25 : 0);
+      const pg = ctx.createRadialGradient(p.x, p.y, 4, p.x, p.y, pr);
+      pg.addColorStop(0, p.muzzleFlash > 0 ? 'rgba(255,219,142,.35)' : 'rgba(255,255,255,.22)');
+      pg.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = pg;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, pr, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      const pr = (eco ? 68 : 92) + (p.muzzleFlash > 0 ? (eco ? 22 : 38) : 0);
+      const pg = ctx.createRadialGradient(p.x, p.y, 10, p.x, p.y, pr);
+      pg.addColorStop(0, p.muzzleFlash > 0 ? 'rgba(255,219,142,.22)' : 'rgba(121,242,154,.09)');
+      pg.addColorStop(.45, p.muzzleFlash > 0 ? 'rgba(255,189,88,.09)' : 'rgba(121,242,154,.035)');
+      pg.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = pg;
+      ctx.fillRect(p.x - pr, p.y - pr, pr * 2, pr * 2);
+    }
   }
 
   // Boss changes the room mood with a breathing red emergency light.

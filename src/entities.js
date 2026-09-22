@@ -3,7 +3,7 @@ import { clamp, dist2, rand, formatTime } from './utils.js';
 import { burst, sprayBlood, makeDecal, particleBudget, spawnDamageText, spawnGore } from './effects.js';
 import { flashMessage, updateUI } from './ui.js';
 import { t } from './i18n.js';
-import { playShoot, playCrit, playKill, playXp, playLevelUp, playUpgradeSelect, playPlayerHit, playGameOver, playUiClick, playNuke, playOverdrive, playHeal, playMagnet, playShieldHit, playShieldBreak, playShieldRecharge, playBossRoar, playElectricZap, playComboMilestone } from './audio.js';
+import { playShoot, playCrit, playKill, playXp, playLevelUp, playUpgradeSelect, playPlayerHit, playGameOver, playUiClick, playNuke, playOverdrive, playHeal, playMagnet, playShieldHit, playShieldBreak, playShieldRecharge, playBossRoar, playElectricZap, playComboMilestone, playBlackoutAlarm, playPowerRestored } from './audio.js';
 import { vibrateHit, vibrateCrit, vibrateLevelUp, vibrateBoss, vibrateDeath, vibrateUi, vibrateNuke, vibrateOverdrive, vibrateCombo } from './haptics.js';
 
 export function makePlayer() {
@@ -59,11 +59,13 @@ export function isDesktopControls() {
   return innerWidth >= 800 && matchMedia('(pointer: fine)').matches;
 }
 
-export function setPaused(paused) {
+export function setPaused(paused, userInitiated = false) {
   if (!game.running && paused) return;
   game.paused = paused;
-  playUiClick();
-  vibrateUi();
+  if (userInitiated) {
+    playUiClick();
+    vibrateUi();
+  }
   if (dom.pauseOverlay) {
     dom.pauseOverlay.hidden = !paused;
     dom.pauseOverlay.classList.toggle('show', paused);
@@ -96,11 +98,11 @@ export function setPaused(paused) {
 
 export function togglePause() {
   if (!game.running || game.upgradeModalOpen) return;
-  setPaused(!game.paused);
+  setPaused(!game.paused, true);
 }
 
 export function resetGame() {
-  setPaused(false);
+  setPaused(false, false);
   closeUpgradeModal();
   game.pendingUpgrades = 0;
   game.running = true;
@@ -119,6 +121,8 @@ export function resetGame() {
   game.combo = 0;
   game.comboTimer = 0;
   game.maxCombo = 0;
+  game.blackoutTimer = 0;
+  game.blackoutTriggeredWave = 0;
   game.player = makePlayer();
   game.bossWave = 0;
   game.roomPhase = Math.random() * Math.PI * 2;
@@ -791,7 +795,7 @@ function endGame() {
   const p = game.player;
   p.hp = 0;
   game.running = false;
-  setPaused(false);
+  setPaused(false, false);
   closeUpgradeModal();
   if (ui.bossBar) {
     ui.bossBar.classList.remove('show');
@@ -894,6 +898,30 @@ export function update(dt) {
   }
   if (game.wave >= 4 && game.wave % 4 === 0 && game.bossWave !== game.wave && !hasActiveBoss()) {
     spawnBoss();
+  }
+
+  // Reactor Blackout Event: triggers on waves 3, 6, 9... about 8s in
+  if (game.wave >= 3 && game.wave % 3 === 0 && game.blackoutTriggeredWave !== game.wave && !hasActiveBoss() && (game.elapsed % 25) >= 8) {
+    game.blackoutTriggeredWave = game.wave;
+    game.blackoutTimer = 12.0;
+    flashMessage(t('msgBlackout'));
+    playBlackoutAlarm();
+    vibrateBoss();
+    game.cameraShake = Math.max(game.cameraShake, .35);
+  }
+
+  if (game.blackoutTimer > 0) {
+    game.blackoutTimer -= dt;
+    if (game.blackoutTimer <= 0) {
+      game.blackoutTimer = 0;
+      flashMessage(t('msgPowerRestored'));
+      playPowerRestored();
+      vibrateUi();
+      game.cameraShake = Math.max(game.cameraShake, .25);
+      spawnPickup(room.x + room.w * 0.45, room.y + room.h * 0.5, 'boss');
+      spawnPickup(room.x + room.w * 0.55, room.y + room.h * 0.5, 'boss');
+      burst(room.x + room.w * 0.5, room.y + room.h * 0.5, '#ffd700', 28, 140);
+    }
   }
 
   let mx = (input.right ? 1 : 0) - (input.left ? 1 : 0);
@@ -1136,7 +1164,6 @@ export function update(dt) {
         h.timer = 0;
         h.tickTimer = 0;
         playElectricZap();
-        vibrateUi();
       } else if (h.state === 'active' && h.timer >= 2.5) {
         h.state = 'dormant';
         h.timer = 0;

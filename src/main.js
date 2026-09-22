@@ -151,9 +151,9 @@ initInput(resetGame);
 initSettingsMenu();
 dom.restartButton?.addEventListener('click', resetGame);
 dom.pauseButton?.addEventListener('click', togglePause);
-dom.resumeButton?.addEventListener('click', () => setPaused(false));
+dom.resumeButton?.addEventListener('click', () => setPaused(false, true));
 dom.pauseOverlay?.addEventListener('click', e => {
-  if (e.target === dom.pauseOverlay) setPaused(false);
+  if (e.target === dom.pauseOverlay) setPaused(false, true);
 });
 dom.shareButton?.addEventListener('click', () => {
   const rank = ui.gameoverRankText ? ui.gameoverRankText.textContent : 'RANK S';

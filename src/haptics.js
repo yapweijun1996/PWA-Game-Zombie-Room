@@ -1,7 +1,29 @@
 import { hapticsState } from './state.js';
 
+let userHasInteracted = false;
+
+if (typeof window !== 'undefined') {
+  const onUserGesture = () => {
+    userHasInteracted = true;
+    removeEventListener('pointerdown', onUserGesture);
+    removeEventListener('keydown', onUserGesture);
+    removeEventListener('touchstart', onUserGesture);
+  };
+  addEventListener('pointerdown', onUserGesture, { passive: true });
+  addEventListener('keydown', onUserGesture, { passive: true });
+  addEventListener('touchstart', onUserGesture, { passive: true });
+}
+
+function hasUserActivation() {
+  if (typeof navigator !== 'undefined' && navigator.userActivation) {
+    return navigator.userActivation.hasBeenActive;
+  }
+  return userHasInteracted;
+}
+
 function vibrate(pattern) {
   if (!hapticsState.enabled) return;
+  if (!hasUserActivation()) return;
   if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
     try {
       navigator.vibrate(pattern);

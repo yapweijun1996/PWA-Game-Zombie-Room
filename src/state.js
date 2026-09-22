@@ -1,4 +1,4 @@
-export const APP_VERSION = '3.4.0';
+export const APP_VERSION = '3.5.0';
 
 export const dom = {
   canvas: document.getElementById('game'),
@@ -178,5 +178,7 @@ export const game = {
   bossWave: 0,
   roomPhase: 0,
   cameraShake: 0,
+  blackoutTimer: 0,
+  blackoutTriggeredWave: 0,
   performanceMode: false
 };

@@ -132,7 +132,9 @@ const dict = {
     evoTeslaDesc: 'Bullets chain high-voltage lightning arcs to 3 nearby enemies',
     evoPlasmaTitle: 'PLASMA FLAK CANNON',
     evoPlasmaDesc: 'Fires 5 heavy plasma pellets with massive knockback force',
-    evoBadge: 'EVOLUTION'
+    evoBadge: 'EVOLUTION',
+    msgBlackout: 'REACTOR BLACKOUT · SURVIVE IN THE DARK!',
+    msgPowerRestored: 'POWER RESTORED · REWARD DROPPED!'
   },
   zh: {
     appTitle: '僵尸房间',
@@ -243,7 +245,9 @@ const dict = {
     evoTeslaDesc: '子弹命中时向附近 3 名敌人弹射高压连锁闪电链',
     evoPlasmaTitle: '等离子重装散弹',
     evoPlasmaDesc: '每次射出 5 颗重型高能等离子霰弹并附加强力击退',
-    evoBadge: '超武进化'
+    evoBadge: '超武进化',
+    msgBlackout: '核心反应堆断电！暗夜极限求生',
+    msgPowerRestored: '电力已恢复！战术空投补给已降落'
   },
   ms: {
     appTitle: 'Zombie Room',
@@ -354,7 +358,9 @@ const dict = {
     evoTeslaDesc: 'Peluru memancarkan arka kilat ke 3 musuh berdekatan',
     evoPlasmaTitle: 'MERIAM FLAK PLASMA',
     evoPlasmaDesc: 'Menembak 5 pelet plasma berat dengan impak tolakan kuat',
-    evoBadge: 'EVOLUSI'
+    evoBadge: 'EVOLUSI',
+    msgBlackout: 'GELAP REAKTOR · BERTAHAN DALAM GELAP!',
+    msgPowerRestored: 'KUASA PULIH · BEKALAN DIGUGURKAN!'
   },
   ja: {
     appTitle: 'Zombie Room',
@@ -465,7 +471,9 @@ const dict = {
     evoTeslaDesc: '着弾時に付近の敵3体に高圧連鎖雷撃を放電',
     evoPlasmaTitle: 'プラズマフラック重砲',
     evoPlasmaDesc: '強烈なノックバックを伴う5連装プラズマ散弾を発射',
-    evoBadge: '超武進化'
+    evoBadge: '超武進化',
+    msgBlackout: '原子炉停電！暗闇で生き残れ',
+    msgPowerRestored: '電力復旧！補給物资投下'
   },
   ko: {
     appTitle: 'Zombie Room',
@@ -576,7 +584,9 @@ const dict = {
     evoTeslaDesc: '탄환 적중 시 주변 3명의 적에게 고전압 전격 연쇄 방전',
     evoPlasmaTitle: '플라즈마 산탄 중포',
     evoPlasmaDesc: '강력한 밀쳐내기 넉백을 동반한 5연발 플라즈마 산탄 발사',
-    evoBadge: '초월 진화'
+    evoBadge: '초월 진화',
+    msgBlackout: '원자로 정전! 암흑 속에서 생존하라',
+    msgPowerRestored: '전력 복구 완료! 전술 보급품 투하'
   },
   vi: {
     appTitle: 'Zombie Room',
@@ -687,7 +697,9 @@ const dict = {
     evoTeslaDesc: 'Đạn phóng tia sét dây chuyền đến 3 kẻ địch lân cận',
     evoPlasmaTitle: 'ĐẠI BÁC PLASMA FLAK',
     evoPlasmaDesc: 'Bắn 5 viên plasma hạng nặng với lực đẩy lùi cực mạnh',
-    evoBadge: 'TIẾN HÓA'
+    evoBadge: 'TIẾN HÓA',
+    msgBlackout: 'MẤT ĐIỆN LÒ PHẢN ỨNG · SINH TỒN TRONG BÓNG TỐI!',
+    msgPowerRestored: 'ĐÃ PHỤC HỒI ĐIỆN · ĐÃ THẢ TIẾP TẾ!'
   },
   th: {
     appTitle: 'Zombie Room',
@@ -798,7 +810,9 @@ const dict = {
     evoTeslaDesc: 'กระสุนปล่อยประกายสายฟ้าช็อตศัตรูใกล้เคียง 3 ตัว',
     evoPlasmaTitle: 'ปืนใหญ่พลาสม่า',
     evoPlasmaDesc: 'ยิงกระสุนพลาสม่าหนัก 5 นัดพร้อมแรงผลักถอยหลังมหาศาล',
-    evoBadge: 'วิวัฒนาการ'
+    evoBadge: 'วิวัฒนาการ',
+    msgBlackout: 'เครื่องปฏิกรณ์ดับ! เอาชีวิตรอดในความมืด',
+    msgPowerRestored: 'ไฟฟ้ากลับมาแล้ว! กล่องเสบียงถูกทิ้งลงมา'
   }
 };
 

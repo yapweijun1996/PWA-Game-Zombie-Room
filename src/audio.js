@@ -491,3 +491,65 @@ export function playComboMilestone(tier = 1) {
     osc.stop(t + 0.22);
   });
 }
+
+// 20. Blackout Alarm: Generator power-down spool and warning sirens
+export function playBlackoutAlarm() {
+  const ac = getContext();
+  if (!ac || ac.state !== 'running') return;
+  const now = ac.currentTime;
+
+  const osc = ac.createOscillator();
+  const gain = ac.createGain();
+  osc.type = 'sawtooth';
+  osc.frequency.setValueAtTime(180, now);
+  osc.frequency.exponentialRampToValueAtTime(32, now + 0.65);
+  gain.gain.setValueAtTime(0.22, now);
+  gain.gain.exponentialRampToValueAtTime(0.001, now + 0.65);
+  osc.connect(gain);
+  gain.connect(ac.destination);
+  osc.start(now);
+  osc.stop(now + 0.65);
+
+  [0.15, 0.42].forEach(delay => {
+    const beep = ac.createOscillator();
+    const beepGain = ac.createGain();
+    beep.type = 'square';
+    beep.frequency.setValueAtTime(880, now + delay);
+    beepGain.gain.setValueAtTime(0.12, now + delay);
+    beepGain.gain.exponentialRampToValueAtTime(0.001, now + delay + 0.12);
+    beep.connect(beepGain);
+    beepGain.connect(ac.destination);
+    beep.start(now + delay);
+    beep.stop(now + delay + 0.12);
+  });
+}
+
+// 21. Power Restored: Generator spin-up and breaker switch clack
+export function playPowerRestored() {
+  const ac = getContext();
+  if (!ac || ac.state !== 'running') return;
+  const now = ac.currentTime;
+
+  const osc = ac.createOscillator();
+  const gain = ac.createGain();
+  osc.type = 'triangle';
+  osc.frequency.setValueAtTime(45, now);
+  osc.frequency.exponentialRampToValueAtTime(360, now + 0.45);
+  gain.gain.setValueAtTime(0.20, now);
+  gain.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
+  osc.connect(gain);
+  gain.connect(ac.destination);
+  osc.start(now);
+  osc.stop(now + 0.45);
+
+  const click = ac.createOscillator();
+  const clickGain = ac.createGain();
+  click.type = 'sawtooth';
+  click.frequency.setValueAtTime(1200, now + 0.45);
+  clickGain.gain.setValueAtTime(0.16, now + 0.45);
+  clickGain.gain.exponentialRampToValueAtTime(0.001, now + 0.52);
+  click.connect(clickGain);
+  clickGain.connect(ac.destination);
+  click.start(now + 0.45);
+  click.stop(now + 0.52);
+}
