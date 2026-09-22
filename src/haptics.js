@@ -5,13 +5,13 @@ let userHasInteracted = false;
 if (typeof window !== 'undefined') {
   const onUserGesture = () => {
     userHasInteracted = true;
-    removeEventListener('pointerdown', onUserGesture);
-    removeEventListener('keydown', onUserGesture);
-    removeEventListener('touchstart', onUserGesture);
+    window.removeEventListener('pointerdown', onUserGesture);
+    window.removeEventListener('keydown', onUserGesture);
+    window.removeEventListener('touchstart', onUserGesture);
   };
-  addEventListener('pointerdown', onUserGesture, { passive: true });
-  addEventListener('keydown', onUserGesture, { passive: true });
-  addEventListener('touchstart', onUserGesture, { passive: true });
+  window.addEventListener('pointerdown', onUserGesture, { passive: true });
+  window.addEventListener('keydown', onUserGesture, { passive: true });
+  window.addEventListener('touchstart', onUserGesture, { passive: true });
 }
 
 function hasUserActivation() {

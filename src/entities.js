@@ -304,7 +304,7 @@ function collectPickup(item, index) {
     playHeal();
     flashMessage(t('msgMedkit'));
     p.hp = Math.min(p.maxHp, p.hp + 35);
-    spawnDamageText(p.x, p.y - p.r - 8, 35, false, false);
+    spawnDamageText(p.x, p.y - p.r - 8, '+35', false, false);
     burst(p.x, p.y, '#79f29a', 18, 90);
   } else if (item.type === 'magnet') {
     playMagnet();
@@ -703,7 +703,7 @@ function damagePlayer(amount, from) {
       p.shield -= amount;
       hpDamage = 0;
       playShieldHit();
-      spawnDamageText(p.x + rand(-4, 4), p.y - p.r - 8, amount + ' 🛡️', false, true);
+      spawnDamageText(p.x + rand(-4, 4), p.y - p.r - 8, '-' + amount + ' 🛡️', false, true);
       burst(p.x, p.y, '#8ae0ff', 7, 70);
     } else {
       hpDamage = amount - p.shield;

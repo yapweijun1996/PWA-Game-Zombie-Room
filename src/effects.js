@@ -89,19 +89,33 @@ export function spawnDamageText(x, y, amount, isCrit = false, isPlayer = false) 
     game.floatingTexts.shift();
   }
 
-  const rounded = Number.isInteger(amount) ? amount : (amount >= 10 ? Math.round(amount) : amount.toFixed(1));
-  let text = String(rounded);
+  let text = '';
+  if (typeof amount === 'number') {
+    const rounded = Number.isInteger(amount) ? amount : (amount >= 10 ? Math.round(amount) : amount.toFixed(1));
+    text = String(rounded);
+  } else {
+    text = String(amount || 0);
+  }
+
   let color = '#f3fdf6';
   let size = 11;
   let stroke = 'rgba(0,0,0,.75)';
 
-  if (isPlayer) {
-    text = '-' + text;
+  if (text.startsWith('+')) {
+    color = '#79f29a';
+    size = 12;
+    stroke = 'rgba(15,45,22,.85)';
+  } else if (isPlayer) {
+    if (!text.startsWith('-')) {
+      text = '-' + text;
+    }
     color = '#ff6174';
     size = 12;
     stroke = 'rgba(40,8,12,.85)';
   } else if (isCrit) {
-    text = '★ ' + text;
+    if (!text.startsWith('★')) {
+      text = '★ ' + text;
+    }
     color = '#ffd666';
     size = 14;
     stroke = 'rgba(120,70,10,.85)';
