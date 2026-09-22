@@ -39,6 +39,7 @@ export function initInput(onRestart) {
   const zone = document.getElementById('joystickZone');
   const base = document.getElementById('joystickBase');
   const knob = document.getElementById('joystickKnob');
+  let releaseJoystick = null;
 
   if (zone && base && knob) {
     const MAX_RADIUS = 36;
@@ -125,9 +126,11 @@ export function initInput(onRestart) {
     zone.addEventListener('pointercancel', onPointerEnd, { passive: false });
     zone.addEventListener('lostpointercapture', onPointerEnd, { passive: false });
     zone.addEventListener('contextmenu', e => e.preventDefault());
+
+    releaseJoystick = resetJoystick;
   }
 
-  addEventListener('blur', () => {
+  function clearMovementInput() {
     input.up = false;
     input.down = false;
     input.left = false;
@@ -135,5 +138,11 @@ export function initInput(onRestart) {
     input.vx = 0;
     input.vy = 0;
     input.active = false;
+    if (releaseJoystick) releaseJoystick();
+  }
+
+  addEventListener('blur', clearMovementInput);
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) clearMovementInput();
   });
 }

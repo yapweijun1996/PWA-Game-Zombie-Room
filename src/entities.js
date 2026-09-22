@@ -605,6 +605,9 @@ export function chooseUpgrade(index) {
       renderUpgradeCards(currentUpgradeChoices);
       return;
     }
+    p.hp = Math.min(p.maxHp, p.hp + 50);
+    game.pendingUpgrades = 0;
+    flashMessage(t('msgLevelUp'));
   }
 
   closeUpgradeModal();

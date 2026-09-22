@@ -48,7 +48,9 @@ export function updateUI() {
     const boss = getActiveBoss();
     if (boss && game.running) {
       ui.bossBar.hidden = false;
-      requestAnimationFrame(() => ui.bossBar.classList.add('show'));
+      if (!ui.bossBar.classList.contains('show')) {
+        requestAnimationFrame(() => ui.bossBar.classList.add('show'));
+      }
       const pct = clamp(Math.ceil((boss.hp / boss.maxHp) * 100), 0, 100);
       ui.bossHpFill.style.width = pct + '%';
       if (ui.bossHpText) ui.bossHpText.textContent = pct + '%';
