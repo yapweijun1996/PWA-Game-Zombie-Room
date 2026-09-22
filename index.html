@@ -88,7 +88,7 @@
       </button>
       <button class="update-button settings-action" id="updateButton" type="button" data-i18n-aria="updateAriaCheck" aria-label="Check for Zombie Room updates">
         <span class="update-dot" aria-hidden="true"></span>
-        <span id="updateLabel">Update v1.6.0</span>
+        <span id="updateLabel">Update v1.7.0</span>
       </button>
       <div class="settings-diagnostics">
         <div class="settings-label" data-i18n="hudDiagnostics">Performance</div>
@@ -105,6 +105,18 @@
     <div class="damage-flash" id="damageFlash"></div>
 
     <div class="center-overlay">
+      <div class="card upgrade-modal" id="upgradeModal" role="dialog" aria-modal="true" aria-labelledby="upgradeTitle" hidden tabindex="-1">
+        <div class="upgrade-header">
+          <div class="upgrade-badge" aria-hidden="true">⚡</div>
+          <div>
+            <h2 class="upgrade-title" id="upgradeTitle" data-i18n="upgradeModalTitle">LEVEL UP!</h2>
+            <p class="upgrade-subtitle" data-i18n="upgradeModalSubtitle">Choose an upgrade to survive</p>
+          </div>
+        </div>
+        <div class="upgrade-cards" id="upgradeCards"></div>
+        <p class="upgrade-keyboard-hint" data-i18n="upgradeKeyboardHint">Press 1, 2, or 3 on keyboard</p>
+      </div>
+
       <div class="card pause-card" id="pauseOverlay" role="dialog" aria-modal="true" aria-labelledby="pauseTitle" hidden tabindex="-1">
         <div class="pause-badge" aria-hidden="true">⏸</div>
         <h2 id="pauseTitle" data-i18n="pausedTitle">PAUSED</h2>

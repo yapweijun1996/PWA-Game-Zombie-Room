@@ -1,4 +1,4 @@
-export const APP_VERSION = '1.6.0';
+export const APP_VERSION = '1.7.0';
 
 export const dom = {
   canvas: document.getElementById('game'),
@@ -12,6 +12,8 @@ export const dom = {
   pauseButton: document.getElementById('pauseButton'),
   pauseOverlay: document.getElementById('pauseOverlay'),
   resumeButton: document.getElementById('resumeButton'),
+  upgradeModal: document.getElementById('upgradeModal'),
+  upgradeCards: document.getElementById('upgradeCards'),
   controlsWrap: document.getElementById('controlsWrap'),
   joystickZone: document.getElementById('joystickZone'),
   joystickBase: document.getElementById('joystickBase'),
@@ -94,13 +96,23 @@ export const pwaState = {
   deferredInstallPrompt: null
 };
 
+function readBestScore() {
+  try {
+    return Number(localStorage.getItem('zombie-room-best') || 0);
+  } catch (_) {
+    return 0;
+  }
+}
+
 export const scoreState = {
-  best: Number(localStorage.getItem('zombie-room-best') || 0)
+  best: readBestScore()
 };
 
 export const game = {
   running: true,
   paused: false,
+  pendingUpgrades: 0,
+  upgradeModalOpen: false,
   elapsed: 0,
   score: 0,
   kills: 0,

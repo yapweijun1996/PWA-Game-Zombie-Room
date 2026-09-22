@@ -25,7 +25,21 @@ export function makePlayer() {
     moving: false,
     walkTime: 0,
     muzzleFlash: 0,
-    recoil: 0
+    recoil: 0,
+    projectiles: 1,
+    pierce: 1,
+    critChance: 0,
+    magnetRadius: 125,
+    upgrades: {
+      multiShot: 1,
+      rapidFire: 0,
+      damage: 0,
+      pierce: 0,
+      vitality: 0,
+      agility: 0,
+      magnet: 0,
+      crit: 0
+    }
   };
 }
 
@@ -73,6 +87,8 @@ export function togglePause() {
 
 export function resetGame() {
   setPaused(false);
+  closeUpgradeModal();
+  game.pendingUpgrades = 0;
   game.running = true;
   game.elapsed = 0;
   game.score = 0;
@@ -137,20 +153,33 @@ function shootNearest() {
   if (!target) return;
   const dx = target.x - p.x;
   const dy = target.y - p.y;
-  const len = Math.hypot(dx, dy) || 1;
-  p.aimAngle = Math.atan2(dy, dx);
+  const baseAngle = Math.atan2(dy, dx);
+  p.aimAngle = baseAngle;
   p.muzzleFlash = .075;
   p.recoil = 1;
-  game.bullets.push({
-    x: p.x,
-    y: p.y,
-    vx: dx / len * p.bulletSpeed,
-    vy: dy / len * p.bulletSpeed,
-    r: 3.5,
-    damage: p.damage,
-    life: 1.35
-  });
-  burst(p.x + dx / len * 15, p.y + dy / len * 15, '#d8f3df', 2, 55);
+
+  const projectileCount = p.projectiles || 1;
+  const spreadAngle = 0.16;
+  const startAngle = baseAngle - ((projectileCount - 1) * spreadAngle) / 2;
+
+  for (let s = 0; s < projectileCount; s++) {
+    const angle = startAngle + s * spreadAngle;
+    const isCrit = p.critChance && Math.random() < p.critChance;
+    const damage = isCrit ? p.damage * 2.2 : p.damage;
+
+    game.bullets.push({
+      x: p.x,
+      y: p.y,
+      vx: Math.cos(angle) * p.bulletSpeed,
+      vy: Math.sin(angle) * p.bulletSpeed,
+      r: isCrit ? 4.8 : 3.5,
+      damage,
+      pierce: p.pierce || 1,
+      isCrit,
+      life: 1.35
+    });
+  }
+  burst(p.x + Math.cos(baseAngle) * 15, p.y + Math.sin(baseAngle) * 15, '#d8f3df', 2, 55);
 }
 
 function deathBurst(z) {
@@ -193,27 +222,219 @@ function spawnBoss() {
   burst(x, y, '#ffd27a', 24, 150);
 }
 
+export const UPGRADES = [
+  {
+    id: 'multiShot',
+    icon: '🏹',
+    titleKey: 'upgradeMultiShotTitle',
+    descKey: 'upgradeMultiShotDesc',
+    maxLevel: 3,
+    level: p => p.upgrades.multiShot,
+    apply: p => {
+      p.projectiles = (p.projectiles || 1) + 1;
+      p.upgrades.multiShot = p.projectiles;
+    }
+  },
+  {
+    id: 'rapidFire',
+    icon: '⚡',
+    titleKey: 'upgradeRapidFireTitle',
+    descKey: 'upgradeRapidFireDesc',
+    maxLevel: 5,
+    level: p => p.upgrades.rapidFire,
+    apply: p => {
+      p.fireRate = Math.max(0.12, p.fireRate * 0.82);
+      p.upgrades.rapidFire = (p.upgrades.rapidFire || 0) + 1;
+    }
+  },
+  {
+    id: 'damage',
+    icon: '💥',
+    titleKey: 'upgradeDamageTitle',
+    descKey: 'upgradeDamageDesc',
+    maxLevel: 5,
+    level: p => p.upgrades.damage,
+    apply: p => {
+      p.damage *= 1.30;
+      p.upgrades.damage = (p.upgrades.damage || 0) + 1;
+    }
+  },
+  {
+    id: 'pierce',
+    icon: '🎯',
+    titleKey: 'upgradePierceTitle',
+    descKey: 'upgradePierceDesc',
+    maxLevel: 3,
+    level: p => p.upgrades.pierce,
+    apply: p => {
+      p.pierce = (p.pierce || 1) + 1;
+      p.upgrades.pierce = p.pierce;
+    }
+  },
+  {
+    id: 'vitality',
+    icon: '💖',
+    titleKey: 'upgradeVitalityTitle',
+    descKey: 'upgradeVitalityDesc',
+    maxLevel: 5,
+    level: p => p.upgrades.vitality,
+    apply: p => {
+      p.maxHp += 25;
+      p.hp = Math.min(p.maxHp, p.hp + 40);
+      p.upgrades.vitality = (p.upgrades.vitality || 0) + 1;
+    }
+  },
+  {
+    id: 'agility',
+    icon: '👟',
+    titleKey: 'upgradeAgilityTitle',
+    descKey: 'upgradeAgilityDesc',
+    maxLevel: 4,
+    level: p => p.upgrades.agility,
+    apply: p => {
+      p.speed = Math.min(300, p.speed * 1.14);
+      p.upgrades.agility = (p.upgrades.agility || 0) + 1;
+    }
+  },
+  {
+    id: 'magnet',
+    icon: '🧲',
+    titleKey: 'upgradeMagnetTitle',
+    descKey: 'upgradeMagnetDesc',
+    maxLevel: 3,
+    level: p => p.upgrades.magnet,
+    apply: p => {
+      p.magnetRadius = (p.magnetRadius || 125) * 1.5;
+      p.upgrades.magnet = (p.upgrades.magnet || 0) + 1;
+    }
+  },
+  {
+    id: 'crit',
+    icon: '⚔️',
+    titleKey: 'upgradeCritTitle',
+    descKey: 'upgradeCritDesc',
+    maxLevel: 3,
+    level: p => p.upgrades.crit,
+    apply: p => {
+      p.critChance = Math.min(0.65, (p.critChance || 0) + 0.20);
+      p.upgrades.crit = (p.upgrades.crit || 0) + 1;
+    }
+  }
+];
+
+export let currentUpgradeChoices = [];
+
+export function getAvailableUpgrades() {
+  const p = game.player;
+  if (!p) return [];
+  const available = UPGRADES.filter(u => u.level(p) < u.maxLevel);
+  if (!available.length) return [];
+  const shuffled = [...available].sort(() => Math.random() - 0.5);
+  return shuffled.slice(0, 3);
+}
+
+export function openUpgradeModal() {
+  const p = game.player;
+  if (!p || !game.running) return;
+  currentUpgradeChoices = getAvailableUpgrades();
+  if (!currentUpgradeChoices.length) {
+    p.hp = Math.min(p.maxHp, p.hp + 50);
+    game.pendingUpgrades = Math.max(0, (game.pendingUpgrades || 1) - 1);
+    flashMessage(t('msgLevelUp'));
+    return;
+  }
+
+  game.upgradeModalOpen = true;
+  if (dom.canvas) dom.canvas.classList.add('game-dimmed');
+
+  renderUpgradeCards(currentUpgradeChoices);
+
+  if (dom.upgradeModal) {
+    dom.upgradeModal.hidden = false;
+    dom.upgradeModal.classList.add('show');
+    dom.upgradeModal.focus();
+  }
+}
+
+export function renderUpgradeCards(choices) {
+  if (!dom.upgradeCards) return;
+  dom.upgradeCards.innerHTML = '';
+  const p = game.player;
+
+  choices.forEach((choice, idx) => {
+    const curLvl = choice.level(p);
+    const nextLvl = curLvl + 1;
+    const lvlText = curLvl === 0 ? 'NEW' : `Lv.${nextLvl}`;
+
+    const btn = document.createElement('button');
+    btn.className = 'upgrade-card';
+    btn.type = 'button';
+    btn.setAttribute('data-index', String(idx));
+    btn.innerHTML = `
+      <div class="upgrade-card-icon" aria-hidden="true">${choice.icon}</div>
+      <div class="upgrade-card-content">
+        <div class="upgrade-card-header">
+          <span class="upgrade-card-name">${t(choice.titleKey)}</span>
+          <span class="upgrade-card-level">${lvlText}</span>
+        </div>
+        <div class="upgrade-card-desc">${t(choice.descKey)}</div>
+      </div>
+      <div class="upgrade-card-key" aria-hidden="true">${idx + 1}</div>
+    `;
+    btn.addEventListener('click', () => chooseUpgrade(idx));
+    dom.upgradeCards.appendChild(btn);
+  });
+}
+
+export function chooseUpgrade(index) {
+  if (!game.upgradeModalOpen || !currentUpgradeChoices[index]) return;
+  const chosen = currentUpgradeChoices[index];
+  const p = game.player;
+  chosen.apply(p);
+
+  flashMessage(t(chosen.titleKey) + ' · ' + t('msgLevelUp'));
+  burst(p.x, p.y, '#ffd27a', 16, 110);
+
+  game.pendingUpgrades = Math.max(0, (game.pendingUpgrades || 1) - 1);
+
+  if (game.pendingUpgrades > 0) {
+    currentUpgradeChoices = getAvailableUpgrades();
+    if (currentUpgradeChoices.length) {
+      renderUpgradeCards(currentUpgradeChoices);
+      return;
+    }
+  }
+
+  closeUpgradeModal();
+}
+
+export function closeUpgradeModal() {
+  game.upgradeModalOpen = false;
+  if (dom.upgradeModal) {
+    dom.upgradeModal.classList.remove('show');
+    dom.upgradeModal.hidden = true;
+  }
+  if (dom.canvas && !game.paused && game.running) {
+    dom.canvas.classList.remove('game-dimmed');
+  }
+  perf.last = performance.now();
+  updateUI();
+}
+
 function gainXp(amount) {
   const p = game.player;
   p.xp += amount;
+  let leveled = false;
   while (p.xp >= p.xpNeed) {
     p.xp -= p.xpNeed;
     p.level++;
     p.xpNeed = Math.ceil(5 + p.level * 2.35);
-    applyAutoUpgrade(p.level);
+    game.pendingUpgrades = (game.pendingUpgrades || 0) + 1;
+    leveled = true;
   }
-}
-
-function applyAutoUpgrade(level) {
-  const p = game.player;
-  const kind = (level - 2) % 4;
-  let text = '';
-  if (kind === 0) { p.damage *= 1.22; text = t('msgUpgradeDamage', { level }); }
-  if (kind === 1) { p.fireRate = Math.max(.13, p.fireRate * .88); text = t('msgUpgradeFireRate', { level }); }
-  if (kind === 2) { p.maxHp += 12; p.hp = Math.min(p.maxHp, p.hp + 24); text = t('msgUpgradeHp', { level }); }
-  if (kind === 3) { p.speed = Math.min(280, p.speed * 1.06); text = t('msgUpgradeSpeed', { level }); }
-  flashMessage(text);
-  burst(p.x, p.y, '#79f29a', 18, 130);
+  if (leveled && !game.upgradeModalOpen) {
+    openUpgradeModal();
+  }
 }
 
 function killZombie(index) {
@@ -255,10 +476,13 @@ function endGame() {
   p.hp = 0;
   game.running = false;
   setPaused(false);
+  closeUpgradeModal();
   const currentScore = Math.floor(game.score);
-  const isNewBest = currentScore > scoreState.best && scoreState.best > 0;
+  const isNewBest = currentScore > scoreState.best;
   scoreState.best = Math.max(scoreState.best, currentScore);
-  localStorage.setItem('zombie-room-best', String(scoreState.best));
+  try {
+    localStorage.setItem('zombie-room-best', String(scoreState.best));
+  } catch (_) {}
   ui.gameoverScore.textContent = currentScore;
   if (ui.gameoverWave) ui.gameoverWave.textContent = game.wave;
   ui.gameoverKills.textContent = game.kills;
@@ -292,7 +516,7 @@ export function update(dt) {
   game.cameraShake = Math.max(0, game.cameraShake - dt * 1.7);
   game.roomPhase += dt * .8;
 
-  if (!game.running || game.paused) return;
+  if (!game.running || game.paused || game.upgradeModalOpen) return;
 
   game.elapsed += dt;
   const p = game.player;
@@ -361,12 +585,13 @@ export function update(dt) {
         const dealt = z.type === 'boss' ? b.damage * (z.armor || .86) : b.damage;
         z.hp -= dealt;
         z.hitFlash = .08;
-        burst(b.x, b.y, '#eaf7ed', 3, 45);
+        burst(b.x, b.y, b.isCrit ? '#ffd27a' : '#eaf7ed', b.isCrit ? 6 : 3, b.isCrit ? 75 : 45);
         sprayBlood(b.x, b.y, z.type === 'boss' ? 1.1 : .45, z.type === 'boss' ? '#e06c78' : '#ba4956');
-        hit = true;
+        b.pierce = (b.pierce || 1) - 1;
+        if (b.pierce <= 0) hit = true;
         if (z.type === 'boss') game.cameraShake = Math.max(game.cameraShake, .08);
         if (z.hp <= 0) killZombie(j);
-        break;
+        if (hit) break;
       }
     }
     if (hit || b.life <= 0 || b.x < room.x - 35 || b.x > room.x + room.w + 35 || b.y < room.y - 35 || b.y > room.y + room.h + 35) {
@@ -409,14 +634,15 @@ export function update(dt) {
     }
   }
 
+  const magnetDist = p.magnetRadius || 125;
   for (let i = game.orbs.length - 1; i >= 0; i--) {
     const o = game.orbs[i];
     o.pulse += dt * 5;
     const dx = p.x - o.x;
     const dy = p.y - o.y;
     const d = Math.hypot(dx, dy) || 1;
-    if (d < 125) {
-      const speed = 115 + (125 - d) * 2.2;
+    if (d < magnetDist) {
+      const speed = 115 + (magnetDist - d) * 2.2;
       o.x += dx / d * speed * dt;
       o.y += dy / d * speed * dt;
     }

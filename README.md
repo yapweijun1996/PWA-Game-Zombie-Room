@@ -7,6 +7,7 @@ Zombie Room is an offline-first, canvas-based survival game for desktop and mobi
 - Canvas game loop with automatic targeting and shooting.
 - 360-degree analog floating virtual joystick for touch devices with dynamic thumb-centering and speed scaling, plus WASD / arrow-key support on desktop.
 - Walker, runner, tank, and boss enemy types.
+- Roguelike 3-choice level-up upgrade system with 8 build-crafting abilities (Spread Shot, Rapid Fire, Heavy Ammo, Piercing Rounds, Field Medkit, Agility, Magnetic Collector, Critical Strike).
 - Waves, experience orbs, automatic level upgrades, score, kills, and local best score.
 - Responsive HUD, safe-area handling, portrait and landscape mobile layouts.
 - Offline application shell through a service worker.
@@ -111,11 +112,11 @@ Real-device testing remains necessary for Safari, Chrome Android, iOS standalone
 
 The core loop is clear and immediately playable. The main improvement opportunity is adding meaningful player decisions beyond movement:
 
-1. Add a short-term choice after level-up, such as selecting one of three upgrades.
+1. Done: Roguelike 3-choice level-up upgrade system with 8 synergistic abilities (spread shot, rapid fire, heavy ammo, pierce, medkit, agility, magnet, critical strike), with number keys (1, 2, 3) or tap selection.
 2. Add distinct enemy telegraphs and attack patterns before increasing enemy health or spawn counts.
 3. Add room objectives, pickups, or temporary abilities to prevent the loop from becoming movement-only.
 4. Add a clearer difficulty curve and a run summary showing the build, wave reached, and best-run comparison.
-5. Add pause/resume for mobile app switching and visibility changes.
+5. Done: pause/resume for mobile app switching, settings menu opening, and visibility changes.
 
 ### UI and UX
 

@@ -1,5 +1,5 @@
 import { input, keyMap, game } from './state.js';
-import { togglePause } from './entities.js';
+import { togglePause, chooseUpgrade } from './entities.js';
 
 export function initInput(onRestart) {
   function setKeyboardInput(dir, pressed) {
@@ -9,6 +9,13 @@ export function initInput(onRestart) {
   }
 
   addEventListener('keydown', e => {
+    if (game.upgradeModalOpen) {
+      if (e.key === '1' || e.key === '2' || e.key === '3') {
+        e.preventDefault();
+        chooseUpgrade(parseInt(e.key, 10) - 1);
+      }
+      return;
+    }
     if ((e.key === 'p' || e.key === 'P' || e.key === 'Escape') && game.running) {
       const panel = document.getElementById('settingsPanel');
       if (panel && !panel.hidden && e.key === 'Escape') return;
@@ -56,7 +63,7 @@ export function initInput(onRestart) {
     }
 
     function onPointerDown(e) {
-      if (activePointerId !== null) return;
+      if (activePointerId !== null || game.upgradeModalOpen) return;
       if (!game.running) {
         onRestart();
         return;

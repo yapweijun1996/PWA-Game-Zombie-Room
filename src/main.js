@@ -1,6 +1,6 @@
 import { dom, ui, viewport, room, game, perf, scoreState } from './state.js';
 import { clamp } from './utils.js';
-import { resetGame, update, isDesktopControls, setPaused, togglePause } from './entities.js';
+import { resetGame, update, isDesktopControls, setPaused, togglePause, renderUpgradeCards, currentUpgradeChoices } from './entities.js';
 import { evaluatePerformance, refreshPerfLabel } from './effects.js';
 import { draw } from './render.js';
 import { initPwa, refreshPwaLabels } from './pwa.js';
@@ -39,7 +39,7 @@ function frame(now) {
   const dt = Math.min(.034, Math.max(0, (now - perf.last) / 1000));
   perf.last = now;
 
-  if (!game.paused) {
+  if (!game.paused && !game.upgradeModalOpen) {
     perf.fpsFrames++;
     const fpsWindowMs = now - perf.fpsWindowStart;
     if (fpsWindowMs >= 500) {
@@ -81,6 +81,9 @@ document.addEventListener('visibilitychange', () => {
 initI18n(() => {
   refreshPwaLabels();
   refreshPerfLabel();
+  if (game.upgradeModalOpen && currentUpgradeChoices.length) {
+    renderUpgradeCards(currentUpgradeChoices);
+  }
 });
 resize();
 ui.bestText.textContent = scoreState.best;
