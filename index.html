@@ -125,7 +125,7 @@
       </button>
       <button class="update-button settings-action" id="updateButton" type="button" data-i18n-aria="updateAriaCheck" aria-label="Check for Zombie Room updates">
         <span class="update-dot" aria-hidden="true"></span>
-        <span id="updateLabel">Update v3.2.0</span>
+        <span id="updateLabel">Update v3.3.0</span>
       </button>
       <div class="settings-diagnostics">
         <div class="settings-label" data-i18n="hudDiagnostics">Performance</div>
@@ -167,6 +167,9 @@
         <div class="gameover-new-best" id="gameoverNewBest" hidden data-i18n="gameoverNewBest">★ NEW BEST! ★</div>
         <div class="gameover-score-label" data-i18n="hudScore">Score</div>
         <div class="gameover-score" id="gameoverScore">0</div>
+        <div class="gameover-rank-badge rank-b" id="gameoverRankBadge">
+          <span id="gameoverRankText">RANK B</span>
+        </div>
         <div class="gameover-stat-row">
           <div class="gameover-stat" data-i18n-aria="hudWave" aria-label="Wave">
             <span class="gameover-stat-icon" aria-hidden="true">🌊</span><b id="gameoverWave">1</b>
@@ -181,7 +184,14 @@
             <span class="gameover-stat-icon" aria-hidden="true">⏱</span><b id="gameoverTime">0:00</b>
           </div>
         </div>
-        <button class="restart-button" id="restartButton" type="button" data-i18n="restartButtonLabel">RESTART</button>
+        <div class="gameover-build-section">
+          <div class="gameover-build-title" data-i18n="buildTitle">TACTICAL BUILD</div>
+          <div class="gameover-build-grid" id="gameoverBuildGrid"></div>
+        </div>
+        <div class="gameover-actions">
+          <button class="restart-button" id="restartButton" type="button" data-i18n="restartButtonLabel">RESTART</button>
+          <button class="share-button" id="shareButton" type="button" data-i18n="shareButtonLabel">SHARE RUN</button>
+        </div>
         <p class="restart" data-i18n="gameoverRestart">Or press any direction / WASD</p>
       </div>
     </div>

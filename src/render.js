@@ -1034,6 +1034,18 @@ export function draw() {
       ctx.fillStyle = '#e8eedb';
       ctx.fillRect(-q.size * 0.4, -q.size * 1.1, q.size * 0.8, q.size * 2.2);
       ctx.restore();
+    } else if (q.shape === 'arc') {
+      ctx.save();
+      ctx.strokeStyle = '#e5f4ff';
+      ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      ctx.moveTo(q.x, q.y);
+      const midX = (q.x + q.tx) / 2 + (Math.sin(q.life * 45) * 10);
+      const midY = (q.y + q.ty) / 2 + (Math.cos(q.life * 45) * 10);
+      ctx.lineTo(midX, midY);
+      ctx.lineTo(q.tx, q.ty);
+      ctx.stroke();
+      ctx.restore();
     } else if (q.shape === 'dot') {
       ctx.fillStyle = q.color;
       ctx.beginPath();

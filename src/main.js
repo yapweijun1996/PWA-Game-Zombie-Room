@@ -7,7 +7,9 @@ import { initPwa, refreshPwaLabels } from './pwa.js';
 import { initInput } from './input.js';
 import { initI18n } from './i18n-apply.js';
 import { initSettingsMenu, refreshSoundToggleUI, refreshHapticsToggleUI } from './settings-menu.js';
-import { initAudio } from './audio.js';
+import { flashMessage } from './ui.js';
+import { t } from './i18n.js';
+import { initAudio, playUiClick } from './audio.js';
 
 function resize() {
   viewport.W = Math.max(320, innerWidth);
@@ -152,5 +154,17 @@ dom.pauseButton?.addEventListener('click', togglePause);
 dom.resumeButton?.addEventListener('click', () => setPaused(false));
 dom.pauseOverlay?.addEventListener('click', e => {
   if (e.target === dom.pauseOverlay) setPaused(false);
+});
+dom.shareButton?.addEventListener('click', () => {
+  const rank = ui.gameoverRankText ? ui.gameoverRankText.textContent : 'RANK S';
+  const text = `🧟 Zombie Room | ${rank} | Score: ${Math.floor(game.score)} | Wave ${game.wave} | Kills: ${game.kills} | Max Combo: ×${game.maxCombo || 0}\nhttps://yapweijun1996.github.io/PWA-Game-Zombie-Room/`;
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(() => {
+      flashMessage(t('shareCopied'));
+      playUiClick();
+    }).catch(() => {});
+  } else {
+    flashMessage(t('shareCopied'));
+  }
 });
 requestAnimationFrame(now => { perf.last = now; requestAnimationFrame(frame); });

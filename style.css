@@ -851,6 +851,21 @@
       text-transform: uppercase;
       letter-spacing: .04em;
     }
+    .upgrade-card.evolution {
+      border-color: rgba(255, 215, 0, .6);
+      background: linear-gradient(145deg, rgba(255, 215, 0, .12), rgba(255, 140, 0, .06));
+      box-shadow: 0 4px 20px rgba(255, 215, 0, .22), inset 0 0 14px rgba(255, 215, 0, .08);
+    }
+    .upgrade-card.evolution:hover, .upgrade-card.evolution:focus-visible {
+      border-color: #ffd700;
+      background: linear-gradient(145deg, rgba(255, 215, 0, .20), rgba(255, 140, 0, .12));
+    }
+    .upgrade-card-level.evo {
+      color: #ffd700;
+      background: rgba(255, 215, 0, .25);
+      border-color: rgba(255, 215, 0, .5);
+      box-shadow: 0 0 8px rgba(255, 215, 0, .4);
+    }
     .upgrade-card-desc {
       margin-top: 3px;
       font-size: 10.5px;
@@ -953,7 +968,10 @@
 
     .gameover {
       width: min(400px, calc(100vw - 32px));
-      padding: 28px 24px 26px;
+      max-height: calc(100dvh - 32px);
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      padding: 24px 20px 22px;
       text-align: center;
       background: rgba(9,16,12,.97);
       box-shadow: 0 24px 60px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.03);
@@ -988,7 +1006,7 @@
     }
     .gameover-score {
       margin-top: 2px;
-      font-size: clamp(42px, 14vw, 64px);
+      font-size: clamp(38px, 12vw, 56px);
       line-height: 1;
       font-weight: 950;
       letter-spacing: -.03em;
@@ -996,22 +1014,151 @@
       color: var(--good);
       text-shadow: 0 0 24px rgba(121,242,154,.25);
     }
+    .gameover-rank-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      margin: 8px auto 0;
+      padding: 3px 14px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 950;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    .rank-s {
+      background: rgba(255, 215, 0, .2);
+      border: 1.5px solid #ffd700;
+      color: #fff275;
+      box-shadow: 0 0 14px rgba(255, 215, 0, .35);
+    }
+    .rank-a {
+      background: rgba(255, 150, 50, .2);
+      border: 1.5px solid #ff9b43;
+      color: #ffbe6b;
+    }
+    .rank-b {
+      background: rgba(121, 242, 154, .2);
+      border: 1.5px solid #79f29a;
+      color: #a8f7be;
+    }
+    .rank-c {
+      background: rgba(150, 170, 160, .15);
+      border: 1.5px solid #95a69a;
+      color: #dfe8e2;
+    }
     .gameover-stat-row {
-      margin-top: 16px;
+      margin-top: 14px;
       display: flex;
       justify-content: center;
-      gap: 24px;
+      gap: 16px;
     }
     .gameover-stat {
       display: flex;
       align-items: center;
-      gap: 6px;
-      font-size: 15px;
+      gap: 5px;
+      font-size: 14px;
       font-weight: 900;
       color: var(--text);
       font-variant-numeric: tabular-nums;
     }
-    .gameover-stat-icon { font-size: 16px; }
+    .gameover-stat-icon { font-size: 15px; }
+
+    .gameover-build-section {
+      margin-top: 14px;
+      padding-top: 10px;
+      border-top: 1px solid var(--line);
+    }
+    .gameover-build-title {
+      font-size: 8.5px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .1em;
+      font-weight: 850;
+      text-align: center;
+    }
+    .gameover-build-grid {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 5px;
+      margin-top: 8px;
+    }
+    .build-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 7px;
+      border-radius: 8px;
+      background: rgba(255,255,255,.05);
+      border: 1px solid var(--line);
+      font-size: 10px;
+      font-weight: 850;
+      color: var(--text);
+    }
+    .build-chip.max {
+      border-color: rgba(255, 214, 102, .45);
+      background: rgba(255, 214, 102, .1);
+    }
+    .build-chip.empty {
+      color: var(--muted);
+      font-style: italic;
+      padding: 3px 8px;
+    }
+    .build-chip-icon { font-size: 11px; }
+    .build-chip-name { font-size: 9.5px; }
+    .build-chip-level {
+      font-size: 8px;
+      font-weight: 900;
+      color: #81d1ff;
+      padding: 1px 4px;
+      border-radius: 4px;
+      background: rgba(105, 182, 255, .15);
+      text-transform: uppercase;
+    }
+    .build-chip.max .build-chip-level {
+      color: #ffd700;
+      background: rgba(255, 215, 0, .2);
+    }
+    .build-chip.evo {
+      border-color: #ffd700;
+      background: rgba(255, 215, 0, .16);
+      box-shadow: 0 0 10px rgba(255, 215, 0, .32);
+    }
+    .build-chip.evo .build-chip-level {
+      color: #ffd700;
+      background: rgba(255, 215, 0, .28);
+    }
+
+    .gameover-actions {
+      margin-top: 16px;
+      display: flex;
+      gap: 8px;
+    }
+    .gameover-actions .restart-button {
+      margin-top: 0;
+      flex: 1 1 auto;
+    }
+    .share-button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 16px;
+      min-height: 48px;
+      border-radius: 14px;
+      border: 1px solid rgba(121, 242, 154, .35);
+      background: rgba(60, 133, 79, .14);
+      color: #c9f5d4;
+      font-size: 12px;
+      font-weight: 900;
+      letter-spacing: .04em;
+      cursor: pointer;
+      touch-action: manipulation;
+      white-space: nowrap;
+      transition: background .15s ease, border-color .15s ease;
+    }
+    .share-button:active { transform: translateY(1px); background: rgba(60, 133, 79, .24); }
+    .share-button:focus-visible { outline: 2px solid rgba(255,255,255,.65); outline-offset: 3px; }
     .restart-button {
       display: block;
       width: 100%;

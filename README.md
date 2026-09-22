@@ -24,6 +24,7 @@ Zombie Room is an offline-first, canvas-based survival game for desktop and mobi
 - High-energy laser beam tracers with color-coded plasma cores (gold for crits, cyan for piercing, neon emerald for standard) and adaptive multi-spark muzzle flare.
 - Tiered weapon audio synthesis with layered harmonic resonance for multi-shot volleys and heavy caliber sub-bass kick.
 - Roguelike 3-choice level-up upgrade system with 8 build-crafting abilities (Spread Shot, Rapid Fire, Heavy Ammo, Piercing Rounds, Field Medkit, Agility, Magnetic Collector, Critical Strike).
+- Super Weapon Synergy Evolutions (Tesla Chain-Lightning & Plasma Flak Cannon) unlocking devastating secondary electric chain arcs and shotgun knockback bursts.
 - Waves, experience orbs, automatic level upgrades, score, kills, and local best score.
 - Responsive HUD, safe-area handling, portrait and landscape mobile layouts.
 - Offline application shell through a service worker.
@@ -38,7 +39,7 @@ Zombie Room is an offline-first, canvas-based survival game for desktop and mobi
 - Explicit pause/resume mechanism: pause button in header, 'P'/'Escape' hotkeys, and auto-pause on opening the settings menu or switching browser tabs.
 - Dedicated pause overlay dialog with blurred/dimmed canvas backdrop.
 - Collapsible settings menu (language, install, update, and FPS/performance diagnostics) behind a single header trigger, with focus trap, outside-click, and Escape handling.
-- Full-screen defeat overlay: blurred/dimmed backdrop, hero score, wave/kills/time stats, "NEW BEST!" achievement banner, and a dedicated Restart button in addition to keyboard/D-pad restart.
+- Full-screen defeat overlay: blurred/dimmed backdrop, hero score, S/A/B/C Survival Rank, tactical build matrix with level chips, wave/kills/combo/time stats, "NEW BEST!" achievement banner, clipboard run sharing, and a dedicated Restart button.
 
 ## Project Structure
 
@@ -133,7 +134,7 @@ The core loop is clear and immediately playable. The main improvement opportunit
 1. Done: Roguelike 3-choice level-up upgrade system with 8 synergistic abilities (spread shot, rapid fire, heavy ammo, pierce, medkit, agility, magnet, critical strike), with number keys (1, 2, 3) or tap selection.
 2. Add distinct enemy telegraphs and attack patterns before increasing enemy health or spawn counts.
 3. Done: Dynamic tactical combat pickups (Tactical Nuke screen-clearing shockwave, Overdrive 2x attack speed, Field Medkit, Super Magnet vacuum).
-4. Add a clearer difficulty curve and a run summary showing the build, wave reached, and best-run comparison.
+4. Done: Comprehensive run summary with S/A/B/C Survival Rank evaluation, active tactical build matrix with ability level chips, Max Combo, and one-tap clipboard run sharing.
 5. Done: pause/resume for mobile app switching, settings menu opening, and visibility changes.
 
 ### UI and UX

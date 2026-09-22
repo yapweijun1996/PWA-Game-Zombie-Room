@@ -123,7 +123,16 @@ const dict = {
     msgCombo50: 'UNSTOPPABLE ×50 · INFERNO MODE!',
     affixFrost: 'FROST',
     affixSwift: 'SWIFT',
-    affixArmored: 'ARMORED'
+    affixArmored: 'ARMORED',
+    rankLabel: 'RANK',
+    buildTitle: 'TACTICAL BUILD',
+    shareButtonLabel: 'SHARE RUN',
+    shareCopied: 'RUN SUMMARY COPIED!',
+    evoTeslaTitle: 'TESLA CHAIN-LIGHTNING',
+    evoTeslaDesc: 'Bullets chain high-voltage lightning arcs to 3 nearby enemies',
+    evoPlasmaTitle: 'PLASMA FLAK CANNON',
+    evoPlasmaDesc: 'Fires 5 heavy plasma pellets with massive knockback force',
+    evoBadge: 'EVOLUTION'
   },
   zh: {
     appTitle: '僵尸房间',
@@ -225,7 +234,16 @@ const dict = {
     msgCombo50: '50 势不可挡！地狱烈焰全开',
     affixFrost: '寒霜',
     affixSwift: '迅捷',
-    affixArmored: '坚盾'
+    affixArmored: '坚盾',
+    rankLabel: '评级',
+    buildTitle: '当局战术构筑',
+    shareButtonLabel: '复制战报',
+    shareCopied: '战报已复制到剪贴板！',
+    evoTeslaTitle: '特斯拉连锁电弧',
+    evoTeslaDesc: '子弹命中时向附近 3 名敌人弹射高压连锁闪电链',
+    evoPlasmaTitle: '等离子重装散弹',
+    evoPlasmaDesc: '每次射出 5 颗重型高能等离子霰弹并附加强力击退',
+    evoBadge: '超武进化'
   },
   ms: {
     appTitle: 'Zombie Room',
@@ -327,7 +345,16 @@ const dict = {
     msgCombo50: 'TIDAK TERSEKAT ×50 · MOD INFERNO!',
     affixFrost: 'FROST',
     affixSwift: 'PANTAS',
-    affixArmored: 'KEBAL'
+    affixArmored: 'KEBAL',
+    rankLabel: 'PANGKAT',
+    buildTitle: 'BINAAN TAKTIKAL',
+    shareButtonLabel: 'KONGSI REKOD',
+    shareCopied: 'REKOD DISALIN KE PAPAN KLIP!',
+    evoTeslaTitle: 'KILAT BERANTAI TESLA',
+    evoTeslaDesc: 'Peluru memancarkan arka kilat ke 3 musuh berdekatan',
+    evoPlasmaTitle: 'MERIAM FLAK PLASMA',
+    evoPlasmaDesc: 'Menembak 5 pelet plasma berat dengan impak tolakan kuat',
+    evoBadge: 'EVOLUSI'
   },
   ja: {
     appTitle: 'Zombie Room',
@@ -429,7 +456,16 @@ const dict = {
     msgCombo50: '50連キル無双！インフェルノ突入',
     affixFrost: 'フロスト',
     affixSwift: '疾風',
-    affixArmored: '装甲'
+    affixArmored: '装甲',
+    rankLabel: 'ランク',
+    buildTitle: 'タクティカルビルド',
+    shareButtonLabel: '戦績をシェア',
+    shareCopied: '戦績をクリップボードにコピーしました！',
+    evoTeslaTitle: 'テスラ連鎖電弧',
+    evoTeslaDesc: '着弾時に付近の敵3体に高圧連鎖雷撃を放電',
+    evoPlasmaTitle: 'プラズマフラック重砲',
+    evoPlasmaDesc: '強烈なノックバックを伴う5連装プラズマ散弾を発射',
+    evoBadge: '超武進化'
   },
   ko: {
     appTitle: 'Zombie Room',
@@ -531,7 +567,16 @@ const dict = {
     msgCombo50: '50연속 독무대! 인페르노 모드',
     affixFrost: '동결',
     affixSwift: '신속',
-    affixArmored: '장갑'
+    affixArmored: '장갑',
+    rankLabel: '등급',
+    buildTitle: '전술 빌드 요약',
+    shareButtonLabel: '전적 공유',
+    shareCopied: '전적이 클립보드에 복사되었습니다!',
+    evoTeslaTitle: '테슬라 연쇄 번개',
+    evoTeslaDesc: '탄환 적중 시 주변 3명의 적에게 고전압 전격 연쇄 방전',
+    evoPlasmaTitle: '플라즈마 산탄 중포',
+    evoPlasmaDesc: '강력한 밀쳐내기 넉백을 동반한 5연발 플라즈마 산탄 발사',
+    evoBadge: '초월 진화'
   },
   vi: {
     appTitle: 'Zombie Room',
@@ -633,7 +678,16 @@ const dict = {
     msgCombo50: 'KHÔNG THỂ CẢN PHÁ ×50 · CHẾ ĐỘ ĐỊA NGỤC!',
     affixFrost: 'BĂNG GIÁ',
     affixSwift: 'NHANH NHẸN',
-    affixArmored: 'BỌC THÉP'
+    affixArmored: 'BỌC THÉP',
+    rankLabel: 'XẾP HẠNG',
+    buildTitle: 'BẢN XÂY DỰNG TAKTIKAL',
+    shareButtonLabel: 'CHIA SẺ KẾT QUẢ',
+    shareCopied: 'ĐÃ SAO CHÉP KẾT QUẢ!',
+    evoTeslaTitle: 'TIA SÉT DÂY CHUYỀN TESLA',
+    evoTeslaDesc: 'Đạn phóng tia sét dây chuyền đến 3 kẻ địch lân cận',
+    evoPlasmaTitle: 'ĐẠI BÁC PLASMA FLAK',
+    evoPlasmaDesc: 'Bắn 5 viên plasma hạng nặng với lực đẩy lùi cực mạnh',
+    evoBadge: 'TIẾN HÓA'
   },
   th: {
     appTitle: 'Zombie Room',
@@ -735,7 +789,16 @@ const dict = {
     msgCombo50: 'ไร้เทียมทาน ×50 · โหมดเพลิงนรก!',
     affixFrost: 'เยือกแข็ง',
     affixSwift: 'ว่องไว',
-    affixArmored: 'เกราะหนา'
+    affixArmored: 'เกราะหนา',
+    rankLabel: 'อันดับ',
+    buildTitle: 'สรุปการอัปเกรด',
+    shareButtonLabel: 'แชร์ผลคะแนน',
+    shareCopied: 'คัดลอกผลคะแนนเรียบร้อยแล้ว!',
+    evoTeslaTitle: 'สายฟ้าลูกโซ่เทสลา',
+    evoTeslaDesc: 'กระสุนปล่อยประกายสายฟ้าช็อตศัตรูใกล้เคียง 3 ตัว',
+    evoPlasmaTitle: 'ปืนใหญ่พลาสม่า',
+    evoPlasmaDesc: 'ยิงกระสุนพลาสม่าหนัก 5 นัดพร้อมแรงผลักถอยหลังมหาศาล',
+    evoBadge: 'วิวัฒนาการ'
   }
 };
 

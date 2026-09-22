@@ -38,6 +38,10 @@ export function makePlayer() {
     magnetRadius: 125,
     overdriveTimer: 0,
     stepTimer: 0,
+    superWeapons: {
+      tesla: false,
+      plasmaFlak: false
+    },
     upgrades: {
       multiShot: 1,
       rapidFire: 0,
@@ -205,8 +209,8 @@ function shootNearest() {
   p.muzzleFlash = .075;
   p.recoil = 1;
 
-  const projectileCount = p.projectiles || 1;
-  const spreadAngle = 0.16;
+  const projectileCount = p.superWeapons?.plasmaFlak ? Math.max(p.projectiles || 1, 5) : (p.projectiles || 1);
+  const spreadAngle = p.superWeapons?.plasmaFlak ? 0.22 : 0.16;
   const startAngle = baseAngle - ((projectileCount - 1) * spreadAngle) / 2;
 
   for (let s = 0; s < projectileCount; s++) {
@@ -309,6 +313,8 @@ function collectPickup(item, index) {
     burst(p.x, p.y, '#d782ff', 22, 140);
   }
 }
+
+export function hasActiveBoss() {
   return game.zombies.some(z => z.type === 'boss');
 }
 
@@ -466,14 +472,47 @@ export const UPGRADES = [
   }
 ];
 
+export const EVOLUTIONS = [
+  {
+    id: 'tesla',
+    icon: '⚡',
+    titleKey: 'evoTeslaTitle',
+    descKey: 'evoTeslaDesc',
+    isEvolution: true,
+    canUnlock: p => (p.upgrades.multiShot || 1) >= 3 && (p.upgrades.pierce || 1) >= 3 && !p.superWeapons?.tesla,
+    apply: p => {
+      p.superWeapons.tesla = true;
+    }
+  },
+  {
+    id: 'plasmaFlak',
+    icon: '💥',
+    titleKey: 'evoPlasmaTitle',
+    descKey: 'evoPlasmaDesc',
+    isEvolution: true,
+    canUnlock: p => (p.upgrades.damage || 0) >= 3 && (p.upgrades.rapidFire || 0) >= 3 && !p.superWeapons?.plasmaFlak,
+    apply: p => {
+      p.superWeapons.plasmaFlak = true;
+    }
+  }
+];
+
 export let currentUpgradeChoices = [];
 
 export function getAvailableUpgrades() {
   const p = game.player;
   if (!p) return [];
-  const available = UPGRADES.filter(u => u.level(p) < u.maxLevel);
-  if (!available.length) return [];
-  const shuffled = [...available].sort(() => Math.random() - 0.5);
+
+  const availableEvos = EVOLUTIONS.filter(e => e.canUnlock(p));
+  const availableRegular = UPGRADES.filter(u => u.level(p) < u.maxLevel);
+
+  if (availableEvos.length > 0) {
+    const evo = availableEvos[0];
+    const otherChoices = availableRegular.sort(() => Math.random() - 0.5).slice(0, 2);
+    return [evo, ...otherChoices];
+  }
+
+  const shuffled = [...availableRegular].sort(() => Math.random() - 0.5);
   return shuffled.slice(0, 3);
 }
 
@@ -508,12 +547,17 @@ export function renderUpgradeCards(choices) {
   const p = game.player;
 
   choices.forEach((choice, idx) => {
-    const curLvl = choice.level(p);
-    const nextLvl = curLvl + 1;
-    const lvlText = curLvl === 0 ? 'NEW' : `Lv.${nextLvl}`;
+    const isEvo = choice.isEvolution;
+    let lvlText = '';
+    if (isEvo) {
+      lvlText = t('evoBadge');
+    } else {
+      const curLvl = choice.level(p);
+      lvlText = curLvl === 0 ? 'NEW' : `Lv.${curLvl + 1}`;
+    }
 
     const btn = document.createElement('button');
-    btn.className = 'upgrade-card';
+    btn.className = 'upgrade-card' + (isEvo ? ' evolution' : '');
     btn.type = 'button';
     btn.setAttribute('data-index', String(idx));
     btn.innerHTML = `
@@ -521,7 +565,7 @@ export function renderUpgradeCards(choices) {
       <div class="upgrade-card-content">
         <div class="upgrade-card-header">
           <span class="upgrade-card-name">${t(choice.titleKey)}</span>
-          <span class="upgrade-card-level">${lvlText}</span>
+          <span class="upgrade-card-level${isEvo ? ' evo' : ''}">${lvlText}</span>
         </div>
         <div class="upgrade-card-desc">${t(choice.descKey)}</div>
       </div>
@@ -540,8 +584,14 @@ export function chooseUpgrade(index) {
   playUpgradeSelect();
   vibrateUi();
 
-  flashMessage(t(chosen.titleKey) + ' · ' + t('msgLevelUp'));
-  burst(p.x, p.y, '#ffd27a', 16, 110);
+  if (chosen.isEvolution) {
+    flashMessage('⚡ ' + t(chosen.titleKey) + ' · ' + t('evoBadge'));
+    burst(p.x, p.y, '#ffd700', 30, 160);
+    game.cameraShake = Math.max(game.cameraShake, .4);
+  } else {
+    flashMessage(t(chosen.titleKey) + ' · ' + t('msgLevelUp'));
+    burst(p.x, p.y, '#ffd27a', 16, 110);
+  }
 
   game.pendingUpgrades = Math.max(0, (game.pendingUpgrades || 1) - 1);
 
@@ -682,6 +732,61 @@ function damagePlayer(amount, from) {
   if (p.hp <= 0) endGame();
 }
 
+export function calculateRunRank(wave, score, kills, maxCombo) {
+  const scoreRating = score + wave * 140 + kills * 8 + maxCombo * 12;
+  if (scoreRating >= 2200 || wave >= 8) return 'S';
+  if (scoreRating >= 1100 || wave >= 5) return 'A';
+  if (scoreRating >= 450 || wave >= 3) return 'B';
+  return 'C';
+}
+
+function renderBuildSummary(p) {
+  if (!ui.gameoverBuildGrid) return;
+  ui.gameoverBuildGrid.innerHTML = '';
+
+  if (p.superWeapons?.tesla) {
+    const evoChip = document.createElement('div');
+    evoChip.className = 'build-chip evo';
+    evoChip.innerHTML = `
+      <span class="build-chip-icon" aria-hidden="true">⚡</span>
+      <span class="build-chip-name">${t('evoTeslaTitle')}</span>
+      <span class="build-chip-level evo">${t('evoBadge')}</span>
+    `;
+    ui.gameoverBuildGrid.appendChild(evoChip);
+  }
+  if (p.superWeapons?.plasmaFlak) {
+    const evoChip = document.createElement('div');
+    evoChip.className = 'build-chip evo';
+    evoChip.innerHTML = `
+      <span class="build-chip-icon" aria-hidden="true">💥</span>
+      <span class="build-chip-name">${t('evoPlasmaTitle')}</span>
+      <span class="build-chip-level evo">${t('evoBadge')}</span>
+    `;
+    ui.gameoverBuildGrid.appendChild(evoChip);
+  }
+
+  const activeUpgrades = UPGRADES.filter(u => u.level(p) > (u.id === 'multiShot' ? 1 : 0));
+  if (!activeUpgrades.length) {
+    const emptyChip = document.createElement('div');
+    emptyChip.className = 'build-chip empty';
+    emptyChip.textContent = 'Lv.1 Standard Issue';
+    ui.gameoverBuildGrid.appendChild(emptyChip);
+    return;
+  }
+  activeUpgrades.forEach(u => {
+    const lvl = u.level(p);
+    const isMax = lvl >= u.maxLevel;
+    const chip = document.createElement('div');
+    chip.className = 'build-chip' + (isMax ? ' max' : '');
+    chip.innerHTML = `
+      <span class="build-chip-icon" aria-hidden="true">${u.icon}</span>
+      <span class="build-chip-name">${t(u.titleKey)}</span>
+      <span class="build-chip-level">${isMax ? t('upgradeMaxLevel') : 'Lv.' + lvl}</span>
+    `;
+    ui.gameoverBuildGrid.appendChild(chip);
+  });
+}
+
 function endGame() {
   const p = game.player;
   p.hp = 0;
@@ -706,6 +811,14 @@ function endGame() {
   ui.gameoverKills.textContent = game.kills;
   ui.gameoverTime.textContent = formatTime(game.elapsed);
   if (ui.gameoverNewBest) ui.gameoverNewBest.hidden = !isNewBest;
+
+  const rank = calculateRunRank(game.wave, currentScore, game.kills, game.maxCombo || 0);
+  if (ui.gameoverRankBadge && ui.gameoverRankText) {
+    ui.gameoverRankText.textContent = t('rankLabel') + ' ' + rank;
+    ui.gameoverRankBadge.className = 'gameover-rank-badge rank-' + rank.toLowerCase();
+  }
+  renderBuildSummary(p);
+
   dom.canvas.classList.add(game.performanceMode ? 'game-dimmed' : 'game-blurred');
   ui.gameover.classList.add('show');
   ui.gameover.focus();
@@ -868,6 +981,45 @@ export function update(dt) {
         spawnDamageText(z.x + rand(-6, 6), z.y - z.r - 4, dealt, b.isCrit, false);
         burst(b.x, b.y, b.isCrit ? '#ffd27a' : (z.affix === 'armored' ? '#69b6ff' : '#eaf7ed'), b.isCrit ? 6 : 3, b.isCrit ? 75 : 45);
         sprayBlood(b.x, b.y, z.type === 'boss' ? 1.1 : .45, z.type === 'boss' ? '#e06c78' : '#ba4956');
+
+        if (p.superWeapons?.plasmaFlak) {
+          const knockDist = z.type === 'boss' ? 12 : 36;
+          const bulletSpeed = p.bulletSpeed || 460;
+          z.x += (b.vx / bulletSpeed) * knockDist;
+          z.y += (b.vy / bulletSpeed) * knockDist;
+          resolveObstacleCollision(z);
+        }
+
+        if (p.superWeapons?.tesla && !b.hasChained) {
+          b.hasChained = true;
+          let chainCount = 0;
+          for (let k = game.zombies.length - 1; k >= 0; k--) {
+            if (k === j) continue;
+            const cz = game.zombies[k];
+            const cdx = cz.x - z.x;
+            const cdy = cz.y - z.y;
+            if (cdx * cdx + cdy * cdy < 110 * 110) {
+              const chainDmg = Math.max(1, Math.round(dealt * 0.75));
+              cz.hp -= chainDmg;
+              cz.hitFlash = 0.08;
+              spawnDamageText(cz.x, cz.y - cz.r, chainDmg, false, false);
+              game.particles.push({
+                shape: 'arc',
+                x: z.x,
+                y: z.y,
+                tx: cz.x,
+                ty: cz.y,
+                life: 0.14,
+                maxLife: 0.14
+              });
+              playElectricZap();
+              if (cz.hp <= 0) killZombie(k, b.isCrit);
+              chainCount++;
+              if (chainCount >= 3) break;
+            }
+          }
+        }
+
         b.pierce = (b.pierce || 1) - 1;
         if (b.pierce <= 0) hit = true;
         if (z.type === 'boss') game.cameraShake = Math.max(game.cameraShake, .08);

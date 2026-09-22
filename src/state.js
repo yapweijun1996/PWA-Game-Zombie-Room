@@ -1,4 +1,4 @@
-export const APP_VERSION = '3.2.0';
+export const APP_VERSION = '3.4.0';
 
 export const dom = {
   canvas: document.getElementById('game'),
@@ -27,7 +27,8 @@ export const dom = {
   joystickKnob: document.getElementById('joystickKnob'),
   hintPill: document.getElementById('hintPill'),
   languageSelect: document.getElementById('languageSelect'),
-  restartButton: document.getElementById('restartButton')
+  restartButton: document.getElementById('restartButton'),
+  shareButton: document.getElementById('shareButton')
 };
 
 export const ctx = dom.canvas.getContext('2d');
@@ -63,7 +64,10 @@ export const ui = {
   comboBadge: document.getElementById('comboBadge'),
   comboText: document.getElementById('comboText'),
   comboBar: document.getElementById('comboBar'),
-  gameoverCombo: document.getElementById('gameoverCombo')
+  gameoverCombo: document.getElementById('gameoverCombo'),
+  gameoverRankBadge: document.getElementById('gameoverRankBadge'),
+  gameoverRankText: document.getElementById('gameoverRankText'),
+  gameoverBuildGrid: document.getElementById('gameoverBuildGrid')
 };
 
 export const input = {
