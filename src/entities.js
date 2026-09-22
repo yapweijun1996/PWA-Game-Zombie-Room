@@ -1159,6 +1159,12 @@ export function update(dt) {
     }
   }
 
+  // gainXp() (via orb pickup or the magnet powerup, above) can synchronously
+  // open the level-up modal mid-frame. Bail out here instead of letting the
+  // hazard damage tick below kill the player in the same tick the modal
+  // opened, which would force-close it before the player ever saw it.
+  if (game.upgradeModalOpen) return;
+
   if (room.hazards) {
     for (const h of room.hazards) {
       h.timer += dt;

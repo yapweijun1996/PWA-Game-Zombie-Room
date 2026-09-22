@@ -118,7 +118,8 @@ export const pwaState = {
 
 function readBestScore() {
   try {
-    return Number(localStorage.getItem('zombie-room-best') || 0);
+    const n = Number(localStorage.getItem('zombie-room-best') || 0);
+    return Number.isFinite(n) ? n : 0;
   } catch (_) {
     return 0;
   }

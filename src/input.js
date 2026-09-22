@@ -18,7 +18,10 @@ export function initInput(onRestart) {
     }
     if ((e.key === 'p' || e.key === 'P' || e.key === 'Escape') && game.running) {
       const panel = document.getElementById('settingsPanel');
-      if (panel && !panel.hidden && e.key === 'Escape') return;
+      // While settings is open it owns pause state (auto-pauses on open, restores
+      // on close); let its own Escape handler close it and ignore 'p' entirely so
+      // the two pause sources can't desync.
+      if (panel && !panel.hidden) return;
       e.preventDefault();
       togglePause();
       return;
