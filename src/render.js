@@ -2,6 +2,32 @@ import { ctx, game, room, viewport } from './state.js';
 import { clamp, rand } from './utils.js';
 import { t } from './i18n.js';
 
+const BULLET_TRAIL_SPEC = {
+  crit: [[0, 'rgba(255, 214, 102, 0)'], [0.5, 'rgba(255, 180, 50, 0.45)'], [1, '#fff6d6']],
+  pierce: [[0, 'rgba(105, 182, 255, 0)'], [0.5, 'rgba(74, 160, 255, 0.45)'], [1, '#e5f3ff']],
+  normal: [[0, 'rgba(121, 242, 154, 0)'], [0.5, 'rgba(121, 242, 154, 0.45)'], [1, '#ffffff']]
+};
+const BULLET_TRAIL_SPRITE_W = 64;
+const BULLET_TRAIL_SPRITE_H = 16;
+let bulletTrailSprites = null;
+
+function getBulletTrailSprites() {
+  if (bulletTrailSprites) return bulletTrailSprites;
+  bulletTrailSprites = {};
+  for (const key in BULLET_TRAIL_SPEC) {
+    const c = document.createElement('canvas');
+    c.width = BULLET_TRAIL_SPRITE_W;
+    c.height = BULLET_TRAIL_SPRITE_H;
+    const sctx = c.getContext('2d');
+    const g = sctx.createLinearGradient(0, 0, BULLET_TRAIL_SPRITE_W, 0);
+    for (const [stop, color] of BULLET_TRAIL_SPEC[key]) g.addColorStop(stop, color);
+    sctx.fillStyle = g;
+    sctx.fillRect(0, 0, BULLET_TRAIL_SPRITE_W, BULLET_TRAIL_SPRITE_H);
+    bulletTrailSprites[key] = c;
+  }
+  return bulletTrailSprites;
+}
+
 function drawGrid() {
   const W = viewport.W, H = viewport.H;
   ctx.fillStyle = '#050b08';
@@ -42,11 +68,14 @@ function drawGrid() {
     if (game.performanceMode) {
       ctx.fillStyle = d.color;
     } else {
-      const g = ctx.createRadialGradient(d.x, d.y, 0, d.x, d.y, d.radius);
-      g.addColorStop(0, d.color.replace('0.24', '0.34'));
-      g.addColorStop(.7, d.color);
-      g.addColorStop(1, 'rgba(0,0,0,0)');
-      ctx.fillStyle = g;
+      if (!d._gradient) {
+        const g = ctx.createRadialGradient(d.x, d.y, 0, d.x, d.y, d.radius);
+        g.addColorStop(0, d.color.replace('0.24', '0.34'));
+        g.addColorStop(.7, d.color);
+        g.addColorStop(1, 'rgba(0,0,0,0)');
+        d._gradient = g;
+      }
+      ctx.fillStyle = d._gradient;
     }
     ctx.beginPath();
     ctx.ellipse(d.x, d.y, d.radius * 1.1, d.radius * (.65 + Math.sin(d.seed) * .12), d.seed, 0, Math.PI * 2);
@@ -999,38 +1028,21 @@ export function draw() {
     ctx.fill();
   }
 
+  const trailSprites = getBulletTrailSprites();
   for (const b of game.bullets) {
     const speed = Math.hypot(b.vx, b.vy) || 1;
     const nx = b.vx / speed;
     const ny = b.vy / speed;
     const trailLen = b.isCrit ? 26 : (b.damage > 1.3 ? 20 : 15);
-    const tailX = b.x - nx * trailLen;
-    const tailY = b.y - ny * trailLen;
+    const lineWidth = b.isCrit ? 5 : (b.damage > 1.3 ? 4 : 2.8);
+    const spriteKey = b.isCrit ? 'crit' : (b.pierce > 1 ? 'pierce' : 'normal');
 
-    // Tapered energy tracer beam
-    const grad = ctx.createLinearGradient(tailX, tailY, b.x, b.y);
-    if (b.isCrit) {
-      grad.addColorStop(0, 'rgba(255, 214, 102, 0)');
-      grad.addColorStop(0.5, 'rgba(255, 180, 50, 0.45)');
-      grad.addColorStop(1, '#fff6d6');
-    } else if (b.pierce > 1) {
-      grad.addColorStop(0, 'rgba(105, 182, 255, 0)');
-      grad.addColorStop(0.5, 'rgba(74, 160, 255, 0.45)');
-      grad.addColorStop(1, '#e5f3ff');
-    } else {
-      grad.addColorStop(0, 'rgba(121, 242, 154, 0)');
-      grad.addColorStop(0.5, 'rgba(121, 242, 154, 0.45)');
-      grad.addColorStop(1, '#ffffff');
-    }
-
+    // Tapered energy tracer beam (pre-rendered sprite, transformed per bullet)
     ctx.save();
-    ctx.strokeStyle = grad;
-    ctx.lineWidth = b.isCrit ? 5 : (b.damage > 1.3 ? 4 : 2.8);
-    ctx.lineCap = 'round';
-    ctx.beginPath();
-    ctx.moveTo(tailX, tailY);
-    ctx.lineTo(b.x, b.y);
-    ctx.stroke();
+    ctx.translate(b.x, b.y);
+    ctx.rotate(Math.atan2(ny, nx));
+    ctx.drawImage(trailSprites[spriteKey], -trailLen, -lineWidth / 2, trailLen, lineWidth);
+    ctx.restore();
 
     // Luminous halo
     if (!game.performanceMode) {
@@ -1045,7 +1057,6 @@ export function draw() {
     ctx.arc(b.x, b.y, b.r * 0.9, 0, Math.PI * 2);
     ctx.fillStyle = b.isCrit ? '#fffbe8' : (b.pierce > 1 ? '#eaf4ff' : '#ffffff');
     ctx.fill();
-    ctx.restore();
   }
 
   for (const z of game.zombies) drawZombie(z);

@@ -1041,7 +1041,10 @@ export function update(dt) {
                 maxLife: 0.14
               });
               playElectricZap();
-              if (cz.hp <= 0) killZombie(k, b.isCrit);
+              if (cz.hp <= 0) {
+                killZombie(k, b.isCrit);
+                if (k < j) j--;
+              }
               chainCount++;
               if (chainCount >= 3) break;
             }
