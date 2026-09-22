@@ -5,7 +5,7 @@ Zombie Room is an offline-first, canvas-based survival game for desktop and mobi
 ## Current Features
 
 - Canvas game loop with automatic targeting and shooting.
-- Four-direction keyboard, arrow-key, and touch controls.
+- 360-degree analog floating virtual joystick for touch devices with dynamic thumb-centering and speed scaling, plus WASD / arrow-key support on desktop.
 - Walker, runner, tank, and boss enemy types.
 - Waves, experience orbs, automatic level upgrades, score, kills, and local best score.
 - Responsive HUD, safe-area handling, portrait and landscape mobile layouts.
@@ -17,9 +17,11 @@ Zombie Room is an offline-first, canvas-based survival game for desktop and mobi
 - Reduced-motion support through `prefers-reduced-motion`.
 - Localized UI in English, Simplified Chinese, Malay, Japanese, Korean, Vietnamese, and Thai.
 - Browser-language detection with a persisted language selection.
-- Merged single-card HUD (vitals, wave/kills/time/level, score/best/FPS) instead of two competing panels.
-- Collapsible settings menu (language, install, update) behind a single header trigger, with focus trap, outside-click, and Escape handling.
-- Full-screen defeat overlay: blurred/dimmed backdrop, hero score, icon-based stats, and a dedicated Restart button in addition to keyboard/D-pad restart.
+- Unified compact top status bar (brand, quick pause, HP/XP meters, wave/kills/time, score/best, settings) reclaiming over 80px of vertical combat view.
+- Explicit pause/resume mechanism: pause button in header, 'P'/'Escape' hotkeys, and auto-pause on opening the settings menu or switching browser tabs.
+- Dedicated pause overlay dialog with blurred/dimmed canvas backdrop.
+- Collapsible settings menu (language, install, update, and FPS/performance diagnostics) behind a single header trigger, with focus trap, outside-click, and Escape handling.
+- Full-screen defeat overlay: blurred/dimmed backdrop, hero score, wave/kills/time stats, "NEW BEST!" achievement banner, and a dedicated Restart button in addition to keyboard/D-pad restart.
 
 ## Project Structure
 
@@ -68,9 +70,9 @@ In the repository settings, open **Settings → Pages** and set the source to **
 
 ## Controls
 
-- **Desktop:** `W`, `A`, `S`, `D`, or the arrow keys.
-- **Mobile:** on-screen directional pad.
-- **Restart after defeat:** press any movement direction.
+- **Desktop:** `W`, `A`, `S`, `D`, or the arrow keys (`P` or `Escape` to pause/resume).
+- **Mobile:** 360-degree floating virtual joystick with analog deflection and speed scaling.
+- **Restart after defeat:** tap the joystick, press any movement direction, or tap the Restart button.
 - **Combat:** shooting and target selection are automatic.
 
 ## PWA and Mobile Compatibility
@@ -117,11 +119,10 @@ The core loop is clear and immediately playable. The main improvement opportunit
 
 ### UI and UX
 
-- Done: HUD merged into a single status bar; install/language/update moved into a collapsible settings menu; defeat screen now has a full-screen backdrop, hero score, and a dedicated Restart button alongside keyboard/D-pad restart.
+- Done: Top App Bar and HUD consolidated into a single compact status strip; duplicate level metric removed; FPS/performance diagnostics relocated into the settings panel; full pause/resume lifecycle added (header button, hotkey, tab switch, settings menu auto-pause); defeat screen enhanced with Wave reached, "NEW BEST!" banner, and dedicated Restart button.
 - Add sound and reduced-motion toggles to the settings menu.
 - Add stronger visual distinction between player, XP, bullets, runners, tanks, and bosses for color-blind users using shape, pattern, and animation in addition to color.
 - Add explicit focus-visible styles and test all controls with keyboard and switch-like pointer input.
-- Move FPS/performance-mode readout into the settings menu as a diagnostics toggle for normal players (currently still always visible in the HUD).
 
 ### Layout and map
 

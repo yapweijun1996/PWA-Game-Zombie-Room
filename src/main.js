@@ -1,6 +1,6 @@
 import { dom, ui, viewport, room, game, perf, scoreState } from './state.js';
 import { clamp } from './utils.js';
-import { resetGame, update, isDesktopControls } from './entities.js';
+import { resetGame, update, isDesktopControls, setPaused, togglePause } from './entities.js';
 import { evaluatePerformance, refreshPerfLabel } from './effects.js';
 import { draw } from './render.js';
 import { initPwa, refreshPwaLabels } from './pwa.js';
@@ -17,10 +17,11 @@ function resize() {
   dom.canvas.style.width = viewport.W + 'px';
   dom.canvas.style.height = viewport.H + 'px';
 
-  const hudRect = dom.hud.getBoundingClientRect();
-  const controlsRect = dom.controlsWrap.getBoundingClientRect();
-  const roomTop = Math.max(hudRect.bottom + 8, dom.appbar.getBoundingClientRect().bottom + 8);
-  const mobileBottom = controlsRect.height > 0 ? Math.max(controlsRect.height + 14, 172) : 18;
+  const hudRect = dom.hud ? dom.hud.getBoundingClientRect() : { bottom: 60 };
+  const appbarBottom = dom.appbar ? dom.appbar.getBoundingClientRect().bottom : 0;
+  const roomTop = Math.max(hudRect.bottom + 8, appbarBottom + 8);
+  const controlsRect = dom.controlsWrap ? dom.controlsWrap.getBoundingClientRect() : { height: 0 };
+  const mobileBottom = controlsRect.height > 0 ? Math.max(controlsRect.height + 8, 134) : 18;
   const bottomReserve = isDesktopControls() ? 18 : mobileBottom;
 
   room.x = 10;
@@ -38,18 +39,24 @@ function frame(now) {
   const dt = Math.min(.034, Math.max(0, (now - perf.last) / 1000));
   perf.last = now;
 
-  perf.fpsFrames++;
-  const fpsWindowMs = now - perf.fpsWindowStart;
-  if (fpsWindowMs >= 500) {
-    const measuredFps = perf.fpsFrames * 1000 / fpsWindowMs;
-    perf.fpsValue = perf.fpsValue ? perf.fpsValue * .62 + measuredFps * .38 : measuredFps;
-    ui.fpsText.textContent = String(Math.round(perf.fpsValue));
-    evaluatePerformance(perf.fpsValue, now);
-    perf.fpsFrames = 0;
+  if (!game.paused) {
+    perf.fpsFrames++;
+    const fpsWindowMs = now - perf.fpsWindowStart;
+    if (fpsWindowMs >= 500) {
+      const measuredFps = perf.fpsFrames * 1000 / fpsWindowMs;
+      perf.fpsValue = perf.fpsValue ? perf.fpsValue * .62 + measuredFps * .38 : measuredFps;
+      if (ui.fpsText) ui.fpsText.textContent = String(Math.round(perf.fpsValue));
+      evaluatePerformance(perf.fpsValue, now);
+      perf.fpsFrames = 0;
+      perf.fpsWindowStart = now;
+    }
+
+    update(dt);
+  } else {
     perf.fpsWindowStart = now;
+    perf.fpsFrames = 0;
   }
 
-  update(dt);
   draw();
   requestAnimationFrame(frame);
 }
@@ -57,7 +64,11 @@ function frame(now) {
 addEventListener('resize', () => requestAnimationFrame(resize), { passive: true });
 addEventListener('orientationchange', () => setTimeout(resize, 140), { passive: true });
 document.addEventListener('visibilitychange', () => {
-  if (!document.hidden) {
+  if (document.hidden) {
+    if (game.running && !game.paused) {
+      setPaused(true);
+    }
+  } else {
     perf.last = performance.now();
     perf.fpsWindowStart = perf.last;
     perf.fpsFrames = 0;
@@ -78,4 +89,9 @@ initPwa();
 initInput(resetGame);
 initSettingsMenu();
 dom.restartButton?.addEventListener('click', resetGame);
+dom.pauseButton?.addEventListener('click', togglePause);
+dom.resumeButton?.addEventListener('click', () => setPaused(false));
+dom.pauseOverlay?.addEventListener('click', e => {
+  if (e.target === dom.pauseOverlay) setPaused(false);
+});
 requestAnimationFrame(now => { perf.last = now; requestAnimationFrame(frame); });

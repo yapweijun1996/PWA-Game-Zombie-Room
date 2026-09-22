@@ -33,7 +33,46 @@ export function isDesktopControls() {
   return innerWidth >= 800 && matchMedia('(pointer: fine)').matches;
 }
 
+export function setPaused(paused) {
+  if (!game.running && paused) return;
+  game.paused = paused;
+  if (dom.pauseOverlay) {
+    dom.pauseOverlay.hidden = !paused;
+    dom.pauseOverlay.classList.toggle('show', paused);
+  }
+  if (dom.canvas) {
+    if (paused) {
+      dom.canvas.classList.add('game-dimmed');
+    } else if (game.running) {
+      dom.canvas.classList.remove('game-dimmed');
+    }
+  }
+  if (dom.pauseButton) {
+    dom.pauseButton.classList.toggle('active', paused);
+    const pauseIcon = dom.pauseButton.querySelector('.pause-icon');
+    const playIcon = dom.pauseButton.querySelector('.play-icon');
+    if (pauseIcon && playIcon) {
+      if (paused) {
+        pauseIcon.setAttribute('hidden', '');
+        playIcon.removeAttribute('hidden');
+      } else {
+        playIcon.setAttribute('hidden', '');
+        pauseIcon.removeAttribute('hidden');
+      }
+    }
+  }
+  if (!paused) {
+    perf.last = performance.now();
+  }
+}
+
+export function togglePause() {
+  if (!game.running) return;
+  setPaused(!game.paused);
+}
+
 export function resetGame() {
+  setPaused(false);
   game.running = true;
   game.elapsed = 0;
   game.score = 0;
@@ -53,6 +92,7 @@ export function resetGame() {
   perf.recoveredFpsWindows = 0;
   perf.perfWarmupUntil = performance.now() + 2200;
   ui.gameover.classList.remove('show');
+  if (ui.gameoverNewBest) ui.gameoverNewBest.hidden = true;
   dom.canvas.classList.remove('game-blurred', 'game-dimmed');
   dom.hintPill.classList.remove('hide');
   setTimeout(() => dom.hintPill.classList.add('hide'), 4200);
@@ -214,11 +254,16 @@ function endGame() {
   const p = game.player;
   p.hp = 0;
   game.running = false;
-  scoreState.best = Math.max(scoreState.best, Math.floor(game.score));
+  setPaused(false);
+  const currentScore = Math.floor(game.score);
+  const isNewBest = currentScore > scoreState.best && scoreState.best > 0;
+  scoreState.best = Math.max(scoreState.best, currentScore);
   localStorage.setItem('zombie-room-best', String(scoreState.best));
-  ui.gameoverScore.textContent = Math.floor(game.score);
+  ui.gameoverScore.textContent = currentScore;
+  if (ui.gameoverWave) ui.gameoverWave.textContent = game.wave;
   ui.gameoverKills.textContent = game.kills;
   ui.gameoverTime.textContent = formatTime(game.elapsed);
+  if (ui.gameoverNewBest) ui.gameoverNewBest.hidden = !isNewBest;
   dom.canvas.classList.add(game.performanceMode ? 'game-dimmed' : 'game-blurred');
   ui.gameover.classList.add('show');
   ui.gameover.focus();
@@ -247,7 +292,7 @@ export function update(dt) {
   game.cameraShake = Math.max(0, game.cameraShake - dt * 1.7);
   game.roomPhase += dt * .8;
 
-  if (!game.running) return;
+  if (!game.running || game.paused) return;
 
   game.elapsed += dt;
   const p = game.player;
@@ -267,14 +312,22 @@ export function update(dt) {
 
   let mx = (input.right ? 1 : 0) - (input.left ? 1 : 0);
   let my = (input.down ? 1 : 0) - (input.up ? 1 : 0);
-  p.moving = !!(mx || my);
+  let speedMultiplier = 1;
+  if (input.active) {
+    mx = input.vx;
+    my = input.vy;
+    const rawLen = Math.hypot(mx, my);
+    speedMultiplier = Math.min(1, Math.max(0.25, rawLen));
+  }
+  const len = Math.hypot(mx, my);
+  p.moving = len > 0.06;
   if (p.moving) {
-    const len = Math.hypot(mx, my) || 1;
-    mx /= len; my /= len;
-    p.moveAngle = Math.atan2(my, mx);
-    p.walkTime += dt * 11;
-    p.x += mx * p.speed * dt;
-    p.y += my * p.speed * dt;
+    const normX = mx / len;
+    const normY = my / len;
+    p.moveAngle = Math.atan2(normY, normX);
+    p.walkTime += dt * 11 * speedMultiplier;
+    p.x += normX * p.speed * speedMultiplier * dt;
+    p.y += normY * p.speed * speedMultiplier * dt;
   } else {
     p.walkTime += dt * 3;
   }

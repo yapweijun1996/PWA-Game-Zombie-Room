@@ -20,20 +20,57 @@
   <main id="app" data-i18n-aria="gameAria" aria-label="Zombie Room game">
     <canvas id="game"></canvas>
 
-    <header class="appbar" id="appbar">
-      <div class="brand" data-i18n-aria="brandAria" aria-label="Zombie Room">
-        <div class="brand-mark" aria-hidden="true">ZR</div>
-        <div class="brand-copy">
-          <div class="brand-title" data-i18n="brandTitle">ZOMBIE ROOM</div>
-          <div class="brand-subtitle" data-i18n="brandSubtitle">Move only · Auto fire</div>
+    <header class="appbar hud-appbar" id="appbar">
+      <div class="card hud-bar" id="hud" aria-live="polite">
+        <div class="hud-col hud-brand-col">
+          <div class="brand-mark" aria-hidden="true">ZR</div>
+          <button class="hud-action-btn" id="pauseButton" type="button" data-i18n-aria="pauseLabel" aria-label="Pause game">
+            <svg class="hud-action-icon pause-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <rect x="6" y="5" width="4" height="14" rx="1.5" fill="currentColor"/>
+              <rect x="14" y="5" width="4" height="14" rx="1.5" fill="currentColor"/>
+            </svg>
+            <svg class="hud-action-icon play-icon" viewBox="0 0 24 24" aria-hidden="true" hidden>
+              <polygon points="6 4 20 12 6 20" fill="currentColor"/>
+            </svg>
+          </button>
         </div>
-      </div>
-      <div class="app-actions">
-        <button class="settings-trigger" id="settingsTrigger" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="settingsPanel" data-i18n-aria="settingsTrigger" aria-label="More options">
-          <svg class="settings-icon" viewBox="0 0 24 24" aria-hidden="true">
-            <circle cx="5" cy="12" r="2.1"/><circle cx="12" cy="12" r="2.1"/><circle cx="19" cy="12" r="2.1"/>
-          </svg>
-        </button>
+
+        <div class="hud-col hud-vitals-col">
+          <div class="hud-bars-row">
+            <div class="hud-meter meter-hp">
+              <div class="meter-head">
+                <span class="label" data-i18n="hudHealth">Health</span>
+                <span class="value" id="hpText">100 / 100</span>
+              </div>
+              <div class="bar"><i id="hpFill"></i></div>
+            </div>
+            <div class="hud-meter meter-xp">
+              <div class="meter-head">
+                <span class="label"><span data-i18n="hudXpLevelPrefix">XP · LV</span> <b id="levelText">1</b></span>
+                <span class="value" id="xpText">0 / 5</span>
+              </div>
+              <div class="bar"><i id="xpFill"></i></div>
+            </div>
+          </div>
+          <div class="hud-metrics-row">
+            <div class="metric"><span data-i18n="hudWave">Wave</span><b id="waveText">1</b></div>
+            <div class="metric"><span data-i18n="hudKills">Kills</span><b id="killsText">0</b></div>
+            <div class="metric"><span data-i18n="hudTime">Time</span><b id="timeText">0:00</b></div>
+          </div>
+        </div>
+
+        <div class="hud-col hud-score-col">
+          <div class="score-box">
+            <div class="label" data-i18n="hudScore">Score</div>
+            <div class="score-value" id="scoreText">0</div>
+            <div class="best-line"><span data-i18n="hudBest">Best</span> <strong id="bestText">0</strong></div>
+          </div>
+          <button class="settings-trigger" id="settingsTrigger" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="settingsPanel" data-i18n-aria="settingsTrigger" aria-label="More options">
+            <svg class="settings-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="5" cy="12" r="2.1"/><circle cx="12" cy="12" r="2.1"/><circle cx="19" cy="12" r="2.1"/>
+            </svg>
+          </button>
+        </div>
       </div>
     </header>
 
@@ -51,47 +88,40 @@
       </button>
       <button class="update-button settings-action" id="updateButton" type="button" data-i18n-aria="updateAriaCheck" aria-label="Check for Zombie Room updates">
         <span class="update-dot" aria-hidden="true"></span>
-        <span id="updateLabel">Update v1.5.0</span>
+        <span id="updateLabel">Update v1.6.0</span>
       </button>
-    </div>
-    <div class="install-tip" id="installTip" role="status" aria-live="polite"></div>
-
-    <section class="hud" id="hud" aria-live="polite">
-      <div class="card hud-bar">
-        <div class="hud-section status-card">
-          <div class="row"><span class="label" data-i18n="hudHealth">Health</span><span class="value" id="hpText">100 / 100</span></div>
-          <div class="bar"><i id="hpFill"></i></div>
-          <div class="row" style="margin-top:6px"><span class="label"><span data-i18n="hudXpLevelPrefix">XP · LV</span> <b id="levelText">1</b></span><span class="value" id="xpText">0 / 5</span></div>
-          <div class="bar"><i id="xpFill"></i></div>
-          <div class="meta-grid">
-            <div class="metric"><span data-i18n="hudWave">Wave</span><b id="waveText">1</b></div>
-            <div class="metric"><span data-i18n="hudKills">Kills</span><b id="killsText">0</b></div>
-            <div class="metric"><span data-i18n="hudTime">Time</span><b id="timeText">0:00</b></div>
-            <div class="metric"><span data-i18n="hudLevel">Level</span><b id="levelMetric">1</b></div>
-          </div>
-        </div>
-        <div class="hud-divider" aria-hidden="true"></div>
-        <div class="hud-section stats-card">
-          <div class="label" data-i18n="hudScore">Score</div>
-          <div class="score-value" id="scoreText">0</div>
-          <div class="best-line"><span data-i18n="hudBest">Best</span> <strong id="bestText">0</strong></div>
+      <div class="settings-diagnostics">
+        <div class="settings-label" data-i18n="hudDiagnostics">Performance</div>
+        <div class="diagnostics-row">
           <div class="fps-line"><span data-i18n="hudFps">FPS</span> <strong id="fpsText">--</strong></div>
           <div class="perf-line" id="perfLine"><span data-i18n="hudAuto">Auto</span> · <strong id="perfText">FULL</strong></div>
         </div>
       </div>
-    </section>
+    </div>
+    <div class="install-tip" id="installTip" role="status" aria-live="polite"></div>
 
     <div class="message" id="message" data-i18n="msgLevelUp">LEVEL UP</div>
     <div class="hint-pill" id="hintPill" data-i18n="hintPill">Move · Auto fire · Collect blue XP</div>
     <div class="damage-flash" id="damageFlash"></div>
 
     <div class="center-overlay">
+      <div class="card pause-card" id="pauseOverlay" role="dialog" aria-modal="true" aria-labelledby="pauseTitle" hidden tabindex="-1">
+        <div class="pause-badge" aria-hidden="true">⏸</div>
+        <h2 id="pauseTitle" data-i18n="pausedTitle">PAUSED</h2>
+        <p class="pause-subtitle" data-i18n="pausedSubtitle">Tap or press P to resume</p>
+        <button class="resume-button" id="resumeButton" type="button" data-i18n="resumeButtonLabel">RESUME</button>
+      </div>
+
       <div class="card gameover" id="gameover" role="dialog" aria-modal="true" aria-labelledby="gameoverTitle" tabindex="-1">
         <div class="gameover-badge" aria-hidden="true">×</div>
         <h1 id="gameoverTitle" data-i18n="gameoverTitle">ROOM LOST</h1>
+        <div class="gameover-new-best" id="gameoverNewBest" hidden data-i18n="gameoverNewBest">★ NEW BEST! ★</div>
         <div class="gameover-score-label" data-i18n="hudScore">Score</div>
         <div class="gameover-score" id="gameoverScore">0</div>
         <div class="gameover-stat-row">
+          <div class="gameover-stat" data-i18n-aria="hudWave" aria-label="Wave">
+            <span class="gameover-stat-icon" aria-hidden="true">🌊</span><b id="gameoverWave">1</b>
+          </div>
           <div class="gameover-stat" data-i18n-aria="hudKills" aria-label="Kills">
             <span class="gameover-stat-icon" aria-hidden="true">💀</span><b id="gameoverKills">0</b>
           </div>
@@ -105,11 +135,16 @@
     </div>
 
     <div class="controls-wrap" id="controlsWrap" data-i18n-aria="controlsAria" aria-label="Movement controls">
-      <div class="dpad" id="dpad">
-        <button id="up" data-key="up" data-letter="W" data-i18n-aria="moveUp" aria-label="Move up">↑</button>
-        <button id="left" data-key="left" data-letter="A" data-i18n-aria="moveLeft" aria-label="Move left">←</button>
-        <button id="right" data-key="right" data-letter="D" data-i18n-aria="moveRight" aria-label="Move right">→</button>
-        <button id="down" data-key="down" data-letter="S" data-i18n-aria="moveDown" aria-label="Move down">↓</button>
+      <div class="joystick-zone" id="joystickZone" role="application" data-i18n-aria="controlsAria" aria-label="Virtual joystick">
+        <div class="joystick-base" id="joystickBase">
+          <div class="joystick-ring" aria-hidden="true">
+            <span class="ring-pip pip-n"></span>
+            <span class="ring-pip pip-e"></span>
+            <span class="ring-pip pip-s"></span>
+            <span class="ring-pip pip-w"></span>
+          </div>
+          <div class="joystick-knob" id="joystickKnob" aria-hidden="true"></div>
+        </div>
       </div>
     </div>
     <div class="desktop-hint" data-i18n="hintDesktop">WASD / Arrow Keys · shooting is automatic</div>

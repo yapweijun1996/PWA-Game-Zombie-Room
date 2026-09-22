@@ -1,4 +1,4 @@
-export const APP_VERSION = '1.5.0';
+export const APP_VERSION = '1.6.0';
 
 export const dom = {
   canvas: document.getElementById('game'),
@@ -9,7 +9,13 @@ export const dom = {
   installTip: document.getElementById('installTip'),
   appbar: document.getElementById('appbar'),
   hud: document.getElementById('hud'),
+  pauseButton: document.getElementById('pauseButton'),
+  pauseOverlay: document.getElementById('pauseOverlay'),
+  resumeButton: document.getElementById('resumeButton'),
   controlsWrap: document.getElementById('controlsWrap'),
+  joystickZone: document.getElementById('joystickZone'),
+  joystickBase: document.getElementById('joystickBase'),
+  joystickKnob: document.getElementById('joystickKnob'),
   hintPill: document.getElementById('hintPill'),
   languageSelect: document.getElementById('languageSelect'),
   restartButton: document.getElementById('restartButton')
@@ -36,11 +42,21 @@ export const ui = {
   damageFlash: document.getElementById('damageFlash'),
   gameover: document.getElementById('gameover'),
   gameoverScore: document.getElementById('gameoverScore'),
+  gameoverWave: document.getElementById('gameoverWave'),
   gameoverKills: document.getElementById('gameoverKills'),
-  gameoverTime: document.getElementById('gameoverTime')
+  gameoverTime: document.getElementById('gameoverTime'),
+  gameoverNewBest: document.getElementById('gameoverNewBest')
 };
 
-export const input = { up: false, down: false, left: false, right: false };
+export const input = {
+  up: false,
+  down: false,
+  left: false,
+  right: false,
+  vx: 0,
+  vy: 0,
+  active: false
+};
 
 export const keyMap = {
   w: 'up', arrowup: 'up',
@@ -84,6 +100,7 @@ export const scoreState = {
 
 export const game = {
   running: true,
+  paused: false,
   elapsed: 0,
   score: 0,
   kills: 0,

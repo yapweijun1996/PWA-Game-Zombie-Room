@@ -1,3 +1,6 @@
+import { game } from './state.js';
+import { setPaused } from './entities.js';
+
 const CLOSE_TRANSITION_MS = 220;
 
 export function initSettingsMenu() {
@@ -7,6 +10,7 @@ export function initSettingsMenu() {
   if (!trigger || !panel) return;
 
   let hideTimer = 0;
+  let wasPausedBySettings = false;
 
   function isOpen() {
     return !panel.hidden;
@@ -32,6 +36,10 @@ export function initSettingsMenu() {
       if (backdrop) backdrop.classList.add('show');
     });
     trigger.setAttribute('aria-expanded', 'true');
+    if (game.running && !game.paused) {
+      wasPausedBySettings = true;
+      setPaused(true);
+    }
     const focusable = panel.querySelector('select, button, [href], input, [tabindex]');
     focusable?.focus();
     document.addEventListener('keydown', onKeydown);
@@ -45,6 +53,10 @@ export function initSettingsMenu() {
     trigger.setAttribute('aria-expanded', 'false');
     document.removeEventListener('keydown', onKeydown);
     document.removeEventListener('pointerdown', onOutsidePointer, true);
+    if (wasPausedBySettings) {
+      wasPausedBySettings = false;
+      if (game.running) setPaused(false);
+    }
     hideTimer = setTimeout(() => {
       panel.hidden = true;
       if (backdrop) backdrop.hidden = true;

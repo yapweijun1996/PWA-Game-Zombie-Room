@@ -79,7 +79,13 @@ const dict = {
     moveRight: 'Move right',
     controlsAria: 'Movement controls',
     gameAria: 'Zombie Room game',
-    bossLabel: 'BOSS'
+    bossLabel: 'BOSS',
+    pauseLabel: 'Pause game',
+    resumeButtonLabel: 'RESUME',
+    pausedTitle: 'PAUSED',
+    pausedSubtitle: 'Tap or press P to resume',
+    gameoverNewBest: '★ NEW BEST! ★',
+    hudDiagnostics: 'Performance'
   },
   zh: {
     appTitle: '僵尸房间',
@@ -137,7 +143,13 @@ const dict = {
     moveRight: '向右移动',
     controlsAria: '移动控制',
     gameAria: '僵尸房间游戏',
-    bossLabel: 'BOSS'
+    bossLabel: 'BOSS',
+    pauseLabel: '暂停游戏',
+    resumeButtonLabel: '继续游戏',
+    pausedTitle: '已暂停',
+    pausedSubtitle: '点击或按 P 键继续',
+    gameoverNewBest: '★ 新纪录！ ★',
+    hudDiagnostics: '性能诊断'
   },
   ms: {
     appTitle: 'Zombie Room',
@@ -195,7 +207,13 @@ const dict = {
     moveRight: 'Gerak ke kanan',
     controlsAria: 'Kawalan pergerakan',
     gameAria: 'Permainan Zombie Room',
-    bossLabel: 'BOS'
+    bossLabel: 'BOS',
+    pauseLabel: 'Jeda permainan',
+    resumeButtonLabel: 'SAMBUNG',
+    pausedTitle: 'DIJEDA',
+    pausedSubtitle: 'Ketik atau tekan P untuk sambung',
+    gameoverNewBest: '★ REKOD BAHARU! ★',
+    hudDiagnostics: 'Prestasi'
   },
   ja: {
     appTitle: 'Zombie Room',
@@ -253,7 +271,13 @@ const dict = {
     moveRight: '右へ移動',
     controlsAria: '移動コントロール',
     gameAria: 'Zombie Roomゲーム',
-    bossLabel: 'ボス'
+    bossLabel: 'ボス',
+    pauseLabel: 'ゲームを一時停止',
+    resumeButtonLabel: '再開',
+    pausedTitle: '一時停止中',
+    pausedSubtitle: 'タップまたは P キーで再開',
+    gameoverNewBest: '★ 新記録！ ★',
+    hudDiagnostics: 'パフォーマンス'
   },
   ko: {
     appTitle: 'Zombie Room',
@@ -311,7 +335,13 @@ const dict = {
     moveRight: '오른쪽으로 이동',
     controlsAria: '이동 컨트롤',
     gameAria: 'Zombie Room 게임',
-    bossLabel: '보스'
+    bossLabel: '보스',
+    pauseLabel: '게임 일시정지',
+    resumeButtonLabel: '계속하기',
+    pausedTitle: '일시정지됨',
+    pausedSubtitle: '탭하거나 P 키를 눌러 계속',
+    gameoverNewBest: '★ 신기록! ★',
+    hudDiagnostics: '성능 진단'
   },
   vi: {
     appTitle: 'Zombie Room',
@@ -369,7 +399,13 @@ const dict = {
     moveRight: 'Di chuyển phải',
     controlsAria: 'Điều khiển di chuyển',
     gameAria: 'Trò chơi Zombie Room',
-    bossLabel: 'TRÙM'
+    bossLabel: 'TRÙM',
+    pauseLabel: 'Tạm dừng trò chơi',
+    resumeButtonLabel: 'TIẾP TỤC',
+    pausedTitle: 'ĐÃ TẠM DỪNG',
+    pausedSubtitle: 'Chạm hoặc nhấn P để tiếp tục',
+    gameoverNewBest: '★ KỶ LỤC MỚI! ★',
+    hudDiagnostics: 'Hiệu suất'
   },
   th: {
     appTitle: 'Zombie Room',
@@ -427,7 +463,13 @@ const dict = {
     moveRight: 'เคลื่อนที่ขวา',
     controlsAria: 'ปุ่มควบคุมการเคลื่อนที่',
     gameAria: 'เกม Zombie Room',
-    bossLabel: 'บอส'
+    bossLabel: 'บอส',
+    pauseLabel: 'หยุดเกมชั่วคราว',
+    resumeButtonLabel: 'เล่นต่อ',
+    pausedTitle: 'หยุดชั่วคราว',
+    pausedSubtitle: 'แตะหรือกด P เพื่อเล่นต่อ',
+    gameoverNewBest: '★ สถิติใหม่! ★',
+    hudDiagnostics: 'ประสิทธิภาพ'
   }
 };
 

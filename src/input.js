@@ -1,45 +1,132 @@
 import { input, keyMap, game } from './state.js';
+import { togglePause } from './entities.js';
 
 export function initInput(onRestart) {
-  function setInput(dir, pressed) {
+  function setKeyboardInput(dir, pressed) {
     if (!Object.prototype.hasOwnProperty.call(input, dir)) return;
     if (pressed && !game.running) onRestart();
     input[dir] = pressed;
-    const button = document.querySelector('[data-key="' + dir + '"]');
-    if (button) button.classList.toggle('active', pressed);
   }
 
   addEventListener('keydown', e => {
+    if ((e.key === 'p' || e.key === 'P' || e.key === 'Escape') && game.running) {
+      const panel = document.getElementById('settingsPanel');
+      if (panel && !panel.hidden && e.key === 'Escape') return;
+      e.preventDefault();
+      togglePause();
+      return;
+    }
     const dir = keyMap[e.key.toLowerCase()];
     if (!dir) return;
     e.preventDefault();
-    setInput(dir, true);
+    setKeyboardInput(dir, true);
   }, { passive: false });
 
   addEventListener('keyup', e => {
     const dir = keyMap[e.key.toLowerCase()];
     if (!dir) return;
     e.preventDefault();
-    setInput(dir, false);
+    setKeyboardInput(dir, false);
   }, { passive: false });
 
-  document.querySelectorAll('.dpad button').forEach(button => {
-    const dir = button.dataset.key;
-    const down = e => {
-      e.preventDefault();
-      try { button.setPointerCapture(e.pointerId); } catch (_) {}
-      setInput(dir, true);
-    };
-    const up = e => {
-      e.preventDefault();
-      setInput(dir, false);
-    };
-    button.addEventListener('pointerdown', down, { passive: false });
-    button.addEventListener('pointerup', up, { passive: false });
-    button.addEventListener('pointercancel', up, { passive: false });
-    button.addEventListener('lostpointercapture', up, { passive: false });
-    button.addEventListener('contextmenu', e => e.preventDefault());
-  });
+  const zone = document.getElementById('joystickZone');
+  const base = document.getElementById('joystickBase');
+  const knob = document.getElementById('joystickKnob');
 
-  addEventListener('blur', () => Object.keys(input).forEach(k => setInput(k, false)));
+  if (zone && base && knob) {
+    const MAX_RADIUS = 36;
+    let activePointerId = null;
+    let originX = 0;
+    let originY = 0;
+
+    function resetJoystick() {
+      activePointerId = null;
+      input.active = false;
+      input.vx = 0;
+      input.vy = 0;
+      input.up = false;
+      input.down = false;
+      input.left = false;
+      input.right = false;
+      knob.style.transition = 'transform .18s ease-out';
+      knob.style.transform = 'translate(0px, 0px)';
+      base.classList.remove('active');
+      base.style.left = '';
+      base.style.top = '';
+    }
+
+    function onPointerDown(e) {
+      if (activePointerId !== null) return;
+      if (!game.running) {
+        onRestart();
+        return;
+      }
+      e.preventDefault();
+      activePointerId = e.pointerId;
+      try { zone.setPointerCapture(e.pointerId); } catch (_) {}
+
+      const zoneRect = zone.getBoundingClientRect();
+      originX = e.clientX;
+      originY = e.clientY;
+
+      const localX = originX - zoneRect.left;
+      const localY = originY - zoneRect.top;
+
+      base.style.left = localX + 'px';
+      base.style.top = localY + 'px';
+      base.classList.add('active');
+      knob.style.transition = 'none';
+      knob.style.transform = 'translate(0px, 0px)';
+      input.active = true;
+    }
+
+    function onPointerMove(e) {
+      if (e.pointerId !== activePointerId) return;
+      e.preventDefault();
+      const dx = e.clientX - originX;
+      const dy = e.clientY - originY;
+      const dist = Math.hypot(dx, dy);
+
+      const clampedDist = Math.min(dist, MAX_RADIUS);
+      const angle = dist > 0 ? Math.atan2(dy, dx) : 0;
+
+      const knobX = Math.cos(angle) * clampedDist;
+      const knobY = Math.sin(angle) * clampedDist;
+
+      knob.style.transform = `translate(${knobX}px, ${knobY}px)`;
+
+      const power = clampedDist / MAX_RADIUS;
+      input.vx = Math.cos(angle) * power;
+      input.vy = Math.sin(angle) * power;
+
+      input.left = input.vx < -0.3;
+      input.right = input.vx > 0.3;
+      input.up = input.vy < -0.3;
+      input.down = input.vy > 0.3;
+    }
+
+    function onPointerEnd(e) {
+      if (e.pointerId !== activePointerId) return;
+      e.preventDefault();
+      try { zone.releasePointerCapture(e.pointerId); } catch (_) {}
+      resetJoystick();
+    }
+
+    zone.addEventListener('pointerdown', onPointerDown, { passive: false });
+    zone.addEventListener('pointermove', onPointerMove, { passive: false });
+    zone.addEventListener('pointerup', onPointerEnd, { passive: false });
+    zone.addEventListener('pointercancel', onPointerEnd, { passive: false });
+    zone.addEventListener('lostpointercapture', onPointerEnd, { passive: false });
+    zone.addEventListener('contextmenu', e => e.preventDefault());
+  }
+
+  addEventListener('blur', () => {
+    input.up = false;
+    input.down = false;
+    input.left = false;
+    input.right = false;
+    input.vx = 0;
+    input.vy = 0;
+    input.active = false;
+  });
 }

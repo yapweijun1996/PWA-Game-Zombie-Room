@@ -15,7 +15,7 @@ export function updateUI() {
   ui.xpText.textContent = p.xp + ' / ' + p.xpNeed;
   ui.xpFill.style.width = clamp(p.xp / p.xpNeed * 100, 0, 100) + '%';
   ui.levelText.textContent = p.level;
-  ui.levelMetric.textContent = p.level;
+  if (ui.levelMetric) ui.levelMetric.textContent = p.level;
   ui.waveText.textContent = game.wave;
   ui.killsText.textContent = game.kills;
   ui.timeText.textContent = formatTime(game.elapsed);
