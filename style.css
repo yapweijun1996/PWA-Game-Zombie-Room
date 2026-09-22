@@ -981,6 +981,7 @@
       transition: opacity .22s ease, transform .22s ease;
     }
     .gameover.show { opacity: 1; transform: translateY(0) scale(1); }
+    .gameover[hidden] { display: none; }
     .gameover:focus { outline: none; }
     .gameover-badge {
       width: 44px;

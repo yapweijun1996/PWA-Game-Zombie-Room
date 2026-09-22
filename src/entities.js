@@ -131,6 +131,7 @@ export function resetGame() {
   perf.recoveredFpsWindows = 0;
   perf.perfWarmupUntil = performance.now() + 2200;
   ui.gameover.classList.remove('show');
+  ui.gameover.hidden = true;
   if (ui.gameoverNewBest) ui.gameoverNewBest.hidden = true;
   if (ui.bossBar) {
     ui.bossBar.classList.remove('show');
@@ -827,6 +828,7 @@ function endGame() {
   renderBuildSummary(p);
 
   dom.canvas.classList.add(game.performanceMode ? 'game-dimmed' : 'game-blurred');
+  ui.gameover.hidden = false;
   ui.gameover.classList.add('show');
   ui.gameover.focus();
   updateUI();
