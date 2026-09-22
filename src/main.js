@@ -1,12 +1,13 @@
 import { dom, ui, viewport, room, game, perf, scoreState } from './state.js';
 import { clamp } from './utils.js';
-import { resetGame, update, isDesktopControls, setPaused, togglePause, renderUpgradeCards, currentUpgradeChoices } from './entities.js';
+import { resetGame, update, isDesktopControls, setPaused, togglePause, renderUpgradeCards, currentUpgradeChoices, resolveObstacleCollision } from './entities.js';
 import { evaluatePerformance, refreshPerfLabel } from './effects.js';
 import { draw } from './render.js';
 import { initPwa, refreshPwaLabels } from './pwa.js';
 import { initInput } from './input.js';
 import { initI18n } from './i18n-apply.js';
-import { initSettingsMenu } from './settings-menu.js';
+import { initSettingsMenu, refreshSoundToggleUI, refreshHapticsToggleUI } from './settings-menu.js';
+import { initAudio } from './audio.js';
 
 function resize() {
   viewport.W = Math.max(320, innerWidth);
@@ -29,10 +30,62 @@ function resize() {
   room.w = viewport.W - 20;
   room.h = Math.max(150, viewport.H - roomTop - bottomReserve);
 
+  updateObstacles();
+  updateHazards();
+
   if (game.player) {
     game.player.x = clamp(game.player.x, room.x + game.player.r, room.x + room.w - game.player.r);
     game.player.y = clamp(game.player.y, room.y + game.player.r, room.y + room.h - game.player.r);
+    resolveObstacleCollision(game.player);
   }
+}
+
+export function updateObstacles() {
+  room.obstacles = room.obstacles || [];
+  room.obstacles.length = 0;
+
+  const isSmall = room.w < 380 || room.h < 340;
+  const ow = isSmall ? 38 : 46;
+  const oh = isSmall ? 34 : 40;
+
+  // Pillar 1: top-left quadrant
+  const p1x = Math.round(room.x + room.w * 0.28 - ow / 2);
+  const p1y = Math.round(room.y + room.h * 0.32 - oh / 2);
+
+  // Pillar 2: bottom-right quadrant
+  const p2x = Math.round(room.x + room.w * 0.72 - ow / 2);
+  const p2y = Math.round(room.y + room.h * 0.68 - oh / 2);
+
+  room.obstacles.push(
+    { x: p1x, y: p1y, w: ow, h: oh, type: 'generator' },
+    { x: p2x, y: p2y, w: ow, h: oh, type: 'relay' }
+  );
+
+  if (room.w >= 640 && room.h >= 380) {
+    const p3w = 40, p3h = 36;
+    const p3x = Math.round(room.x + room.w * 0.5 - p3w / 2);
+    const p3y = Math.round(room.y + room.h * 0.5 - p3h / 2);
+    room.obstacles.push({ x: p3x, y: p3y, w: p3w, h: p3h, type: 'terminal' });
+  }
+}
+
+export function updateHazards() {
+  room.hazards = room.hazards || [];
+  const isSmall = room.w < 380 || room.h < 340;
+  const hr = isSmall ? 26 : 32;
+
+  const h1 = room.hazards[0] || { state: 'dormant', timer: 0, tickTimer: 0 };
+  const h2 = room.hazards[1] || { state: 'dormant', timer: 3.8, tickTimer: 0 };
+
+  h1.x = Math.round(room.x + room.w * 0.72);
+  h1.y = Math.round(room.y + room.h * 0.28);
+  h1.r = hr;
+
+  h2.x = Math.round(room.x + room.w * 0.28);
+  h2.y = Math.round(room.y + room.h * 0.72);
+  h2.r = hr;
+
+  room.hazards = [h1, h2];
 }
 
 function frame(now) {
@@ -81,10 +134,13 @@ document.addEventListener('visibilitychange', () => {
 initI18n(() => {
   refreshPwaLabels();
   refreshPerfLabel();
+  refreshSoundToggleUI();
+  refreshHapticsToggleUI();
   if (game.upgradeModalOpen && currentUpgradeChoices.length) {
     renderUpgradeCards(currentUpgradeChoices);
   }
 });
+initAudio();
 resize();
 ui.bestText.textContent = scoreState.best;
 resetGame();

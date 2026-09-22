@@ -1,8 +1,10 @@
 import { game, room, ui, dom, input, timers, perf, scoreState, viewport } from './state.js';
 import { clamp, dist2, rand, formatTime } from './utils.js';
-import { burst, sprayBlood, makeDecal, particleBudget } from './effects.js';
+import { burst, sprayBlood, makeDecal, particleBudget, spawnDamageText, spawnGore } from './effects.js';
 import { flashMessage, updateUI } from './ui.js';
 import { t } from './i18n.js';
+import { playShoot, playCrit, playKill, playXp, playLevelUp, playUpgradeSelect, playPlayerHit, playGameOver, playUiClick, playNuke, playOverdrive, playHeal, playMagnet, playShieldHit, playShieldBreak, playShieldRecharge, playBossRoar, playElectricZap, playComboMilestone } from './audio.js';
+import { vibrateHit, vibrateCrit, vibrateLevelUp, vibrateBoss, vibrateDeath, vibrateUi, vibrateNuke, vibrateOverdrive, vibrateCombo } from './haptics.js';
 
 export function makePlayer() {
   return {
@@ -11,6 +13,10 @@ export function makePlayer() {
     r: 13,
     hp: 100,
     maxHp: 100,
+    shield: 40,
+    maxShield: 40,
+    shieldCooldown: 0,
+    shieldHitFlash: 0,
     speed: 180,
     level: 1,
     xp: 0,
@@ -30,6 +36,8 @@ export function makePlayer() {
     pierce: 1,
     critChance: 0,
     magnetRadius: 125,
+    overdriveTimer: 0,
+    stepTimer: 0,
     upgrades: {
       multiShot: 1,
       rapidFire: 0,
@@ -50,6 +58,8 @@ export function isDesktopControls() {
 export function setPaused(paused) {
   if (!game.running && paused) return;
   game.paused = paused;
+  playUiClick();
+  vibrateUi();
   if (dom.pauseOverlay) {
     dom.pauseOverlay.hidden = !paused;
     dom.pauseOverlay.classList.toggle('show', paused);
@@ -57,7 +67,7 @@ export function setPaused(paused) {
   if (dom.canvas) {
     if (paused) {
       dom.canvas.classList.add('game-dimmed');
-    } else if (game.running) {
+    } else if (game.running && !game.upgradeModalOpen) {
       dom.canvas.classList.remove('game-dimmed');
     }
   }
@@ -81,7 +91,7 @@ export function setPaused(paused) {
 }
 
 export function togglePause() {
-  if (!game.running) return;
+  if (!game.running || game.upgradeModalOpen) return;
   setPaused(!game.paused);
 }
 
@@ -100,6 +110,11 @@ export function resetGame() {
   game.orbs.length = 0;
   game.particles.length = 0;
   game.decals.length = 0;
+  game.floatingTexts.length = 0;
+  game.pickups.length = 0;
+  game.combo = 0;
+  game.comboTimer = 0;
+  game.maxCombo = 0;
   game.player = makePlayer();
   game.bossWave = 0;
   game.roomPhase = Math.random() * Math.PI * 2;
@@ -109,7 +124,19 @@ export function resetGame() {
   perf.perfWarmupUntil = performance.now() + 2200;
   ui.gameover.classList.remove('show');
   if (ui.gameoverNewBest) ui.gameoverNewBest.hidden = true;
+  if (ui.bossBar) {
+    ui.bossBar.classList.remove('show');
+    ui.bossBar.hidden = true;
+  }
   dom.canvas.classList.remove('game-blurred', 'game-dimmed');
+  if (room.hazards && room.hazards.length) {
+    room.hazards[0].state = 'dormant';
+    room.hazards[0].timer = 0;
+    if (room.hazards[1]) {
+      room.hazards[1].state = 'dormant';
+      room.hazards[1].timer = 3.8;
+    }
+  }
   dom.hintPill.classList.remove('hide');
   setTimeout(() => dom.hintPill.classList.add('hide'), 4200);
   updateUI();
@@ -132,10 +159,30 @@ function spawnZombie() {
   if (side === 3) { x = room.x - 18; y = rand(room.y, room.y + room.h); }
 
   const scale = 1 + (wave - 1) * .08;
-  const z = { x, y, type, hitFlash: 0, attackFlash: 0, walkTime: Math.random() * Math.PI * 2, facing: 0 };
+  const z = { x, y, type, hitFlash: 0, attackFlash: 0, walkTime: Math.random() * Math.PI * 2, facing: 0, affix: null };
   if (type === 'runner') Object.assign(z, { r: 10, hp: 1.2 * scale, maxHp: 1.2 * scale, speed: 82 + wave * 2.2, damage: 8, color: '#e5a84d', score: 14, xp: 1 });
   else if (type === 'tank') Object.assign(z, { r: 18, hp: 5.5 * scale, maxHp: 5.5 * scale, speed: 32 + wave * 1.2, damage: 17, color: '#7d9c75', score: 35, xp: 3 });
   else Object.assign(z, { r: 13, hp: 2.1 * scale, maxHp: 2.1 * scale, speed: 48 + wave * 1.7, damage: 11, color: '#79b86a', score: 10, xp: 1 });
+
+  if (wave >= 2 && Math.random() < Math.min(0.28, 0.12 + wave * 0.025)) {
+    const affixes = ['frost', 'swift', 'armored'];
+    z.affix = affixes[Math.floor(Math.random() * affixes.length)];
+    if (z.affix === 'frost') {
+      z.xp += 2;
+      z.score = Math.round(z.score * 1.5);
+    } else if (z.affix === 'swift') {
+      z.speed *= 1.42;
+      z.xp += 2;
+      z.score = Math.round(z.score * 1.5);
+    } else if (z.affix === 'armored') {
+      z.maxHp *= 1.6;
+      z.hp = z.maxHp;
+      z.r = Math.round(z.r * 1.22);
+      z.armor = 0.60;
+      z.xp += 3;
+      z.score = Math.round(z.score * 1.8);
+    }
+  }
 
   const dx = z.x - p.x, dy = z.y - p.y;
   if (dx * dx + dy * dy > 900) game.zombies.push(z);
@@ -164,7 +211,9 @@ function shootNearest() {
 
   for (let s = 0; s < projectileCount; s++) {
     const angle = startAngle + s * spreadAngle;
-    const isCrit = p.critChance && Math.random() < p.critChance;
+    const comboCritBonus = game.combo >= 50 ? 0.20 : (game.combo >= 25 ? 0.10 : 0);
+    const effectiveCrit = Math.min(0.85, (p.critChance || 0) + comboCritBonus);
+    const isCrit = effectiveCrit > 0 && Math.random() < effectiveCrit;
     const damage = isCrit ? p.damage * 2.2 : p.damage;
 
     game.bullets.push({
@@ -179,6 +228,7 @@ function shootNearest() {
       life: 1.35
     });
   }
+  playShoot(projectileCount, p.damage >= 1.6);
   burst(p.x + Math.cos(baseAngle) * 15, p.y + Math.sin(baseAngle) * 15, '#d8f3df', 2, 55);
 }
 
@@ -187,10 +237,101 @@ function deathBurst(z) {
   burst(z.x, z.y, isBoss ? '#ffd07d' : z.color, isBoss ? 28 : z.type === 'tank' ? 16 : 9, isBoss ? 170 : 110);
   sprayBlood(z.x, z.y, isBoss ? 2.6 : z.type === 'tank' ? 1.5 : 1, isBoss ? '#b93a48' : '#9f3440');
   makeDecal(z.x + rand(-8, 8), z.y + rand(-8, 8), isBoss ? rand(20, 34) : rand(9, 18));
+  spawnGore(z.x, z.y, z.type, isBoss ? 4 : (z.killedByCrit ? 3 : 2));
 }
 
-export function hasActiveBoss() {
+export function spawnPickup(x, y, source = 'normal') {
+  if (game.pickups.length >= 8) return;
+  let type = 'medkit';
+  if (source === 'boss') {
+    const bossTypes = ['nuke', 'overdrive', 'medkit'];
+    type = bossTypes[Math.floor(Math.random() * bossTypes.length)];
+  } else {
+    const roll = Math.random();
+    if (roll < 0.35) type = 'medkit';
+    else if (roll < 0.65) type = 'magnet';
+    else if (roll < 0.85) type = 'overdrive';
+    else type = 'nuke';
+  }
+  game.pickups.push({
+    x: clamp(x, room.x + 20, room.x + room.w - 20),
+    y: clamp(y, room.y + 20, room.y + room.h - 20),
+    type,
+    life: 16,
+    pulse: Math.random() * Math.PI * 2
+  });
+}
+
+function collectPickup(item, index) {
+  const p = game.player;
+  game.pickups.splice(index, 1);
+
+  if (item.type === 'nuke') {
+    playNuke();
+    vibrateNuke();
+    flashMessage(t('msgNuke'));
+    game.cameraShake = Math.max(game.cameraShake, 0.55);
+    ui.damageFlash.style.background = 'radial-gradient(circle, rgba(255,255,255,.95) 0%, rgba(255,214,102,.6) 100%)';
+    ui.damageFlash.classList.add('show');
+    setTimeout(() => { ui.damageFlash.style.background = ''; }, 240);
+
+    for (let i = game.zombies.length - 1; i >= 0; i--) {
+      const z = game.zombies[i];
+      if (z.type === 'boss') {
+        z.hp -= 30;
+        spawnDamageText(z.x, z.y - z.r, 30, true, false);
+        if (z.hp <= 0) killZombie(i);
+      } else {
+        spawnDamageText(z.x, z.y - z.r, Math.round(z.hp), true, false);
+        killZombie(i);
+      }
+    }
+  } else if (item.type === 'overdrive') {
+    playOverdrive();
+    vibrateOverdrive();
+    flashMessage(t('msgOverdrive'));
+    p.overdriveTimer = 8;
+    burst(p.x, p.y, '#69b6ff', 24, 130);
+  } else if (item.type === 'medkit') {
+    playHeal();
+    flashMessage(t('msgMedkit'));
+    p.hp = Math.min(p.maxHp, p.hp + 35);
+    spawnDamageText(p.x, p.y - p.r - 8, 35, false, false);
+    burst(p.x, p.y, '#79f29a', 18, 90);
+  } else if (item.type === 'magnet') {
+    playMagnet();
+    flashMessage(t('msgMagnet'));
+    for (const o of game.orbs) {
+      gainXp(o.value);
+      game.score += 2;
+    }
+    game.orbs.length = 0;
+    burst(p.x, p.y, '#d782ff', 22, 140);
+  }
+}
   return game.zombies.some(z => z.type === 'boss');
+}
+
+export function getActiveBoss() {
+  return game.zombies.find(z => z.type === 'boss') || null;
+}
+
+export function resolveObstacleCollision(entity) {
+  if (!room.obstacles) return;
+  const r = entity.r || 13;
+  for (const obs of room.obstacles) {
+    const closestX = clamp(entity.x, obs.x, obs.x + obs.w);
+    const closestY = clamp(entity.y, obs.y, obs.y + obs.h);
+    const dx = entity.x - closestX;
+    const dy = entity.y - closestY;
+    const distSq = dx * dx + dy * dy;
+    if (distSq < r * r) {
+      const dist = Math.sqrt(distSq) || 0.001;
+      const overlap = r - dist;
+      entity.x += (dx / dist) * overlap;
+      entity.y += (dy / dist) * overlap;
+    }
+  }
 }
 
 function spawnBoss() {
@@ -214,11 +355,14 @@ function spawnBoss() {
     xp: 8,
     dashCd: 2.6,
     lunge: 0,
-    armor: .86
+    armor: .86,
+    frenzy: false
   };
   game.zombies.push(z);
   game.bossWave = game.wave;
   flashMessage(t('msgBossIncoming'));
+  vibrateBoss();
+  game.cameraShake = Math.max(game.cameraShake, .45);
   burst(x, y, '#ffd27a', 24, 150);
 }
 
@@ -345,6 +489,8 @@ export function openUpgradeModal() {
   }
 
   game.upgradeModalOpen = true;
+  playLevelUp();
+  vibrateLevelUp();
   if (dom.canvas) dom.canvas.classList.add('game-dimmed');
 
   renderUpgradeCards(currentUpgradeChoices);
@@ -391,6 +537,8 @@ export function chooseUpgrade(index) {
   const chosen = currentUpgradeChoices[index];
   const p = game.player;
   chosen.apply(p);
+  playUpgradeSelect();
+  vibrateUi();
 
   flashMessage(t(chosen.titleKey) + ' · ' + t('msgLevelUp'));
   burst(p.x, p.y, '#ffd27a', 16, 110);
@@ -437,14 +585,48 @@ function gainXp(amount) {
   }
 }
 
-function killZombie(index) {
+function killZombie(index, isCrit = false) {
   const z = game.zombies[index];
+  z.killedByCrit = isCrit;
   game.score += z.score;
   game.kills++;
+
+  game.combo++;
+  game.comboTimer = 2.4;
+  game.maxCombo = Math.max(game.maxCombo || 0, game.combo);
+  const p = game.player;
+
+  if (game.combo === 10) {
+    flashMessage(t('msgCombo10'));
+    playComboMilestone(1);
+    vibrateCombo();
+    burst(p.x, p.y, '#ffd27a', 16, 100);
+    game.cameraShake = Math.max(game.cameraShake, .15);
+  } else if (game.combo === 25) {
+    flashMessage(t('msgCombo25'));
+    playComboMilestone(2);
+    vibrateCombo();
+    burst(p.x, p.y, '#ff6174', 24, 130);
+    game.cameraShake = Math.max(game.cameraShake, .25);
+  } else if (game.combo === 50) {
+    flashMessage(t('msgCombo50'));
+    playComboMilestone(3);
+    vibrateCombo();
+    burst(p.x, p.y, '#ffd700', 32, 160);
+    game.cameraShake = Math.max(game.cameraShake, .38);
+  }
+
+  playKill(game.combo);
   deathBurst(z);
   if (z.type === 'boss') {
     game.cameraShake = Math.max(game.cameraShake, .45);
     flashMessage(t('msgBossDown'));
+    spawnPickup(z.x, z.y, 'boss');
+  } else {
+    const dropChance = z.type === 'tank' ? 0.14 : (z.type === 'runner' ? 0.05 : 0.025);
+    if (Math.random() < dropChance) {
+      spawnPickup(z.x, z.y);
+    }
   }
   for (let i = 0; i < z.xp; i++) {
     game.orbs.push({ x: z.x + rand(-8, 8), y: z.y + rand(-8, 8), r: z.type === 'boss' ? 6 : 5, value: 1, pulse: Math.random() * Math.PI * 2 });
@@ -455,12 +637,41 @@ function killZombie(index) {
 function damagePlayer(amount, from) {
   const p = game.player;
   if (p.invuln > 0 || !game.running) return;
-  p.hp -= amount;
+
   p.invuln = .58;
   timers.damageTimer = .16;
-  ui.damageFlash.classList.add('show');
-  burst(p.x, p.y, '#ff6576', 10, 120);
-  sprayBlood(p.x, p.y, .7, '#d95b67');
+  p.shieldCooldown = 4.0;
+
+  let hpDamage = amount;
+  if (p.shield > 0) {
+    p.shieldHitFlash = 0.16;
+    if (p.shield >= amount) {
+      p.shield -= amount;
+      hpDamage = 0;
+      playShieldHit();
+      spawnDamageText(p.x + rand(-4, 4), p.y - p.r - 8, amount + ' 🛡️', false, true);
+      burst(p.x, p.y, '#8ae0ff', 7, 70);
+    } else {
+      hpDamage = amount - p.shield;
+      p.shield = 0;
+      playShieldBreak();
+      vibrateHit();
+      spawnDamageText(p.x + rand(-4, 4), p.y - p.r - 8, amount, false, true);
+      burst(p.x, p.y, '#69b6ff', 14, 110);
+    }
+  }
+
+  if (hpDamage > 0) {
+    p.hp -= hpDamage;
+    ui.damageFlash.classList.add('show');
+    playPlayerHit();
+    vibrateHit();
+    if (p.shield === 0 && hpDamage === amount) {
+      spawnDamageText(p.x + rand(-4, 4), p.y - p.r - 8, hpDamage, false, true);
+    }
+    burst(p.x, p.y, '#ff6576', 10, 120);
+    sprayBlood(p.x, p.y, .7, '#d95b67');
+  }
 
   const dx = p.x - from.x;
   const dy = p.y - from.y;
@@ -477,6 +688,12 @@ function endGame() {
   game.running = false;
   setPaused(false);
   closeUpgradeModal();
+  if (ui.bossBar) {
+    ui.bossBar.classList.remove('show');
+    ui.bossBar.hidden = true;
+  }
+  playGameOver();
+  vibrateDeath();
   const currentScore = Math.floor(game.score);
   const isNewBest = currentScore > scoreState.best;
   scoreState.best = Math.max(scoreState.best, currentScore);
@@ -484,6 +701,7 @@ function endGame() {
     localStorage.setItem('zombie-room-best', String(scoreState.best));
   } catch (_) {}
   ui.gameoverScore.textContent = currentScore;
+  if (ui.gameoverCombo) ui.gameoverCombo.textContent = game.maxCombo || 0;
   if (ui.gameoverWave) ui.gameoverWave.textContent = game.wave;
   ui.gameoverKills.textContent = game.kills;
   ui.gameoverTime.textContent = formatTime(game.elapsed);
@@ -507,12 +725,23 @@ export function update(dt) {
   for (const p of game.particles) {
     p.x += p.vx * dt;
     p.y += p.vy * dt;
+    if (p.rot !== undefined) p.rot += (p.vrot || 0) * dt;
     p.vx *= Math.pow(p.drag ?? .02, dt);
     p.vy *= Math.pow(p.drag ?? .02, dt);
     p.vy += (p.gravity ?? 0) * dt;
     p.life -= dt;
   }
   game.particles = game.particles.filter(p => p.life > 0);
+  for (let i = game.floatingTexts.length - 1; i >= 0; i--) {
+    const ft = game.floatingTexts[i];
+    ft.x += ft.vx * dt;
+    ft.y += ft.vy * dt;
+    ft.vy += 42 * dt;
+    ft.life -= dt;
+    if (ft.life <= 0) {
+      game.floatingTexts.splice(i, 1);
+    }
+  }
   game.cameraShake = Math.max(0, game.cameraShake - dt * 1.7);
   game.roomPhase += dt * .8;
 
@@ -524,6 +753,26 @@ export function update(dt) {
   p.shootTimer -= dt;
   p.muzzleFlash = Math.max(0, p.muzzleFlash - dt);
   p.recoil = Math.max(0, p.recoil - dt * 9);
+  p.overdriveTimer = Math.max(0, p.overdriveTimer - dt);
+  p.shieldHitFlash = Math.max(0, p.shieldHitFlash - dt);
+
+  if (game.comboTimer > 0) {
+    game.comboTimer -= dt;
+    if (game.comboTimer <= 0) {
+      game.combo = 0;
+    }
+  }
+
+  if (p.shieldCooldown > 0) {
+    p.shieldCooldown = Math.max(0, p.shieldCooldown - dt);
+  } else if (p.shield < p.maxShield) {
+    const wasFull = p.shield >= p.maxShield;
+    p.shield = Math.min(p.maxShield, p.shield + 16 * dt);
+    if (!wasFull && p.shield >= p.maxShield) {
+      playShieldRecharge();
+      burst(p.x, p.y, '#8ae0ff', 8, 70);
+    }
+  }
 
   const nextWave = 1 + Math.floor(game.elapsed / 25);
   if (nextWave !== game.wave) {
@@ -549,13 +798,38 @@ export function update(dt) {
     const normX = mx / len;
     const normY = my / len;
     p.moveAngle = Math.atan2(normY, normX);
-    p.walkTime += dt * 11 * speedMultiplier;
-    p.x += normX * p.speed * speedMultiplier * dt;
-    p.y += normY * p.speed * speedMultiplier * dt;
+    const comboSpeedBonus = game.combo >= 50 ? 1.25 : (game.combo >= 25 ? 1.18 : (game.combo >= 10 ? 1.10 : 1.0));
+
+    let frostSlow = 1.0;
+    for (const z of game.zombies) {
+      if (z.affix === 'frost') {
+        const dx = p.x - z.x;
+        const dy = p.y - z.y;
+        if (dx * dx + dy * dy < (z.r + 55) ** 2) {
+          frostSlow = 0.72;
+          break;
+        }
+      }
+    }
+
+    p.walkTime += dt * 11 * speedMultiplier * comboSpeedBonus * frostSlow;
+    p.x += normX * p.speed * speedMultiplier * comboSpeedBonus * frostSlow * dt;
+    p.y += normY * p.speed * speedMultiplier * comboSpeedBonus * frostSlow * dt;
+
+    p.stepTimer = (p.stepTimer || 0) - dt;
+    if (p.stepTimer <= 0) {
+      p.stepTimer = 0.11;
+      const backX = p.x - normX * 8 + rand(-2, 2);
+      const backY = p.y - normY * 8 + rand(-2, 2);
+      burst(backX, backY, 'rgba(140, 168, 150, .32)', 1, 16);
+    }
   } else {
     p.walkTime += dt * 3;
   }
   if (!game.zombies.length && p.moving) p.aimAngle = p.moveAngle;
+  p.x = clamp(p.x, room.x + p.r, room.x + room.w - p.r);
+  p.y = clamp(p.y, room.y + p.r, room.y + room.h - p.r);
+  resolveObstacleCollision(p);
   p.x = clamp(p.x, room.x + p.r, room.x + room.w - p.r);
   p.y = clamp(p.y, room.y + p.r, room.y + room.h - p.r);
 
@@ -569,7 +843,7 @@ export function update(dt) {
 
   if (p.shootTimer <= 0) {
     shootNearest();
-    p.shootTimer = p.fireRate;
+    p.shootTimer = p.overdriveTimer > 0 ? p.fireRate * 0.48 : p.fireRate;
   }
 
   for (let i = game.bullets.length - 1; i >= 0; i--) {
@@ -582,16 +856,32 @@ export function update(dt) {
       const z = game.zombies[j];
       const rr = b.r + z.r;
       if ((b.x - z.x) ** 2 + (b.y - z.y) ** 2 <= rr * rr) {
-        const dealt = z.type === 'boss' ? b.damage * (z.armor || .86) : b.damage;
+        let dealt = b.damage;
+        if (z.type === 'boss') dealt *= (z.armor || .86);
+        else if (z.affix === 'armored') dealt *= (z.armor || .60);
         z.hp -= dealt;
         z.hitFlash = .08;
-        burst(b.x, b.y, b.isCrit ? '#ffd27a' : '#eaf7ed', b.isCrit ? 6 : 3, b.isCrit ? 75 : 45);
+        if (b.isCrit) {
+          playCrit();
+          vibrateCrit();
+        }
+        spawnDamageText(z.x + rand(-6, 6), z.y - z.r - 4, dealt, b.isCrit, false);
+        burst(b.x, b.y, b.isCrit ? '#ffd27a' : (z.affix === 'armored' ? '#69b6ff' : '#eaf7ed'), b.isCrit ? 6 : 3, b.isCrit ? 75 : 45);
         sprayBlood(b.x, b.y, z.type === 'boss' ? 1.1 : .45, z.type === 'boss' ? '#e06c78' : '#ba4956');
         b.pierce = (b.pierce || 1) - 1;
         if (b.pierce <= 0) hit = true;
         if (z.type === 'boss') game.cameraShake = Math.max(game.cameraShake, .08);
-        if (z.hp <= 0) killZombie(j);
+        if (z.hp <= 0) killZombie(j, b.isCrit);
         if (hit) break;
+      }
+    }
+    if (!hit && room.obstacles) {
+      for (const obs of room.obstacles) {
+        if (b.x >= obs.x && b.x <= obs.x + obs.w && b.y >= obs.y && b.y <= obs.y + obs.h) {
+          hit = true;
+          burst(b.x, b.y, '#ffd27a', 3, 50);
+          break;
+        }
       }
     }
     if (hit || b.life <= 0 || b.x < room.x - 35 || b.x > room.x + room.w + 35 || b.y < room.y - 35 || b.y > room.y + room.h + 35) {
@@ -602,9 +892,17 @@ export function update(dt) {
   for (const z of game.zombies) {
     z.hitFlash = Math.max(0, z.hitFlash - dt);
     z.attackFlash = Math.max(0, z.attackFlash - dt);
-    z.walkTime += dt * (z.type === 'runner' ? 15 : z.type === 'tank' ? 7 : z.type === 'boss' ? 6 : 10);
+    z.walkTime += dt * (z.type === 'runner' ? 15 : z.type === 'tank' ? 7 : (z.type === 'boss' ? (z.frenzy ? 14 : 6) : 10));
     if (z.type === 'boss') {
-      z.pulse += dt * 3.2;
+      if (!z.frenzy && z.hp <= z.maxHp * 0.5) {
+        z.frenzy = true;
+        flashMessage(t('msgBossFrenzy'));
+        playBossRoar();
+        vibrateBoss();
+        game.cameraShake = Math.max(game.cameraShake, .55);
+        burst(z.x, z.y, '#ff4359', 32, 160);
+      }
+      z.pulse += dt * (z.frenzy ? 7.2 : 3.2);
       z.entrance = Math.max(0, z.entrance - dt);
       z.dashCd -= dt;
       z.lunge = Math.max(0, z.lunge - dt);
@@ -615,17 +913,23 @@ export function update(dt) {
     z.facing = Math.atan2(dy, dx);
     let moveScale = 1;
     if (z.type === 'boss') {
-      moveScale = z.entrance > 0 ? .35 : 1;
-      if (z.dashCd <= 0 && len > 100) {
-        z.attackFlash = .32;
-        z.lunge = .22;
-        z.dashCd = rand(2.6, 4.2);
-        game.cameraShake = Math.max(game.cameraShake, .18);
+      const baseScale = z.frenzy ? 1.42 : 1.0;
+      moveScale = z.entrance > 0 ? .35 : baseScale;
+      const minDistance = z.frenzy ? 75 : 100;
+      if (z.dashCd <= 0 && len > minDistance) {
+        z.attackFlash = z.frenzy ? .42 : .32;
+        z.lunge = z.frenzy ? .32 : .22;
+        z.dashCd = z.frenzy ? rand(1.3, 2.3) : rand(2.6, 4.2);
+        game.cameraShake = Math.max(game.cameraShake, z.frenzy ? .28 : .18);
+        if (z.frenzy) {
+          burst(z.x, z.y, '#ff4359', 8, 80);
+        }
       }
-      if (z.lunge > 0) moveScale = 2.15;
+      if (z.lunge > 0) moveScale = z.frenzy ? 2.85 : 2.15;
     }
     z.x += dx / len * z.speed * moveScale * dt;
     z.y += dy / len * z.speed * moveScale * dt;
+    resolveObstacleCollision(z);
 
     const rr = p.r + z.r - (z.type === 'boss' ? 6 : 2);
     if (dx * dx + dy * dy <= rr * rr) {
@@ -648,8 +952,70 @@ export function update(dt) {
     }
     if (d < p.r + o.r + 5) {
       gainXp(o.value);
+      playXp();
       game.score += 2;
       game.orbs.splice(i, 1);
+    }
+  }
+
+  for (let i = game.pickups.length - 1; i >= 0; i--) {
+    const item = game.pickups[i];
+    item.pulse += dt * 5;
+    item.life -= dt;
+    if (item.life <= 0) {
+      game.pickups.splice(i, 1);
+      continue;
+    }
+    const dx = p.x - item.x;
+    const dy = p.y - item.y;
+    if (dx * dx + dy * dy < (p.r + 14) ** 2) {
+      collectPickup(item, i);
+    }
+  }
+
+  if (room.hazards) {
+    for (const h of room.hazards) {
+      h.timer += dt;
+      if (h.state === 'dormant' && h.timer >= 4.0) {
+        h.state = 'warning';
+        h.timer = 0;
+      } else if (h.state === 'warning' && h.timer >= 1.5) {
+        h.state = 'active';
+        h.timer = 0;
+        h.tickTimer = 0;
+        playElectricZap();
+        vibrateUi();
+      } else if (h.state === 'active' && h.timer >= 2.5) {
+        h.state = 'dormant';
+        h.timer = 0;
+      }
+
+      if (h.state === 'active') {
+        h.tickTimer -= dt;
+        if (h.tickTimer <= 0) {
+          h.tickTimer = 0.32;
+          for (let j = game.zombies.length - 1; j >= 0; j--) {
+            const z = game.zombies[j];
+            const dx = z.x - h.x;
+            const dy = z.y - h.y;
+            if (dx * dx + dy * dy < (z.r + h.r) ** 2) {
+              const dealt = 3.6 * (1 + game.wave * 0.08);
+              z.hp -= dealt;
+              z.hitFlash = 0.08;
+              spawnDamageText(z.x + rand(-4, 4), z.y - z.r, Math.round(dealt), false, false);
+              burst(z.x, z.y, '#69b6ff', 3, 55);
+              if (z.hp <= 0) killZombie(j);
+            }
+          }
+
+          const pdx = p.x - h.x;
+          const pdy = p.y - h.y;
+          if (pdx * pdx + pdy * pdy < (p.r + h.r) ** 2) {
+            damagePlayer(7, h);
+            burst(p.x, p.y, '#69b6ff', 4, 60);
+          }
+        }
+      }
     }
   }
 

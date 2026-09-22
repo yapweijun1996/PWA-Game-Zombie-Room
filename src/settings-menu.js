@@ -1,7 +1,24 @@
-import { game } from './state.js';
+import { game, dom, audioState, hapticsState } from './state.js';
 import { setPaused } from './entities.js';
+import { t } from './i18n.js';
+import { playUiClick } from './audio.js';
+import { vibrateUi } from './haptics.js';
 
 const CLOSE_TRANSITION_MS = 220;
+
+export function refreshSoundToggleUI() {
+  if (!dom.soundToggle || !dom.soundStatusText) return;
+  dom.soundToggle.classList.toggle('active', audioState.enabled);
+  dom.soundToggle.setAttribute('aria-checked', String(audioState.enabled));
+  dom.soundStatusText.textContent = audioState.enabled ? t('soundOn') : t('soundOff');
+}
+
+export function refreshHapticsToggleUI() {
+  if (!dom.hapticsToggle || !dom.hapticsStatusText) return;
+  dom.hapticsToggle.classList.toggle('active', hapticsState.enabled);
+  dom.hapticsToggle.setAttribute('aria-checked', String(hapticsState.enabled));
+  dom.hapticsStatusText.textContent = hapticsState.enabled ? t('soundOn') : t('soundOff');
+}
 
 export function initSettingsMenu() {
   const trigger = document.getElementById('settingsTrigger');
@@ -11,6 +28,26 @@ export function initSettingsMenu() {
 
   let hideTimer = 0;
   let wasPausedBySettings = false;
+
+  refreshSoundToggleUI();
+  dom.soundToggle?.addEventListener('click', () => {
+    audioState.enabled = !audioState.enabled;
+    try {
+      localStorage.setItem('zombie-room-sound', String(audioState.enabled));
+    } catch (_) {}
+    refreshSoundToggleUI();
+    if (audioState.enabled) playUiClick();
+  });
+
+  refreshHapticsToggleUI();
+  dom.hapticsToggle?.addEventListener('click', () => {
+    hapticsState.enabled = !hapticsState.enabled;
+    try {
+      localStorage.setItem('zombie-room-haptics', String(hapticsState.enabled));
+    } catch (_) {}
+    refreshHapticsToggleUI();
+    if (hapticsState.enabled) vibrateUi();
+  });
 
   function isOpen() {
     return !panel.hidden;
@@ -28,6 +65,7 @@ export function initSettingsMenu() {
   }
 
   function open() {
+    if (game.upgradeModalOpen) return;
     clearTimeout(hideTimer);
     panel.hidden = false;
     if (backdrop) backdrop.hidden = false;

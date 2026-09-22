@@ -1,4 +1,4 @@
-export const APP_VERSION = '1.7.0';
+export const APP_VERSION = '3.2.0';
 
 export const dom = {
   canvas: document.getElementById('game'),
@@ -14,6 +14,13 @@ export const dom = {
   resumeButton: document.getElementById('resumeButton'),
   upgradeModal: document.getElementById('upgradeModal'),
   upgradeCards: document.getElementById('upgradeCards'),
+  soundToggle: document.getElementById('soundToggle'),
+  soundStatusText: document.getElementById('soundStatusText'),
+  hapticsToggle: document.getElementById('hapticsToggle'),
+  hapticsStatusText: document.getElementById('hapticsStatusText'),
+  comboBadge: document.getElementById('comboBadge'),
+  comboText: document.getElementById('comboText'),
+  comboBar: document.getElementById('comboBar'),
   controlsWrap: document.getElementById('controlsWrap'),
   joystickZone: document.getElementById('joystickZone'),
   joystickBase: document.getElementById('joystickBase'),
@@ -28,6 +35,8 @@ export const ctx = dom.canvas.getContext('2d');
 export const ui = {
   hpText: document.getElementById('hpText'),
   hpFill: document.getElementById('hpFill'),
+  shieldText: document.getElementById('shieldText'),
+  shieldFill: document.getElementById('shieldFill'),
   xpText: document.getElementById('xpText'),
   xpFill: document.getElementById('xpFill'),
   levelText: document.getElementById('levelText'),
@@ -47,7 +56,14 @@ export const ui = {
   gameoverWave: document.getElementById('gameoverWave'),
   gameoverKills: document.getElementById('gameoverKills'),
   gameoverTime: document.getElementById('gameoverTime'),
-  gameoverNewBest: document.getElementById('gameoverNewBest')
+  gameoverNewBest: document.getElementById('gameoverNewBest'),
+  bossBar: document.getElementById('bossBar'),
+  bossHpFill: document.getElementById('bossHpFill'),
+  bossHpText: document.getElementById('bossHpText'),
+  comboBadge: document.getElementById('comboBadge'),
+  comboText: document.getElementById('comboText'),
+  comboBar: document.getElementById('comboBar'),
+  gameoverCombo: document.getElementById('gameoverCombo')
 };
 
 export const input = {
@@ -69,7 +85,7 @@ export const keyMap = {
 
 export const viewport = { W: innerWidth, H: innerHeight, dpr: 1 };
 
-export const room = { x: 12, y: 150, w: viewport.W - 24, h: viewport.H - 340 };
+export const room = { x: 12, y: 150, w: viewport.W - 24, h: viewport.H - 340, obstacles: [], hazards: [] };
 
 export const perf = {
   last: performance.now(),
@@ -104,8 +120,34 @@ function readBestScore() {
   }
 }
 
+function readSoundSetting() {
+  try {
+    const saved = localStorage.getItem('zombie-room-sound');
+    return saved === null ? true : saved === 'true';
+  } catch (_) {
+    return true;
+  }
+}
+
+function readHapticsSetting() {
+  try {
+    const saved = localStorage.getItem('zombie-room-haptics');
+    return saved === null ? true : saved === 'true';
+  } catch (_) {
+    return true;
+  }
+}
+
 export const scoreState = {
   best: readBestScore()
+};
+
+export const audioState = {
+  enabled: readSoundSetting()
+};
+
+export const hapticsState = {
+  enabled: readHapticsSetting()
 };
 
 export const game = {
@@ -116,6 +158,9 @@ export const game = {
   elapsed: 0,
   score: 0,
   kills: 0,
+  combo: 0,
+  comboTimer: 0,
+  maxCombo: 0,
   wave: 1,
   spawnTimer: 0,
   bullets: [],
@@ -123,6 +168,8 @@ export const game = {
   orbs: [],
   particles: [],
   decals: [],
+  floatingTexts: [],
+  pickups: [],
   player: null,
   bossWave: 0,
   roomPhase: 0,

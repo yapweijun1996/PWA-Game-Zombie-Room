@@ -5,8 +5,24 @@ Zombie Room is an offline-first, canvas-based survival game for desktop and mobi
 ## Current Features
 
 - Canvas game loop with automatic targeting and shooting.
+- Zero-asset procedural sound effects synthesized via Web Audio API (gunshots, crits, kills, pentatonic XP suction, level-up arpeggios, UI taps) with persisted sound toggle.
+- Tactile haptic vibration feedback via the Vibration API with multi-pattern pulses for damage, crits, level-ups, boss spawns, and death, with persisted toggle.
+- Dynamic floating combat damage numbers with pop-in scaling, upward drift, alpha fade-out, and distinct gold critical strike callouts.
 - 360-degree analog floating virtual joystick for touch devices with dynamic thumb-centering and speed scaling, plus WASD / arrow-key support on desktop.
 - Walker, runner, tank, and boss enemy types.
+- Cinematic Boss encounters with heavy screen rumble, warning haptics, and a dedicated glowing Boss health bar.
+- Boss Phase 2 Frenzy (< 50% HP) with terrifying beast roar audio, flaming red magma visuals, blazing golden eyes, halved dash cooldown, and rapid charges.
+- Tactical industrial obstacles and cover pillars providing strategic kiting, line-of-sight protection, and projectile absorption.
+- Regenerative Energy Shield system absorbing incoming damage with plasma deflection bubbles, overload break shatter, and auto-recharge delay.
+- Dynamic environmental electrical hazard pools with cyclic dormant/warning/active phases, electrocuting enemies lured inside with animated plasma arcs.
+- Visceral zombie dismemberment physics with flying severed limbs, spinning bone splinters, and landing blood decals on critical kills, Boss defeats, and Nuke blasts.
+- Elite Affix mutation system (Frost slowing aura, Swift sprint, Armored barrier) with distinct glowing crests and threat radar tracking.
+- Dynamic combo kill streak system with decay timer, rising kill pitch synthesis, multi-tier speed/crit buffs (×10, ×25, ×50), fanfare bursts, and defeat screen Max Combo tracking.
+- Survivor visual polish: Tactical Combat Helmet, dynamic state-colored illuminated visor, pulsing shoulder beacon, footstep dust kick, aiming laser guide ray, and holographic distress invulnerability shimmer.
+- Off-screen tactical threat radar rendering edge warning chevrons for approaching fast runners, armored tanks, and lunging bosses.
+- Dynamic tactical combat pickups (Tactical Nuke, Overdrive Frenzy, Field Medkit, Super Magnet) with screen-clearing blasts and electric lightning aura.
+- High-energy laser beam tracers with color-coded plasma cores (gold for crits, cyan for piercing, neon emerald for standard) and adaptive multi-spark muzzle flare.
+- Tiered weapon audio synthesis with layered harmonic resonance for multi-shot volleys and heavy caliber sub-bass kick.
 - Roguelike 3-choice level-up upgrade system with 8 build-crafting abilities (Spread Shot, Rapid Fire, Heavy Ammo, Piercing Rounds, Field Medkit, Agility, Magnetic Collector, Critical Strike).
 - Waves, experience orbs, automatic level upgrades, score, kills, and local best score.
 - Responsive HUD, safe-area handling, portrait and landscape mobile layouts.
@@ -37,6 +53,8 @@ Zombie Room is an offline-first, canvas-based survival game for desktop and mobi
 └── src/
     ├── main.js             # Resize handling and animation frame loop
     ├── state.js            # DOM references and game state
+    ├── audio.js            # Web Audio API procedural sound synthesis and mute toggle
+    ├── haptics.js          # Vibration API tactile pulse feedback and toggle
     ├── entities.js         # Simulation, enemies, combat, waves, and scoring
     ├── render.js           # Canvas map, lighting, entities, and effects rendering
     ├── effects.js          # Particles, decals, and adaptive performance mode
@@ -114,33 +132,37 @@ The core loop is clear and immediately playable. The main improvement opportunit
 
 1. Done: Roguelike 3-choice level-up upgrade system with 8 synergistic abilities (spread shot, rapid fire, heavy ammo, pierce, medkit, agility, magnet, critical strike), with number keys (1, 2, 3) or tap selection.
 2. Add distinct enemy telegraphs and attack patterns before increasing enemy health or spawn counts.
-3. Add room objectives, pickups, or temporary abilities to prevent the loop from becoming movement-only.
+3. Done: Dynamic tactical combat pickups (Tactical Nuke screen-clearing shockwave, Overdrive 2x attack speed, Field Medkit, Super Magnet vacuum).
 4. Add a clearer difficulty curve and a run summary showing the build, wave reached, and best-run comparison.
 5. Done: pause/resume for mobile app switching, settings menu opening, and visibility changes.
 
 ### UI and UX
 
 - Done: Top App Bar and HUD consolidated into a single compact status strip; duplicate level metric removed; FPS/performance diagnostics relocated into the settings panel; full pause/resume lifecycle added (header button, hotkey, tab switch, settings menu auto-pause); defeat screen enhanced with Wave reached, "NEW BEST!" banner, and dedicated Restart button.
-- Add sound and reduced-motion toggles to the settings menu.
+- Done: Web Audio procedural sound effects engine with persisted sound toggle switch in the settings menu.
+- Add reduced-motion toggles to the settings menu.
 - Add stronger visual distinction between player, XP, bullets, runners, tanks, and bosses for color-blind users using shape, pattern, and animation in addition to color.
 - Add explicit focus-visible styles and test all controls with keyboard and switch-like pointer input.
 
 ### Layout and map
 
-The room has a strong industrial visual language, but the playable area is currently one bounded arena with decorative details. A next step would be to introduce light spatial strategy without requiring a full procedural map:
+The room has a strong industrial visual language with solid spatial tactical depth:
 
-- Add cover, hazards, doors, or temporary safe zones.
+- Done: Tactical industrial cover pillars with dynamic Circle-AABB physics collision, projectile spark absorption, hazard stripes, and status LEDs, supporting figure-8 kite loops.
+- Done: Dynamic environmental electrical hazard zones with alternating charge cycles, warning sparks, and high-voltage discharge for luring and frying zombie hordes.
+- Done: Off-screen tactical threat radar rendering edge warning chevrons (red double chevrons with localized badge for Bosses, amber chevrons for fast runners, olive for tanks) to prevent off-screen ambushes.
 - Use a small number of readable obstacles rather than dense decoration.
 - Keep a clear movement path on small screens and ensure enemies cannot hide behind UI.
-- If the camera becomes scrollable, add a minimap or off-screen enemy indicators.
 
 ### Hero avatar and readability
 
-The current survivor is recognizable at the game scale and has a directional weapon, backpack, shadow, and movement animation. Improve identity and combat readability with:
+The survivor has high-contrast tactical readability across all battlefield states:
 
-- One high-contrast silhouette feature, such as a helmet, scarf, or bright shoulder light.
-- A stronger hit/invulnerability indicator that does not rely only on blinking.
-- A distinct muzzle direction and target indicator when many enemies overlap.
+- Done: Tactical Combat Helmet with reinforced brow rim, dynamic state-colored visor (green/amber/blue/red), and specular reflection glint.
+- Done: Pulsing high-contrast shoulder beacon LED for instant identification against dense dark-green zombie swarms.
+- Done: Subtle sprint footstep dust kick grounded to the industrial floor.
+- Done: Tactical dashed laser guide ray projecting auto-aim target direction.
+- Done: Holographic protective distress shimmer replacing full invisible blinking during invulnerability.
 - A short spawn and defeat animation so state changes are easier to understand.
 
 ### Color and visual hierarchy

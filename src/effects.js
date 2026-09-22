@@ -24,6 +24,9 @@ export function setPerformanceMode(enabled, notify = true) {
   if (enabled && game.decals.length > 22) {
     game.decals.splice(0, game.decals.length - 22);
   }
+  if (enabled && game.floatingTexts.length > 16) {
+    game.floatingTexts.splice(0, game.floatingTexts.length - 16);
+  }
   if (notify) flashMessage(enabled ? t('msgPerfEco') : t('msgPerfFull'));
 }
 
@@ -78,4 +81,71 @@ export function makeDecal(x, y, radius, color = 'rgba(110,24,30,.24)') {
   game.decals.push({ x, y, radius, color, seed: Math.random() * Math.PI * 2 });
   const maxDecals = game.performanceMode ? 22 : 36;
   while (game.decals.length > maxDecals) game.decals.shift();
+}
+
+export function spawnDamageText(x, y, amount, isCrit = false, isPlayer = false) {
+  const maxTexts = game.performanceMode ? 16 : 32;
+  if (game.floatingTexts.length >= maxTexts) {
+    game.floatingTexts.shift();
+  }
+
+  const rounded = Number.isInteger(amount) ? amount : (amount >= 10 ? Math.round(amount) : amount.toFixed(1));
+  let text = String(rounded);
+  let color = '#f3fdf6';
+  let size = 11;
+  let stroke = 'rgba(0,0,0,.75)';
+
+  if (isPlayer) {
+    text = '-' + text;
+    color = '#ff6174';
+    size = 12;
+    stroke = 'rgba(40,8,12,.85)';
+  } else if (isCrit) {
+    text = '★ ' + text;
+    color = '#ffd666';
+    size = 14;
+    stroke = 'rgba(120,70,10,.85)';
+  }
+
+  game.floatingTexts.push({
+    x,
+    y,
+    text,
+    color,
+    stroke,
+    size,
+    isCrit,
+    isPlayer,
+    vx: rand(-12, 12),
+    vy: rand(-38, -52),
+    life: isCrit ? 0.65 : 0.48,
+    maxLife: isCrit ? 0.65 : 0.48
+  });
+}
+
+export function spawnGore(x, y, type = 'walker', count = 2) {
+  const actualCount = game.performanceMode ? Math.min(1, count) : count;
+  const isBoss = type === 'boss';
+  const outfitColor = type === 'runner' ? '#b6813d' : (type === 'tank' ? '#53685a' : (isBoss ? '#7a1926' : '#678a62'));
+
+  for (let i = 0; i < actualCount && game.particles.length < particleBudget(); i++) {
+    const angle = rand(-Math.PI, Math.PI);
+    const speed = rand(45, 120 + (isBoss ? 50 : 0));
+    const shape = i % 2 === 0 ? 'limb' : 'bone';
+    game.particles.push({
+      x,
+      y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed - rand(15, 45),
+      rot: Math.random() * Math.PI * 2,
+      vrot: rand(-10, 10),
+      life: rand(0.5, 0.95),
+      maxLife: 0.95,
+      color: shape === 'limb' ? outfitColor : '#e8eedb',
+      size: isBoss ? rand(5, 7.5) : rand(3.5, 5),
+      drag: 0.015,
+      gravity: 280,
+      shape
+    });
+  }
 }

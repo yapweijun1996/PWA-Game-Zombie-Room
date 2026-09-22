@@ -40,9 +40,9 @@
             <div class="hud-meter meter-hp">
               <div class="meter-head">
                 <span class="label" data-i18n="hudHealth">Health</span>
-                <span class="value" id="hpText">100 / 100</span>
+                <span class="value"><span id="hpText">100 / 100</span> <span class="shield-badge" id="shieldText">🛡️ 40</span></span>
               </div>
-              <div class="bar"><i id="hpFill"></i></div>
+              <div class="bar"><i id="hpFill"></i><i id="shieldFill"></i></div>
             </div>
             <div class="hud-meter meter-xp">
               <div class="meter-head">
@@ -74,11 +74,48 @@
       </div>
     </header>
 
+    <div class="boss-bar-wrap" id="bossBar" hidden aria-live="polite">
+      <div class="boss-bar-card card">
+        <div class="boss-bar-header">
+          <span class="boss-badge" data-i18n="bossLabel">BOSS</span>
+          <span class="boss-name" data-i18n="bossTitle">MUTANT BEHEMOTH</span>
+          <span class="boss-hp-val" id="bossHpText">100%</span>
+        </div>
+        <div class="boss-bar-track">
+          <i class="boss-bar-fill" id="bossHpFill"></i>
+        </div>
+      </div>
+    </div>
+
+    <div class="combo-badge" id="comboBadge" hidden>
+      <span class="combo-flame" aria-hidden="true">🔥</span>
+      <span class="combo-label" id="comboText">COMBO ×10</span>
+      <div class="combo-track"><i id="comboBar"></i></div>
+    </div>
+
     <div class="settings-backdrop" id="settingsBackdrop" hidden></div>
     <div class="settings-panel" id="settingsPanel" role="menu" data-i18n-aria="settingsTrigger" aria-label="Settings" hidden>
       <div class="settings-row">
         <span class="settings-label" data-i18n="languageLabel">Language</span>
         <select class="lang-select" id="languageSelect" data-i18n-aria="languageLabel" aria-label="Language"></select>
+      </div>
+      <div class="settings-row">
+        <div class="settings-toggle-row">
+          <span class="settings-label" data-i18n="soundLabel">Sound</span>
+          <button class="settings-toggle-btn active" id="soundToggle" type="button" role="switch" aria-checked="true" data-i18n-aria="soundLabel" aria-label="Toggle sound">
+            <span class="toggle-track"><span class="toggle-thumb"></span></span>
+            <span class="toggle-text" id="soundStatusText" data-i18n="soundOn">ON</span>
+          </button>
+        </div>
+      </div>
+      <div class="settings-row">
+        <div class="settings-toggle-row">
+          <span class="settings-label" data-i18n="hapticsLabel">Haptics</span>
+          <button class="settings-toggle-btn active" id="hapticsToggle" type="button" role="switch" aria-checked="true" data-i18n-aria="hapticsLabel" aria-label="Toggle haptics">
+            <span class="toggle-track"><span class="toggle-thumb"></span></span>
+            <span class="toggle-text" id="hapticsStatusText" data-i18n="soundOn">ON</span>
+          </button>
+        </div>
       </div>
       <button class="install-button settings-action" id="installButton" type="button" data-i18n-aria="installAriaInstall" aria-label="Install Zombie Room PWA">
         <svg class="install-icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -88,7 +125,7 @@
       </button>
       <button class="update-button settings-action" id="updateButton" type="button" data-i18n-aria="updateAriaCheck" aria-label="Check for Zombie Room updates">
         <span class="update-dot" aria-hidden="true"></span>
-        <span id="updateLabel">Update v1.7.0</span>
+        <span id="updateLabel">Update v3.2.0</span>
       </button>
       <div class="settings-diagnostics">
         <div class="settings-label" data-i18n="hudDiagnostics">Performance</div>
@@ -136,6 +173,9 @@
           </div>
           <div class="gameover-stat" data-i18n-aria="hudKills" aria-label="Kills">
             <span class="gameover-stat-icon" aria-hidden="true">💀</span><b id="gameoverKills">0</b>
+          </div>
+          <div class="gameover-stat" data-i18n-aria="comboLabel" aria-label="Max Combo">
+            <span class="gameover-stat-icon" aria-hidden="true">🔥</span><b id="gameoverCombo">0</b>
           </div>
           <div class="gameover-stat" data-i18n-aria="hudTime" aria-label="Time">
             <span class="gameover-stat-icon" aria-hidden="true">⏱</span><b id="gameoverTime">0:00</b>
