@@ -6,3 +6,11 @@ export function formatTime(seconds) {
   const s = Math.max(0, Math.floor(seconds));
   return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
 }
+
+export function shuffle(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}

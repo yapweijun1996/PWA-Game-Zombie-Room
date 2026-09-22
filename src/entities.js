@@ -1,5 +1,5 @@
 import { game, room, ui, dom, input, timers, perf, scoreState, viewport } from './state.js';
-import { clamp, dist2, rand, formatTime } from './utils.js';
+import { clamp, dist2, rand, formatTime, shuffle } from './utils.js';
 import { burst, sprayBlood, makeDecal, particleBudget, spawnDamageText, spawnGore } from './effects.js';
 import { flashMessage, updateUI } from './ui.js';
 import { t } from './i18n.js';
@@ -512,11 +512,11 @@ export function getAvailableUpgrades() {
 
   if (availableEvos.length > 0) {
     const evo = availableEvos[0];
-    const otherChoices = availableRegular.sort(() => Math.random() - 0.5).slice(0, 2);
+    const otherChoices = shuffle([...availableRegular]).slice(0, 2);
     return [evo, ...otherChoices];
   }
 
-  const shuffled = [...availableRegular].sort(() => Math.random() - 0.5);
+  const shuffled = shuffle([...availableRegular]);
   return shuffled.slice(0, 3);
 }
 

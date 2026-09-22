@@ -100,10 +100,30 @@ export function playCrit() {
 }
 
 // 3. Zombie Kill: Low crunch/thud with dynamic combo pitch scaling
+// Throttled: mass-kill events (e.g. the tactical nuke) can trigger dozens of
+// kills in a single frame, and creating that many oscillator/gain nodes at
+// once causes audible crackle and a frame hitch. Cap real voices per short
+// window; excess kills in the same burst simply stay silent (inaudible
+// difference at that density anyway).
+const KILL_VOICE_MAX = 6;
+const KILL_VOICE_WINDOW = 0.05;
+let killVoiceWindowStart = 0;
+let killVoiceWindowCount = 0;
+
+function allowKillVoice(now) {
+  if (now - killVoiceWindowStart > KILL_VOICE_WINDOW) {
+    killVoiceWindowStart = now;
+    killVoiceWindowCount = 0;
+  }
+  killVoiceWindowCount++;
+  return killVoiceWindowCount <= KILL_VOICE_MAX;
+}
+
 export function playKill(combo = 0) {
   const ac = getContext();
   if (!ac || ac.state !== 'running') return;
   const now = ac.currentTime;
+  if (!allowKillVoice(now)) return;
 
   const osc = ac.createOscillator();
   const gain = ac.createGain();

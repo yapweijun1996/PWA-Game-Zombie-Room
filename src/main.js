@@ -116,7 +116,11 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 
-addEventListener('resize', () => requestAnimationFrame(resize), { passive: true });
+let resizeDebounceTimer = null;
+addEventListener('resize', () => {
+  clearTimeout(resizeDebounceTimer);
+  resizeDebounceTimer = setTimeout(() => requestAnimationFrame(resize), 120);
+}, { passive: true });
 addEventListener('orientationchange', () => setTimeout(resize, 140), { passive: true });
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) {
