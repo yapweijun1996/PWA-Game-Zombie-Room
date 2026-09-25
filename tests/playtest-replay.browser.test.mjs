@@ -184,7 +184,7 @@ function connectCdp(webSocketUrl) {
         returnByValue: true,
         userGesture: true
       });
-      if (response.exceptionDetails) throw new Error(response.exceptionDetails.text);
+      if (response.exceptionDetails) throw new Error(response.exceptionDetails.exception?.description || response.exceptionDetails.text);
       return response.result.value;
     },
     close() {
@@ -262,7 +262,9 @@ async function driveRecording(cdp, timeoutMs = 60000) {
         driverUpgradeReady: !game.upgradeModalOpen || Boolean(button),
         elapsed: game.elapsed,
         paused: game.paused,
-        upgradeModal: game.upgradeModalOpen
+        upgradeModal: game.upgradeModalOpen,
+        dashCooldown: game.player?.dashCooldown ?? 0,
+        dashAbilityCount: window.__zombieRoomPlaytest?.abilities.length ?? 0
       };
     })()`);
     if (state.status === 'finished') return state;
@@ -275,6 +277,9 @@ async function driveRecording(cdp, timeoutMs = 60000) {
         upgradeFocusVerified = true;
       }
       await cdp.evaluate("document.querySelector('#upgradeCards button')?.click()");
+    }
+    if (!state.paused && !state.upgradeModal && state.dashAbilityCount === 0 && state.dashCooldown <= 0) {
+      await cdp.evaluate("document.querySelector('#dashButton')?.click()");
     }
     if (state.paused && !pauseFocusVerified) {
       const focus = await verifyFocusTrap(cdp, '#pauseOverlay');
@@ -315,7 +320,7 @@ async function stopBrowser(browser) {
   }
 }
 
-test('fixed-step replay and modal keyboard focus behavior match expectations', {
+test('replay, dash controls, telegraphs, wave modifiers, and modal focus work together', {
   skip: requireBrowser ? false : skipReason,
   timeout: 120000
 }, async () => {
@@ -354,6 +359,8 @@ test('fixed-step replay and modal keyboard focus behavior match expectations', {
     await cdp.ready();
     await cdp.send('Page.enable');
     await cdp.send('Runtime.enable');
+    await cdp.send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+    await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 1 });
     await cdp.send('Page.navigate', {
       url: `http://127.0.0.1:${serverPort}/?playtestSeed=987&playtestLimit=15&playtestProfile=browser-regression&playtestInput=keyboard-loop-v1`
     });
@@ -364,10 +371,37 @@ test('fixed-step replay and modal keyboard focus behavior match expectations', {
     assert.ok(appVersion.length > 0);
     assert.equal(appVersion, await cdp.evaluate('window.__zombieRoomPlaytest.appVersion'));
 
+    const gameStartup = await cdp.evaluate('(async () => { const { game } = await import("./src/state.js"); return { running: game.running, paused: game.paused, upgradeModal: game.upgradeModalOpen, hasPlayer: Boolean(game.player) }; })()');
+    assert.deepEqual(gameStartup, { running: true, paused: false, upgradeModal: false, hasPlayer: true });
+    const dashControl = await cdp.evaluate(`(() => {
+      const button = document.querySelector('#dashButton');
+      const rect = button.getBoundingClientRect();
+      return { visible: rect.width >= 48 && rect.height >= 48, label: button.getAttribute('aria-label'), right: rect.right, bottom: rect.bottom };
+    })()`);
+    assert.equal(dashControl.visible, true, 'touch dash control should have a usable hit target');
+    assert.ok(dashControl.right <= 390 && dashControl.bottom <= 844, 'touch dash control should fit in portrait viewport');
+    assert.match(dashControl.label, /ready/i);
+    await cdp.evaluate("document.querySelector('#dashButton').click()");
+    const usedDash = await waitFor(
+      cdp.evaluate.bind(cdp),
+      '(async () => { const { game } = await import("./src/state.js"); return { hasPlayer: Boolean(game.player), running: game.running, paused: game.paused, upgradeModal: game.upgradeModalOpen, timer: game.player?.dashTimer ?? 0, cooldown: game.player?.dashCooldown ?? 0, disabled: document.querySelector("#dashButton").getAttribute("aria-disabled"), abilityCount: window.__zombieRoomPlaytest?.abilities.length ?? -1 }; })()',
+      value => value.hasPlayer && value.cooldown > 7 && value.disabled === 'true' && value.abilityCount === 1,
+      5000
+    );
+    assert.ok(usedDash.timer > 0, 'dash should begin immediately');
+    const repeatedDashAbilityCount = await cdp.evaluate(`(() => {
+      document.querySelector('#dashButton').click();
+      return window.__zombieRoomPlaytest?.abilities.length ?? -1;
+    })()`);
+    assert.equal(repeatedDashAbilityCount, 1, 'cooldown should reject repeat activation');
+
     const completedRun = await driveRecording(cdp);
     assert.equal(completedRun.status, 'finished');
     const source = await cdp.evaluate('JSON.stringify(window.__zombieRoomPlaytest)').then(JSON.parse);
-    assert.equal(source.schemaVersion, 2);
+    assert.equal(source.schemaVersion, 3);
+    assert.equal(source.scenarioSeed, source.seed);
+    assert.equal(source.abilities.length, 1);
+    assert.ok(source.events.some(event => event.type === 'ability' && event.id === 'dash'));
     assert.equal(source.mode, 'record');
     assert.equal(source.eventsTruncated, false);
     assert.ok(source.events.some(event => event.type === 'input' &&
@@ -375,6 +409,9 @@ test('fixed-step replay and modal keyboard focus behavior match expectations', {
     const pauseEvents = source.events.filter(event => event.type === 'pause');
     assert.ok(pauseEvents.some(event => event.paused) && pauseEvents.some(event => !event.paused), 'record should contain pause and resume events');
     assert.ok(source.events.some(event => event.type === 'upgrade'), 'record should contain an upgrade selection');
+    const runSummary = await cdp.evaluate('window.__zombieRoomPlaytestTools.summarizeRuns()');
+    assert.equal(runSummary.completedRuns, 1);
+    assert.ok(runSummary.phases.early.checkpointSamples > 0);
 
     const replayJson = JSON.stringify(source);
     const replayResult = await cdp.evaluate(`window.__zombieRoomPlaytestTools.replay(JSON.parse(${JSON.stringify(replayJson)}))`);
@@ -388,9 +425,12 @@ test('fixed-step replay and modal keyboard focus behavior match expectations', {
     const comparison = await cdp.evaluate('window.__zombieRoomPlaytest.replayComparison');
     assert.deepEqual(comparison, {
       outcomeMatches: true,
+      scenarioSeedMatches: true,
       finalMatches: true,
       checkpointsMatch: true,
       upgradesMatch: true,
+      abilitiesMatch: true,
+      waveModifiersMatch: true,
       damageEventsMatch: true,
       randomDrawsMatch: true,
       eventsConsumed: true,
@@ -509,6 +549,97 @@ test('fixed-step replay and modal keyboard focus behavior match expectations', {
     assert.equal(normalStartup.spawnClear, true);
     assert.equal(normalStartup.recorder, false);
     assert.equal(normalStartup.tools, false);
+
+    await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: false });
+    await cdp.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 720, deviceScaleFactor: 1, mobile: false });
+    await delay(180);
+    assert.equal(await cdp.evaluate("document.querySelector('#dashButton').getClientRects().length"), 0, 'touch control should yield to desktop keyboard layout');
+    await cdp.evaluate("(async () => { const { game } = await import('./src/state.js'); game.player.dashCooldown = 0; game.player.dashTimer = 0; })()");
+    await sendKey(cdp, 'keydown', ' ');
+    const keyboardDash = await waitFor(
+      cdp.evaluate.bind(cdp),
+      '(async () => { const { game } = await import("./src/state.js"); return { timer: game.player.dashTimer, cooldown: game.player.dashCooldown }; })()',
+      value => value.cooldown > 7
+    );
+    assert.ok(keyboardDash.timer > 0, 'Space should activate the desktop evasive dash');
+
+    await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 1 });
+    await cdp.send('Emulation.setDeviceMetricsOverride', { width: 844, height: 390, deviceScaleFactor: 1, mobile: true });
+    await delay(180);
+    const landscapeDash = await cdp.evaluate(`(() => {
+      const rect = document.querySelector('#dashButton').getBoundingClientRect();
+      return { visible: rect.width >= 48 && rect.height >= 48, left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom };
+    })()`);
+    assert.equal(landscapeDash.visible, true, 'dash control should remain usable in landscape');
+    assert.ok(landscapeDash.left >= 0 && landscapeDash.right <= 844 && landscapeDash.top >= 0 && landscapeDash.bottom <= 390,
+      'landscape dash control should remain inside the viewport');
+
+    const waveAndCharge = await cdp.evaluate(`(async () => {
+      const { game, ui, room } = await import('./src/state.js');
+      const { update } = await import('./src/entities.js');
+      const { getWaveModifier } = await import('./src/wave-director.js');
+      const { t } = await import('./src/i18n.js');
+      const { createTelegraphedCharge } = await import('./src/telegraphed-charge.js');
+      game.scenarioSeed = 1337;
+      game.wave = 1;
+      game.waveModifierId = null;
+      game.waveModifierWave = 0;
+      game.pendingWaveModifierId = null;
+      game.preparedWave = 0;
+      game.elapsed = 21.99;
+      game.spawnTimer = 100;
+      game.zombies.length = 0;
+      update(1 / 60);
+      const warning = { preparedWave: game.preparedWave, pending: game.pendingWaveModifierId, message: ui.message.textContent };
+      game.elapsed = 25 - 1 / 60;
+      update(1 / 60);
+      const expectedModifier = getWaveModifier(1337, 2);
+      const modifierLabelKey = { swift: 'waveModifierSwift', armored: 'waveModifierArmored', frost: 'waveModifierFrost' }[expectedModifier];
+      const waveStart = { wave: game.wave, active: game.waveModifierId, expected: expectedModifier, expectedLabel: t(modifierLabelKey) };
+
+      const player = game.player;
+      player.x = room.x + room.w * .7;
+      player.y = room.y + room.h * .5;
+      player.shootTimer = 1;
+      player.invuln = 0;
+      game.elapsed = 0;
+      game.wave = 1;
+      game.waveModifierId = null;
+      game.waveModifierWave = 0;
+      game.pendingWaveModifierId = null;
+      game.preparedWave = 0;
+      game.spawnTimer = 100;
+      game.bossWave = 1;
+      game.zombies.length = 0;
+      const boss = { x: player.x - 220, y: player.y, type: 'boss', r: 26, hp: 100, maxHp: 100, speed: 30, damage: 24, hitFlash: 0, attackFlash: 0, walkTime: 0, facing: 0, pulse: 0, entrance: 0, armor: .86, frenzy: false, charge: createTelegraphedCharge(0) };
+      game.zombies.push(boss);
+      update(1 / 60);
+      const bossWindup = boss.charge.state;
+      const bossDirection = boss.charge.directionX;
+      update(.62);
+      const bossDash = { state: boss.charge.state, x: boss.x };
+
+      game.zombies.length = 0;
+      game.elapsed = 0;
+      game.swiftChargeCooldown = 0;
+      const swift = { x: player.x - 190, y: player.y, type: 'walker', affix: 'swift', r: 13, hp: 10, maxHp: 10, speed: 100, damage: 8, hitFlash: 0, attackFlash: 0, walkTime: 0, facing: 0, charge: createTelegraphedCharge(0) };
+      game.zombies.push(swift);
+      update(1 / 60);
+      return { warning, waveStart, bossWindup, bossDirection, bossDash, swiftWindup: swift.charge.state };
+    })()`);
+    assert.equal(waveAndCharge.warning.preparedWave, 2);
+    assert.equal(waveAndCharge.warning.pending, waveAndCharge.waveStart.expected);
+    assert.ok(waveAndCharge.warning.message.includes(waveAndCharge.waveStart.expectedLabel));
+    assert.deepEqual(waveAndCharge.waveStart, {
+      wave: 2,
+      active: waveAndCharge.waveStart.expected,
+      expected: waveAndCharge.waveStart.expected,
+      expectedLabel: waveAndCharge.waveStart.expectedLabel
+    });
+    assert.equal(waveAndCharge.bossWindup, 'windup');
+    assert.equal(waveAndCharge.bossDirection, 1);
+    assert.equal(waveAndCharge.bossDash.state, 'dash');
+    assert.equal(waveAndCharge.swiftWindup, 'windup');
     assert.deepEqual(cdp.runtimeExceptions, []);
   } finally {
     cdp?.close();

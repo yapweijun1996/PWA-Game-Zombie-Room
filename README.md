@@ -1,6 +1,6 @@
 # Zombie Room
 
-Zombie Room is an offline-first, canvas-based survival game for desktop and mobile browsers. The player moves with four directions while the weapon fires automatically. The project is implemented as a dependency-free static web app and installable Progressive Web App (PWA).
+Zombie Room is an offline-first, canvas-based survival game for desktop and mobile browsers. The player moves in four directions, can trigger a timed evasive dash, and fires automatically. The project is implemented as a dependency-free static web app and installable Progressive Web App (PWA).
 
 ## Current Features
 
@@ -16,7 +16,9 @@ Zombie Room is an offline-first, canvas-based survival game for desktop and mobi
 - Regenerative Energy Shield system absorbing incoming damage with plasma deflection bubbles, overload break shatter, and auto-recharge delay.
 - Dynamic environmental electrical hazard pools with cyclic dormant/warning/active phases, electrocuting enemies lured inside with animated plasma arcs.
 - Visceral zombie dismemberment physics with flying severed limbs, spinning bone splinters, and landing blood decals on critical kills, Boss defeats, and Nuke blasts.
-- Elite Affix mutation system (Frost slowing aura, Swift sprint, Armored barrier) with distinct glowing crests and threat radar tracking.
+- Elite Affix mutation system (Frost slowing aura, Swift sprint with a telegraphed rush, Armored barrier) with distinct crests and threat radar tracking.
+- Boss and Swift-elite charges use direction-locked, dashed-lane telegraphs before impact; mobile players can evade with the Dash button, while desktop players press Space.
+- Seeded, preannounced elite waves (Swift, Armored, or Frost emphasis) vary affix distribution only—no extra spawns or global health scaling—and skip boss / blackout waves.
 - Dynamic combo kill streak system with decay timer, rising kill pitch synthesis, multi-tier speed/crit buffs (×10, ×25, ×50), fanfare bursts, and defeat screen Max Combo tracking.
 - Survivor visual polish: Tactical Combat Helmet, dynamic state-colored illuminated visor, pulsing shoulder beacon, footstep dust kick, aiming laser guide ray, and holographic distress invulnerability shimmer.
 - Off-screen tactical threat radar rendering edge warning chevrons for approaching fast runners, armored tanks, and lunging bosses.
@@ -58,6 +60,9 @@ Zombie Room is an offline-first, canvas-based survival game for desktop and mobi
     ├── audio.js            # Web Audio API procedural sound synthesis and mute toggle
     ├── haptics.js          # Vibration API tactile pulse feedback and toggle
     ├── entities.js         # Simulation, enemies, combat, waves, and scoring
+    ├── wave-director.js    # Seed-independent modifier selection and elite-affix weighting
+    ├── telegraphed-charge.js # Deterministic windup / charge state machine
+    ├── playtest-analysis.js # Phase, build, damage, and outcome summaries
     ├── game-ui.js          # Upgrade, pause, and game-over presentation
     ├── focus-trap.js       # Keyboard focus containment for active dialogs
     ├── render.js           # Canvas map, lighting, entities, and effects rendering
@@ -93,8 +98,8 @@ In the repository settings, open **Settings → Pages** and set the source to **
 
 ## Controls
 
-- **Desktop:** `W`, `A`, `S`, `D`, or the arrow keys (`P` or `Escape` to pause/resume).
-- **Mobile:** 360-degree floating virtual joystick with analog deflection and speed scaling.
+- **Desktop:** `W`, `A`, `S`, `D`, or arrow keys to move; `Space` to evasive-dash; `P` or `Escape` to pause/resume.
+- **Mobile:** 360-degree floating virtual joystick with analog deflection and speed scaling; tap **Dash** for a directional evade (8-second prototype cooldown).
 - **Restart after defeat:** tap the joystick, press any movement direction, or tap the Restart button.
 - **Combat:** shooting and target selection are automatic.
 
@@ -136,13 +141,15 @@ Likely factors to validate include the survivor's 180 speed versus a wave-1 walk
 
 The opposing pressure is also significant: the spawn interval falls from about 0.80 seconds at the start toward a 0.22-second floor, and enemy health continues scaling. Balance may therefore diverge between early and late waves or between upgrade builds. Compare runs by wave reached, duration, build, and cause of death before tuning. Initial scripted browser trials at the same narrow viewport produced very different outcomes; because upgrade and spawn randomness were not seeded and inputs were synthetic, treat them as exploratory evidence only (see Verification Status). Prefer readable enemy pressure and telegraphed attacks over an unmeasured blanket increase to health or spawn counts.
 
-With upgrades and combat pickups already in place, the main improvement opportunity is making threats more readable and gameplay decisions more consequential:
+With upgrades and combat pickups already in place, the current gameplay focus is making threats readable, adding one deliberate movement decision, and collecting phase/build evidence before tuning difficulty:
 
 1. Done: Roguelike 3-choice level-up upgrade system with 8 synergistic abilities (spread shot, rapid fire, heavy ammo, pierce, medkit, agility, magnet, critical strike), with number keys (1, 2, 3) or tap selection.
-2. Add distinct enemy telegraphs and attack patterns before increasing enemy health or spawn counts.
+2. Done: Boss and Swift-elite attacks now have direction-locked dashed-lane telegraphs and a windup; continue validating reaction windows before numeric difficulty changes.
 3. Done: Dynamic tactical combat pickups (Tactical Nuke screen-clearing shockwave, Overdrive 2x attack speed, Field Medkit, Super Magnet vacuum).
 4. Done: Comprehensive run summary with S/A/B/C Survival Rank evaluation, active tactical build matrix with ability level chips, Max Combo, and one-tap clipboard run sharing.
 5. Done: pause/resume for mobile app switching, settings menu opening, and visibility changes.
+6. Done: optional evasive Dash on Space / touch, with visible, localized accessible cooldown state while auto-fire remains unchanged.
+7. Done: seeded, warned wave affix variations and in-memory phase/build/death-cause summaries; no automatic balance tuning or blanket HP/spawn changes.
 
 ### UI and UX
 
@@ -251,13 +258,13 @@ Before release, verify the following on HTTPS and localhost:
 - Add multiple room layouts or a lightweight procedural room system.
 - Add richer hero animation and enemy silhouettes.
 - Profile and optimize only the hot paths confirmed by low-end device traces.
-- Add automated browser regression coverage for responsive and standalone states.
+- Expand browser regression coverage for standalone flows and broader responsive layouts; the new dash control currently has desktop, portrait, and landscape emulation checks.
 
 ## Verification Status
 
-No `package.json` or build configuration is present. Run the Node unit and browser replay checks with `node --test tests/playtest-rng.test.mjs tests/playtest-replay.browser.test.mjs`. The browser test uses Node's built-in WebSocket and an installed Edge/Chrome browser; it auto-skips locally if either is unavailable. It checks deterministic replay, normal unseeded startup and spawn clearance, and focus containment for upgrade, pause, game-over, and settings dialogs. Set `PLAYTEST_BROWSER` to select a browser executable, or `PLAYTEST_REQUIRE_BROWSER=1` to make missing browser support fail. GitHub Actions runs the same tests with browser support required, and deploys only after they pass. No packages are installed by the test.
+No `package.json` or build configuration is present. Run all checks with `node --test tests/playtest-rng.test.mjs tests/playtest-replay.browser.test.mjs tests/wave-director.test.mjs tests/telegraphed-charge.test.mjs tests/playtest-analysis.test.mjs`. The browser test uses Node's built-in WebSocket and an installed Edge/Chrome browser; it auto-skips locally if either is unavailable. It checks seeded replay (including Dash), mobile and desktop controls, charge and wave transitions, normal unseeded startup, and dialog focus behavior. Set `PLAYTEST_BROWSER` to select a browser executable, or `PLAYTEST_REQUIRE_BROWSER=1` to make missing browser support fail. GitHub Actions requires the browser test and deploys only after all checks pass. No packages are installed by the tests.
 
-For opt-in repeatable local trials, load the app with `?playtestSeed=123456&playtestLimit=180&playtestProfile=offense&playtestInput=joystick-loop-v1`. The seed must be an unsigned 32-bit integer; the recording limit defaults to 180 game seconds, and `0` disables it. Reaching the limit finalizes the record but does not stop gameplay. Seeded mode uses a fixed 1/60-second simulation step and records ordered input-state, upgrade-choice, and pause events alongside five-second checkpoints, accepted damage events and sources, and the final outcome. Records remain in memory at `window.__zombieRoomPlaytest` and `window.__zombieRoomPlaytestRuns`; nothing is uploaded or persisted. To replay a completed schema-version-2 record, keep a copy with `const source = structuredClone(window.__zombieRoomPlaytest)` and call `window.__zombieRoomPlaytestTools.replay(source)` on a page with a valid `playtestSeed`. For a saved record, parse its JSON and pass that object instead. The replay produces `replayComparison` evidence; `window.__zombieRoomPlaytestTools.exportRuns()` returns the current JSON, and `window.__zombieRoomPlaytestTools.stopReplay()` returns to recording mode. Cosmetic effects remain unseeded and do not feed the simulation.
+For opt-in repeatable local trials, load the app with `?playtestSeed=123456&playtestLimit=180&playtestProfile=offense&playtestInput=joystick-loop-v1`. The seed must be an unsigned 32-bit integer; the recording limit defaults to 180 game seconds, and `0` disables it. Reaching the limit finalizes the record but does not stop gameplay. Seeded mode uses a fixed 1/60-second simulation step and records ordered input-state, upgrade-choice, pause, and Dash events alongside five-second checkpoints, damage sources, wave modifiers, and the final outcome. Scenario modifiers are derived from the run seed and wave, independent of build-related gameplay RNG draws. Records remain in memory at `window.__zombieRoomPlaytest` and `window.__zombieRoomPlaytestRuns`; nothing is uploaded or persisted. To replay a completed schema-version-3 record from the same app version, keep a copy with `const source = structuredClone(window.__zombieRoomPlaytest)` and call `window.__zombieRoomPlaytestTools.replay(source)` on a page with a valid `playtestSeed`. The replay produces `replayComparison` evidence; `window.__zombieRoomPlaytestTools.exportRuns()` returns current JSON, and `window.__zombieRoomPlaytestTools.summarizeRuns()` groups completed runs by early (waves 1–2), mid (3–5), and late (6+) phases, build, health samples, damage sources, death causes, outcomes, and modifiers. `window.__zombieRoomPlaytestTools.stopReplay()` returns to recording mode. Results are in-memory only; the report is descriptive and never tunes balance. Do not increase enemy HP or spawn rate from small or build-skewed samples; compare repeated seeded runs across phases and builds first. Cosmetic effects remain unseeded and do not feed the simulation.
 
 Two initial exploratory Chrome DevTools runs used a 390×844 mobile/touch emulation, a repeating one-second diagonal WASD pattern, and a consistent upgrade preference (damage, rapid fire, multishot when offered; otherwise the first card). One ended at 19.5 seconds in wave 1 with 18 kills, likely from zombie contact; damage-source recording had not yet been implemented. The other reached the 180-second trial cap in wave 8 with 533 kills, 136/150 HP, 40 shield, and the Plasma Flak evolution. The desktop version was then tested at 929×861 with the same input pattern: it reached the trial cap in wave 8 with 523 kills, 89/100 HP, 40 shield, and both weapon evolutions. Collision fixtures for inside, edge-overlap, and clear positions passed; a resize test fixture placed the player at the future terminal position on a narrow layout and confirmed ejection after widening, and a 390×844 reset remained clear.
 

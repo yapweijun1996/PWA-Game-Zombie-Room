@@ -1,5 +1,5 @@
 import { input, keyMap, game } from './state.js';
-import { togglePause, chooseUpgrade } from './entities.js';
+import { togglePause, chooseUpgrade, activateDash } from './entities.js';
 import { isPlaytestReplaying, recordPlaytestInput } from './playtest.js';
 
 let resetInputHandler = () => {};
@@ -23,7 +23,7 @@ export function initInput(onRestart) {
   addEventListener('keydown', e => {
     if (isPlaytestReplaying()) {
       const key = e.key.toLowerCase();
-      if (keyMap[key] || ['1', '2', '3', 'p', 'escape'].includes(key)) e.preventDefault();
+      if (keyMap[key] || ['1', '2', '3', 'p', 'escape'].includes(key) || e.code === 'Space') e.preventDefault();
       return;
     }
     if (game.upgradeModalOpen) {
@@ -41,6 +41,13 @@ export function initInput(onRestart) {
       if (panel && !panel.hidden) return;
       e.preventDefault();
       togglePause();
+      return;
+    }
+    if (e.code === 'Space' || e.key === ' ') {
+      if (game.running && !game.paused && !game.upgradeModalOpen) {
+        e.preventDefault();
+        if (!e.repeat) activateDash();
+      }
       return;
     }
     const dir = keyMap[e.key.toLowerCase()];

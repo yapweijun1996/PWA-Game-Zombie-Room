@@ -702,6 +702,9 @@
     .message {
       top: 28%;
       padding: 8px 12px;
+      max-width: calc(100vw - 24px);
+      white-space: normal;
+      text-align: center;
       font-size: 11px;
       font-weight: 900;
       letter-spacing: .045em;
@@ -1189,19 +1192,72 @@
       bottom: max(6px, var(--safe-bottom));
       height: 124px;
       display: flex;
-      justify-content: center;
+      justify-content: space-between;
       align-items: center;
+      gap: 8px;
+      padding: 0 max(12px, var(--safe-right)) 0 max(12px, var(--safe-left));
       pointer-events: none;
     }
 
     .joystick-zone {
       position: relative;
-      width: min(340px, calc(100vw - 24px));
+      flex: 1 1 auto;
+      width: min(340px, calc(100vw - 100px));
+      max-width: 340px;
       height: 100%;
       pointer-events: auto;
       touch-action: none;
       user-select: none;
     }
+
+    .dash-action {
+      position: relative;
+      flex: 0 0 60px;
+      width: 60px;
+      height: 60px;
+      min-height: 60px;
+      padding: 7px 4px 10px;
+      border: 1px solid rgba(121, 242, 154, .58);
+      border-radius: 50%;
+      background: radial-gradient(circle at 38% 30%, rgba(45, 100, 59, .96), rgba(8, 20, 12, .98));
+      box-shadow: 0 6px 18px rgba(0, 0, 0, .48), inset 0 0 12px rgba(121, 242, 154, .14);
+      color: #eaffed;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0;
+      cursor: pointer;
+      pointer-events: auto;
+      touch-action: manipulation;
+      user-select: none;
+      -webkit-user-select: none;
+      transition: opacity .12s ease, border-color .12s ease, transform .12s ease;
+    }
+    .dash-action[aria-disabled="true"] { opacity: .72; border-color: rgba(228, 255, 235, .35); }
+    .dash-action:active { transform: scale(.96); }
+    .dash-action:focus-visible { outline: 2px solid #f5fff7; outline-offset: 3px; }
+    .dash-action-icon { font-size: 20px; line-height: 17px; font-weight: 1000; letter-spacing: -.18em; transform: translateX(-1px); }
+    .dash-action-label { font-size: 9px; line-height: 12px; font-weight: 950; letter-spacing: .07em; }
+    .dash-action-status {
+      position: absolute;
+      top: 1px;
+      right: 1px;
+      min-width: 18px;
+      height: 18px;
+      padding: 0 4px;
+      border: 1px solid rgba(255, 255, 255, .44);
+      border-radius: 999px;
+      background: #07100b;
+      color: #fff;
+      font-size: 9px;
+      line-height: 16px;
+      font-weight: 900;
+      font-variant-numeric: tabular-nums;
+    }
+    .dash-action-status:empty { display: none; }
+    .dash-cooldown-track { position: absolute; left: 13px; right: 13px; bottom: 6px; height: 3px; border-radius: 999px; background: rgba(255,255,255,.26); overflow: hidden; }
+    .dash-cooldown-track > i { display: block; width: 100%; height: 100%; border-radius: inherit; background: #baffc9; transition: width .1s linear; }
 
     .joystick-base {
       position: absolute;
@@ -1334,6 +1390,7 @@
       .hud-brand-col .brand-mark { width: 28px; height: 28px; font-size: 12px; }
       .hud-action-btn { width: 28px; height: 28px; min-height: 28px; }
       .controls-wrap { height: 104px; bottom: max(2px, calc(var(--safe-bottom) - 4px)); }
+      .dash-action { flex-basis: 54px; width: 54px; height: 54px; min-height: 54px; }
       .joystick-base { width: 88px; height: 88px; }
       .joystick-knob { width: 36px; height: 36px; }
       .hint-pill { bottom: calc(114px + var(--safe-bottom)); }
@@ -1344,11 +1401,12 @@
       .boss-bar-wrap { top: calc(50px + var(--safe-top)); left: auto; right: max(160px, var(--safe-right)); transform: none; width: min(340px, calc(100% - 320px)); }
       .boss-bar-wrap.show { transform: none; }
       .hud-bar { width: min(520px, calc(100% - 150px)); padding: 4px 8px; }
-      .controls-wrap { left: auto; right: max(10px, var(--safe-right)); width: 140px; height: 110px; bottom: max(6px, var(--safe-bottom)); }
-      .joystick-zone { width: 100%; }
+      .controls-wrap { left: auto; right: max(10px, var(--safe-right)); width: 220px; height: 110px; bottom: max(6px, var(--safe-bottom)); padding: 0 8px; }
+      .joystick-zone { width: auto; max-width: none; }
+      .dash-action { flex-basis: 56px; width: 56px; height: 56px; min-height: 56px; }
       .joystick-base { width: 88px; height: 88px; }
       .joystick-knob { width: 36px; height: 36px; }
-      .hint-pill { left: auto; right: 155px; bottom: max(14px, var(--safe-bottom)); transform: none; }
+      .hint-pill { left: auto; right: max(230px, calc(220px + var(--safe-right))); bottom: max(14px, var(--safe-bottom)); transform: none; }
       .install-tip { left: auto; right: 164px; bottom: max(14px, var(--safe-bottom)); transform: translateY(8px); width: min(330px, calc(100% - 330px)); }
       .install-tip.show { transform: translateY(0); }
     }

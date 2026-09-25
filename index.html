@@ -125,7 +125,7 @@
       </button>
       <button class="update-button settings-action" id="updateButton" type="button" data-i18n-aria="updateAriaCheck" aria-label="Check for Zombie Room updates">
         <span class="update-dot" aria-hidden="true"></span>
-        <span id="updateLabel">Update v3.5.6</span>
+        <span id="updateLabel">Update v3.5.7</span>
       </button>
       <div class="settings-diagnostics">
         <div class="settings-label" data-i18n="hudDiagnostics">Performance</div>
@@ -208,8 +208,14 @@
           <div class="joystick-knob" id="joystickKnob" aria-hidden="true"></div>
         </div>
       </div>
+      <button class="dash-action" id="dashButton" type="button" data-i18n-aria="dashActionReady" aria-label="Evasive dash ready. Press Space or activate the dash button." aria-disabled="false">
+        <span class="dash-action-icon" aria-hidden="true">»</span>
+        <span class="dash-action-label" data-i18n="dashActionLabel">DASH</span>
+        <span class="dash-action-status" id="dashButtonStatus" aria-hidden="true"></span>
+        <span class="dash-cooldown-track" aria-hidden="true"><i id="dashCooldownFill"></i></span>
+      </button>
     </div>
-    <div class="desktop-hint" data-i18n="hintDesktop">WASD / Arrow Keys · shooting is automatic</div>
+    <div class="desktop-hint" data-i18n="hintDesktop">WASD / Arrow Keys · Space to dash · auto fire</div>
   </main>
 
   <script type="module" src="./src/main.js"></script>

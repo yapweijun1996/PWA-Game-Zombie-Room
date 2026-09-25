@@ -1,4 +1,4 @@
-export const APP_VERSION = '3.5.6';
+export const APP_VERSION = '3.5.7';
 
 export const dom = {
   canvas: document.getElementById('game'),
@@ -25,6 +25,9 @@ export const dom = {
   joystickZone: document.getElementById('joystickZone'),
   joystickBase: document.getElementById('joystickBase'),
   joystickKnob: document.getElementById('joystickKnob'),
+  dashButton: document.getElementById('dashButton'),
+  dashButtonStatus: document.getElementById('dashButtonStatus'),
+  dashCooldownFill: document.getElementById('dashCooldownFill'),
   hintPill: document.getElementById('hintPill'),
   languageSelect: document.getElementById('languageSelect'),
   restartButton: document.getElementById('restartButton'),
@@ -167,6 +170,12 @@ export const game = {
   comboTimer: 0,
   maxCombo: 0,
   wave: 1,
+  waveModifierId: null,
+  waveModifierWave: 0,
+  pendingWaveModifierId: null,
+  preparedWave: 0,
+  scenarioSeed: 0,
+  swiftChargeCooldown: 0,
   spawnTimer: 0,
   bullets: [],
   zombies: [],

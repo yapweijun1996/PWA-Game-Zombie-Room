@@ -31,7 +31,7 @@ jobs:
       - name: Run unit and browser replay tests
         env:
           PLAYTEST_REQUIRE_BROWSER: '1'
-        run: node --test tests/playtest-rng.test.mjs tests/playtest-replay.browser.test.mjs
+        run: node --test tests/playtest-rng.test.mjs tests/playtest-replay.browser.test.mjs tests/wave-director.test.mjs tests/telegraphed-charge.test.mjs tests/playtest-analysis.test.mjs
 
   deploy:
     needs: verify

@@ -1,4 +1,4 @@
-import { ui, game, timers, scoreState, getActiveBoss } from './state.js';
+import { dom, ui, game, timers, scoreState, getActiveBoss } from './state.js';
 import { clamp, formatTime } from './utils.js';
 import { t } from './i18n.js';
 
@@ -29,6 +29,21 @@ export function updateUI() {
   ui.timeText.textContent = formatTime(game.elapsed);
   ui.scoreText.textContent = Math.floor(game.score);
   ui.bestText.textContent = scoreState.best;
+
+  if (dom.dashButton) {
+    const cooldownMax = p.dashCooldownMax || 8;
+    const cooldown = Math.max(0, p.dashCooldown || 0);
+    const coolingDown = cooldown > 0;
+    const secondsRemaining = Math.ceil(cooldown);
+    dom.dashButton.setAttribute('aria-disabled', String(coolingDown));
+    dom.dashButton.setAttribute('aria-label', coolingDown
+      ? t('dashActionCooldown', { seconds: secondsRemaining })
+      : t('dashActionReady'));
+    if (dom.dashButtonStatus) dom.dashButtonStatus.textContent = coolingDown ? String(secondsRemaining) : '';
+    if (dom.dashCooldownFill) {
+      dom.dashCooldownFill.style.width = clamp(1 - cooldown / cooldownMax, 0, 1) * 100 + '%';
+    }
+  }
 
   if (ui.comboBadge && ui.comboText && ui.comboBar) {
     if (game.combo >= 5 && game.running) {

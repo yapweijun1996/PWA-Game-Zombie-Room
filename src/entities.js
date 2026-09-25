@@ -1,12 +1,24 @@
 import { APP_VERSION, game, room, ui, dom, input, timers, perf, scoreState, viewport, getActiveBoss, hasActiveBoss } from './state.js';
 import { clamp, dist2, rand, shuffle } from './utils.js';
-import { beginPlaytestRun, finishPlaytestRun, gameRandom, gameRand, isPlaytestReplaying, playtestConfig, recordPlaytestCheckpoint, recordPlaytestDamage, recordPlaytestInput, recordPlaytestPause, recordPlaytestUpgrade } from './playtest.js';
+import { beginPlaytestRun, finishPlaytestRun, gameRandom, gameRand, getPlaytestSeed, isPlaytestReplaying, playtestConfig, recordPlaytestAbility, recordPlaytestCheckpoint, recordPlaytestDamage, recordPlaytestInput, recordPlaytestPause, recordPlaytestUpgrade, recordPlaytestWaveModifier } from './playtest.js';
 import { burst, sprayBlood, makeDecal, particleBudget, spawnDamageText, spawnGore } from './effects.js';
 import { flashMessage, updateUI } from './ui.js';
 import { renderPausePresentation, showUpgradeDialog, updateUpgradeDialog, hideUpgradeDialog, showGameOver, hideGameOver, hideBossBar } from './game-ui.js';
 import { t } from './i18n.js';
+import { createTelegraphedCharge, updateTelegraphedCharge } from './telegraphed-charge.js';
+import { getWaveModifier, selectEliteAffix } from './wave-director.js';
+
 import { playShoot, playCrit, playKill, playXp, playLevelUp, playUpgradeSelect, playPlayerHit, playGameOver, playUiClick, playNuke, playOverdrive, playHeal, playMagnet, playShieldHit, playShieldBreak, playShieldRecharge, playBossRoar, playElectricZap, playComboMilestone, playBlackoutAlarm, playPowerRestored } from './audio.js';
 import { vibrateHit, vibrateCrit, vibrateLevelUp, vibrateBoss, vibrateDeath, vibrateUi, vibrateNuke, vibrateOverdrive, vibrateCombo } from './haptics.js';
+
+const WAVE_MODIFIER_LABEL_KEYS = Object.freeze({
+  swift: 'waveModifierSwift',
+  armored: 'waveModifierArmored',
+  frost: 'waveModifierFrost'
+});
+const DASH_DURATION_SECONDS = 0.24;
+const DASH_COOLDOWN_SECONDS = 8;
+const DASH_SPEED_MULTIPLIER = 2.8;
 
 export function makePlayer() {
   return {
@@ -28,6 +40,11 @@ export function makePlayer() {
     shootTimer: 0,
     bulletSpeed: 460,
     invuln: 0,
+    dashTimer: 0,
+    dashCooldown: 0,
+    dashCooldownMax: DASH_COOLDOWN_SECONDS,
+    dashDirectionX: 0,
+    dashDirectionY: 0,
     aimAngle: -Math.PI / 2,
     moveAngle: -Math.PI / 2,
     moving: false,
@@ -80,6 +97,61 @@ export function togglePause() {
   setPaused(!game.paused, true);
 }
 
+function getDashDirection() {
+  const p = game.player;
+  let dx = (input.right ? 1 : 0) - (input.left ? 1 : 0);
+  let dy = (input.down ? 1 : 0) - (input.up ? 1 : 0);
+  if (input.active) {
+    dx = input.vx;
+    dy = input.vy;
+  }
+
+  let length = Math.hypot(dx, dy);
+  if (length <= 0.06 && game.zombies.length) {
+    let nearest = null;
+    let nearestDistance = Infinity;
+    for (const zombie of game.zombies) {
+      const distance = dist2(p, zombie);
+      if (distance < nearestDistance) {
+        nearest = zombie;
+        nearestDistance = distance;
+      }
+    }
+    if (nearest) {
+      dx = p.x - nearest.x;
+      dy = p.y - nearest.y;
+      length = Math.hypot(dx, dy);
+    }
+  }
+
+  if (length <= 0.0001) {
+    const angle = Number.isFinite(p.moveAngle) ? p.moveAngle : p.aimAngle;
+    dx = Math.cos(angle);
+    dy = Math.sin(angle);
+    length = 1;
+  }
+  return { x: dx / length, y: dy / length };
+}
+
+export function activateDash(replayEvent = false, recordedDirection = null) {
+  const p = game.player;
+  if (!game.running || game.paused || game.upgradeModalOpen || !p || p.dashCooldown > 0) return false;
+  if (isPlaytestReplaying() && !replayEvent) return false;
+
+  const direction = recordedDirection || getDashDirection();
+  const length = Math.hypot(direction.x, direction.y);
+  if (!Number.isFinite(length) || length <= 0.0001) return false;
+
+  p.dashDirectionX = recordedDirection ? direction.x : direction.x / length;
+  p.dashDirectionY = recordedDirection ? direction.y : direction.y / length;
+  p.dashTimer = DASH_DURATION_SECONDS;
+  p.dashCooldown = DASH_COOLDOWN_SECONDS;
+  p.invuln = Math.max(p.invuln, DASH_DURATION_SECONDS);
+  burst(p.x - p.dashDirectionX * p.r, p.y - p.dashDirectionY * p.r, '#d7ffe0', 10, 95);
+  recordPlaytestAbility('dash', p.dashDirectionX, p.dashDirectionY);
+  return true;
+}
+
 function playtestSnapshot() {
   const p = game.player;
   if (!p) return null;
@@ -87,6 +159,7 @@ function playtestSnapshot() {
   return {
     elapsed: round(game.elapsed),
     wave: game.wave,
+    waveModifier: game.waveModifierId,
     kills: game.kills,
     score: Math.floor(game.score),
     zombies: game.zombies.length,
@@ -99,6 +172,8 @@ function playtestSnapshot() {
       shield: round(p.shield),
       maxShield: p.maxShield,
       shieldCooldown: round(p.shieldCooldown || 0),
+      dashTimer: round(p.dashTimer || 0),
+      dashCooldown: round(p.dashCooldown || 0),
       level: p.level
     },
     combo: game.combo,
@@ -109,9 +184,11 @@ function playtestSnapshot() {
 }
 
 export function resetGame() {
+  const scenarioSeed = getPlaytestSeed() ?? Math.floor(Math.random() * 0x100000000);
   if (playtestConfig.enabled) {
     beginPlaytestRun({
       appVersion: APP_VERSION,
+      scenarioSeed,
       viewport: {
         width: viewport.W,
         height: viewport.H,
@@ -130,6 +207,12 @@ export function resetGame() {
   game.score = 0;
   game.kills = 0;
   game.wave = 1;
+  game.waveModifierId = null;
+  game.waveModifierWave = 0;
+  game.pendingWaveModifierId = null;
+  game.preparedWave = 0;
+  game.scenarioSeed = scenarioSeed;
+  game.swiftChargeCooldown = 0;
   game.spawnTimer = 0.3;
   game.bullets.length = 0;
   game.zombies.length = 0;
@@ -186,14 +269,13 @@ function spawnZombie() {
   if (side === 3) { x = room.x - 18; y = gameRand(room.y, room.y + room.h); }
 
   const scale = 1 + (wave - 1) * .08;
-  const z = { x, y, type, hitFlash: 0, attackFlash: 0, walkTime: Math.random() * Math.PI * 2, facing: 0, affix: null };
+  const z = { x, y, type, hitFlash: 0, attackFlash: 0, walkTime: Math.random() * Math.PI * 2, facing: 0, affix: null, charge: null };
   if (type === 'runner') Object.assign(z, { r: 10, hp: 1.2 * scale, maxHp: 1.2 * scale, speed: 82 + wave * 2.2, damage: 8, color: '#e5a84d', score: 14, xp: 1 });
   else if (type === 'tank') Object.assign(z, { r: 18, hp: 5.5 * scale, maxHp: 5.5 * scale, speed: 32 + wave * 1.2, damage: 17, color: '#7d9c75', score: 35, xp: 3 });
   else Object.assign(z, { r: 13, hp: 2.1 * scale, maxHp: 2.1 * scale, speed: 48 + wave * 1.7, damage: 11, color: '#79b86a', score: 10, xp: 1 });
 
   if (wave >= 2 && gameRandom() < Math.min(0.28, 0.12 + wave * 0.025)) {
-    const affixes = ['frost', 'swift', 'armored'];
-    z.affix = affixes[Math.floor(gameRandom() * affixes.length)];
+    z.affix = selectEliteAffix(game.waveModifierId, gameRandom());
     if (z.affix === 'frost') {
       z.xp += 2;
       z.score = Math.round(z.score * 1.5);
@@ -201,6 +283,7 @@ function spawnZombie() {
       z.speed *= 1.42;
       z.xp += 2;
       z.score = Math.round(z.score * 1.5);
+      z.charge = createTelegraphedCharge(gameRand(1.8, 2.8));
     } else if (z.affix === 'armored') {
       z.maxHp *= 1.6;
       z.hp = z.maxHp;
@@ -389,8 +472,7 @@ function spawnBoss() {
     color: '#c75b68',
     score: 140,
     xp: 8,
-    dashCd: 2.6,
-    lunge: 0,
+    charge: createTelegraphedCharge(2.6),
     armor: .86,
     frenzy: false
   };
@@ -789,6 +871,34 @@ function endGame() {
   updateUI();
 }
 
+function prepareWaveModifier(wave) {
+  game.preparedWave = wave;
+  game.pendingWaveModifierId = getWaveModifier(game.scenarioSeed, wave);
+  if (!game.pendingWaveModifierId) return;
+
+  flashMessage(t('msgWaveModifierWarning', {
+    wave,
+    modifier: t(WAVE_MODIFIER_LABEL_KEYS[game.pendingWaveModifierId])
+  }));
+}
+
+function enterWave(wave) {
+  if (game.preparedWave !== wave) prepareWaveModifier(wave);
+  game.wave = wave;
+  game.waveModifierId = game.pendingWaveModifierId;
+  game.waveModifierWave = game.waveModifierId ? wave : 0;
+  game.pendingWaveModifierId = null;
+  game.preparedWave = 0;
+
+  if (game.waveModifierId) {
+    const modifier = t(WAVE_MODIFIER_LABEL_KEYS[game.waveModifierId]);
+    flashMessage(t('msgWaveModifierStart', { wave, modifier }));
+    recordPlaytestWaveModifier(wave, game.waveModifierId, game.elapsed);
+  } else {
+    flashMessage(t('msgWave', { wave }));
+  }
+}
+
 export function update(dt) {
   if (timers.messageTimer > 0) {
     timers.messageTimer -= dt;
@@ -826,6 +936,10 @@ export function update(dt) {
 
   game.elapsed += dt;
   const p = game.player;
+  const dashThisStep = p.dashTimer > 0;
+  p.dashTimer = Math.max(0, p.dashTimer - dt);
+  p.dashCooldown = Math.max(0, p.dashCooldown - dt);
+  game.swiftChargeCooldown = Math.max(0, game.swiftChargeCooldown - dt);
   p.invuln = Math.max(0, p.invuln - dt);
   p.shootTimer -= dt;
   p.muzzleFlash = Math.max(0, p.muzzleFlash - dt);
@@ -852,10 +966,11 @@ export function update(dt) {
   }
 
   const nextWave = 1 + Math.floor(game.elapsed / 25);
-  if (nextWave !== game.wave) {
-    game.wave = nextWave;
-    flashMessage(t('msgWave', { wave: game.wave }));
+  const secondsUntilNextWave = game.wave * 25 - game.elapsed;
+  if (nextWave === game.wave && secondsUntilNextWave > 0 && secondsUntilNextWave <= 3 && game.preparedWave !== game.wave + 1) {
+    prepareWaveModifier(game.wave + 1);
   }
+  if (nextWave !== game.wave) enterWave(nextWave);
   if (game.wave >= 4 && game.wave % 4 === 0 && game.bossWave !== game.wave && !hasActiveBoss()) {
     spawnBoss();
   }
@@ -887,7 +1002,11 @@ export function update(dt) {
   let mx = (input.right ? 1 : 0) - (input.left ? 1 : 0);
   let my = (input.down ? 1 : 0) - (input.up ? 1 : 0);
   let speedMultiplier = 1;
-  if (input.active) {
+  if (dashThisStep) {
+    mx = p.dashDirectionX;
+    my = p.dashDirectionY;
+    speedMultiplier = DASH_SPEED_MULTIPLIER;
+  } else if (input.active) {
     mx = input.vx;
     my = input.vy;
     const rawLen = Math.hypot(mx, my);
@@ -902,20 +1021,23 @@ export function update(dt) {
     const comboSpeedBonus = game.combo >= 50 ? 1.25 : (game.combo >= 25 ? 1.18 : (game.combo >= 10 ? 1.10 : 1.0));
 
     let frostSlow = 1.0;
-    for (const z of game.zombies) {
-      if (z.affix === 'frost') {
-        const dx = p.x - z.x;
-        const dy = p.y - z.y;
-        if (dx * dx + dy * dy < (z.r + 55) ** 2) {
-          frostSlow = 0.72;
-          break;
+    if (!dashThisStep) {
+      for (const z of game.zombies) {
+        if (z.affix === 'frost') {
+          const dx = p.x - z.x;
+          const dy = p.y - z.y;
+          if (dx * dx + dy * dy < (z.r + 55) ** 2) {
+            frostSlow = 0.72;
+            break;
+          }
         }
       }
     }
 
-    p.walkTime += dt * 11 * speedMultiplier * comboSpeedBonus * frostSlow;
-    p.x += normX * p.speed * speedMultiplier * comboSpeedBonus * frostSlow * dt;
-    p.y += normY * p.speed * speedMultiplier * comboSpeedBonus * frostSlow * dt;
+    const movementMultiplier = dashThisStep ? DASH_SPEED_MULTIPLIER : speedMultiplier * comboSpeedBonus * frostSlow;
+    p.walkTime += dt * 11 * movementMultiplier;
+    p.x += normX * p.speed * movementMultiplier * dt;
+    p.y += normY * p.speed * movementMultiplier * dt;
 
     p.stepTimer = (p.stepTimer || 0) - dt;
     if (p.stepTimer <= 0) {
@@ -1047,35 +1169,72 @@ export function update(dt) {
       }
       z.pulse += dt * (z.frenzy ? 7.2 : 3.2);
       z.entrance = Math.max(0, z.entrance - dt);
-      z.dashCd -= dt;
-      z.lunge = Math.max(0, z.lunge - dt);
     }
+
     const dx = p.x - z.x;
     const dy = p.y - z.y;
-    const len = Math.hypot(dx, dy) || 1;
-    z.facing = Math.atan2(dy, dx);
+    const distance = Math.hypot(dx, dy) || 1;
+    let moveX = dx / distance;
+    let moveY = dy / distance;
     let moveScale = 1;
+
     if (z.type === 'boss') {
-      const baseScale = z.frenzy ? 1.42 : 1.0;
-      moveScale = z.entrance > 0 ? .35 : baseScale;
-      const minDistance = z.frenzy ? 75 : 100;
-      if (z.dashCd <= 0 && len > minDistance) {
-        z.attackFlash = z.frenzy ? .42 : .32;
-        z.lunge = z.frenzy ? .32 : .22;
-        z.dashCd = z.frenzy ? gameRand(1.3, 2.3) : gameRand(2.6, 4.2);
+      const baseScale = z.frenzy ? 1.42 : 1;
+      const wasWinding = z.charge.state === 'windup';
+      const charge = updateTelegraphedCharge(z.charge, dt, dx, dy, {
+        minDistance: z.frenzy ? 75 : 100,
+        windupSeconds: z.frenzy ? .42 : .62,
+        dashSeconds: z.frenzy ? .32 : .24,
+        windupMultiplier: .12,
+        dashMultiplier: z.frenzy ? 2.85 : 2.15
+      });
+      if (wasWinding && charge.state === 'dash') z.attackFlash = z.frenzy ? .42 : .32;
+      if (charge.started) {
+        z.charge.cooldown = z.frenzy ? gameRand(1.3, 2.3) : gameRand(2.6, 4.2);
+        flashMessage(t('msgBossDashWarning'));
         game.cameraShake = Math.max(game.cameraShake, z.frenzy ? .28 : .18);
-        if (z.frenzy) {
-          burst(z.x, z.y, '#ff4359', 8, 80);
-        }
+        if (z.frenzy) burst(z.x, z.y, '#ff4359', 8, 80);
       }
-      if (z.lunge > 0) moveScale = z.frenzy ? 2.85 : 2.15;
+      if (charge.mode !== 'idle') {
+        moveX = charge.directionX;
+        moveY = charge.directionY;
+        moveScale = charge.mode === 'windup'
+          ? (z.entrance > 0 ? .35 : baseScale * charge.movementMultiplier)
+          : charge.movementMultiplier;
+      } else {
+        moveScale = z.entrance > 0 ? .35 : baseScale;
+      }
+    } else if (z.affix === 'swift' && z.charge) {
+      const wasWinding = z.charge.state === 'windup';
+      const charge = updateTelegraphedCharge(z.charge, dt, dx, dy, {
+        minDistance: 145,
+        windupSeconds: .46,
+        dashSeconds: .2,
+        windupMultiplier: .3,
+        dashMultiplier: 2.2,
+        canStart: game.swiftChargeCooldown <= 0
+      });
+      if (wasWinding && charge.state === 'dash') z.attackFlash = .18;
+      if (charge.started) {
+        z.charge.cooldown = gameRand(2.8, 3.8);
+        game.swiftChargeCooldown = 1.1;
+      }
+      if (charge.mode !== 'idle') {
+        moveX = charge.directionX;
+        moveY = charge.directionY;
+        moveScale = charge.movementMultiplier;
+      }
     }
-    z.x += dx / len * z.speed * moveScale * dt;
-    z.y += dy / len * z.speed * moveScale * dt;
+
+    z.facing = Math.atan2(moveY, moveX);
+    z.x += moveX * z.speed * moveScale * dt;
+    z.y += moveY * z.speed * moveScale * dt;
     resolveObstacleCollision(z);
 
-    const rr = p.r + z.r - (z.type === 'boss' ? 6 : 2);
-    if (dx * dx + dy * dy <= rr * rr) {
+    const contactDx = p.x - z.x;
+    const contactDy = p.y - z.y;
+    const contactRadius = p.r + z.r - (z.type === 'boss' ? 6 : 2);
+    if (contactDx * contactDx + contactDy * contactDy <= contactRadius * contactRadius) {
       if (p.invuln <= 0) z.attackFlash = z.type === 'boss' ? .24 : .18;
       damagePlayer(z.damage, z);
     }

@@ -1,3 +1,5 @@
+import { getWaveModifier } from './wave-director.js';
+
 const UINT32_MAX = 0xffffffff;
 const DEFAULT_LIMIT_SECONDS = 180;
 const CHECKPOINT_INTERVAL_SECONDS = 5;
@@ -68,6 +70,10 @@ export function isPlaytestReplaying() {
   return replaySource !== null;
 }
 
+export function getPlaytestSeed() {
+  return playtestConfig.enabled ? activeSeed : null;
+}
+
 export function resetPlaytestRandom() {
   if (!playtestConfig.enabled) return;
   random = createSeededRandom(activeSeed);
@@ -101,8 +107,9 @@ export function beginPlaytestRun(metadata, previousSnapshot) {
   lastInputState = null;
 
   activeRun = {
-    schemaVersion: 2,
+    schemaVersion: 3,
     appVersion: metadata.appVersion,
+    scenarioSeed: metadata.scenarioSeed,
     seed: activeSeed,
     rng: 'mulberry32-v1',
     fixedStepSeconds: PLAYTEST_FIXED_STEP_SECONDS,
@@ -124,6 +131,8 @@ export function beginPlaytestRun(metadata, previousSnapshot) {
     simulationTicks: 0,
     checkpoints: [],
     upgrades: [],
+    abilities: [],
+    waveModifiers: [],
     damageEvents: [],
     events: replaySource ? replaySource.events.map(event => ({ ...event })) : [],
     eventsTruncated: replaySource ? replaySource.eventsTruncated : false,
@@ -201,6 +210,23 @@ export function recordPlaytestUpgrade(upgrade) {
   appendPlaytestEvent('upgrade', { id: upgrade.id, index: upgrade.index });
 }
 
+export function recordPlaytestAbility(id, dx, dy) {
+  if (!activeRun || activeRun.status !== 'running') return;
+  activeRun.abilities.push({ id, dx, dy, tick: playtestTick, randomDraws });
+  appendPlaytestEvent('ability', { id, dx, dy });
+}
+
+export function recordPlaytestWaveModifier(wave, id, elapsed) {
+  if (!activeRun || activeRun.status !== 'running') return;
+  activeRun.waveModifiers.push({
+    wave,
+    id,
+    elapsed: Math.round(elapsed * 100) / 100,
+    tick: playtestTick,
+    randomDraws
+  });
+}
+
 export function recordPlaytestDamage(event) {
   if (!activeRun || activeRun.status !== 'running') return;
   const recorded = { ...event, tick: playtestTick, randomDraws };
@@ -244,9 +270,12 @@ export function finishPlaytestRun(outcome, snapshot, details = {}) {
   if (activeRun.mode === 'replay' && replaySource && ['player-death', 'time-cap'].includes(outcome)) {
     activeRun.replayComparison = {
       outcomeMatches: outcome === replaySource.outcome,
+      scenarioSeedMatches: activeRun.scenarioSeed === replaySource.scenarioSeed,
       finalMatches: equalJson(snapshot, replaySource.final),
       checkpointsMatch: equalJson(activeRun.checkpoints, replaySource.checkpoints),
       upgradesMatch: equalJson(activeRun.upgrades, replaySource.upgrades),
+      abilitiesMatch: equalJson(activeRun.abilities, replaySource.abilities),
+      waveModifiersMatch: equalJson(activeRun.waveModifiers, replaySource.waveModifiers),
       damageEventsMatch: equalJson(activeRun.damageEvents, replaySource.damageEvents),
       randomDrawsMatch: randomDraws === replaySource.randomDraws,
       eventsConsumed: replayCursor === replaySource.events.length,
@@ -255,7 +284,7 @@ export function finishPlaytestRun(outcome, snapshot, details = {}) {
   }
 }
 
-export function preparePlaytestReplay(record) {
+export function preparePlaytestReplay(record, expectedAppVersion = null) {
   if (!playtestConfig.enabled) return { ok: false, reason: 'Open the app with a valid playtestSeed first.' };
 
   let source;
@@ -265,12 +294,17 @@ export function preparePlaytestReplay(record) {
     return { ok: false, reason: 'The replay record must be JSON data.' };
   }
 
-  if (!source || source.schemaVersion !== 2) return { ok: false, reason: 'Replay requires a schemaVersion 2 record.' };
+  if (!source || source.schemaVersion !== 3) return { ok: false, reason: 'Replay requires a schemaVersion 3 record.' };
+  if (expectedAppVersion && source.appVersion !== expectedAppVersion) {
+    return { ok: false, reason: 'Replay records must come from the same app version.' };
+  }
   if (!['player-death', 'time-cap'].includes(source.outcome) || source.status !== 'finished') {
     return { ok: false, reason: 'Only completed death or time-cap runs can be replayed.' };
   }
   if (source.eventsTruncated) return { ok: false, reason: 'The input event limit was reached; this record is not replayable.' };
-  if (!Array.isArray(source.events) || source.events.length > MAX_PLAYTEST_EVENTS || !Number.isInteger(source.seed) || source.seed < 0 || source.seed > UINT32_MAX) {
+  if (!Array.isArray(source.events) || source.events.length > MAX_PLAYTEST_EVENTS || !Number.isInteger(source.seed) || source.seed < 0 || source.seed > UINT32_MAX ||
+    !Array.isArray(source.abilities) || !Array.isArray(source.waveModifiers) || !Number.isInteger(source.scenarioSeed) ||
+    source.scenarioSeed !== source.seed) {
     return { ok: false, reason: 'The replay record has invalid seed or event data.' };
   }
   if (source.fixedStepSeconds !== PLAYTEST_FIXED_STEP_SECONDS) {
@@ -295,9 +329,31 @@ export function preparePlaytestReplay(record) {
       if (typeof event.paused !== 'boolean') return { ok: false, reason: 'A replay pause event is malformed.' };
     } else if (event.type === 'upgrade') {
       if (typeof event.id !== 'string') return { ok: false, reason: 'A replay upgrade event is malformed.' };
+    } else if (event.type === 'ability') {
+      if (event.id !== 'dash' || !Number.isFinite(event.dx) || !Number.isFinite(event.dy) ||
+        Math.abs(Math.hypot(event.dx, event.dy) - 1) > 0.001) {
+        return { ok: false, reason: 'A replay ability event is malformed.' };
+      }
     } else {
       return { ok: false, reason: 'The replay contains an unknown event type.' };
     }
+  }
+
+  const abilityEvents = source.events.filter(event => event.type === 'ability').map(({ id, dx, dy, tick, randomDraws: draws }) => ({ id, dx, dy, tick, randomDraws: draws }));
+  if (source.abilities.length !== abilityEvents.length || !equalJson(source.abilities, abilityEvents) ||
+    source.abilities.some(ability => ability.id !== 'dash' || !Number.isFinite(ability.dx) || !Number.isFinite(ability.dy) ||
+      Math.abs(Math.hypot(ability.dx, ability.dy) - 1) > 0.001 || !Number.isInteger(ability.tick) || ability.tick < 0)) {
+    return { ok: false, reason: 'The replay record has malformed ability data.' };
+  }
+
+  let previousModifierWave = 0;
+  for (const modifier of source.waveModifiers) {
+    if (!modifier || !Number.isInteger(modifier.wave) || modifier.wave <= previousModifierWave ||
+      !Number.isFinite(modifier.elapsed) || !Number.isInteger(modifier.tick) || modifier.tick < 0 ||
+      modifier.id !== getWaveModifier(source.scenarioSeed, modifier.wave)) {
+      return { ok: false, reason: 'The replay record has malformed wave modifier data.' };
+    }
+    previousModifierWave = modifier.wave;
   }
 
   if (source.limitSeconds !== null && (!Number.isInteger(source.limitSeconds) || source.limitSeconds <= 0 || source.limitSeconds > 3600)) {

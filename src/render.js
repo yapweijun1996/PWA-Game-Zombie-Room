@@ -275,6 +275,23 @@ function drawPlayer(p) {
   ctx.lineWidth = hurt || lowHp ? 2.2 : 1.5;
   ctx.stroke();
 
+  if (p.dashTimer > 0) {
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    ctx.rotate(Math.atan2(p.dashDirectionY, p.dashDirectionX));
+    ctx.strokeStyle = '#effff2';
+    ctx.lineWidth = 2.4;
+    ctx.setLineDash([5, 4]);
+    ctx.beginPath();
+    ctx.moveTo(-p.r - 4, -9);
+    ctx.lineTo(-p.r - 25, -9);
+    ctx.moveTo(-p.r - 4, 9);
+    ctx.lineTo(-p.r - 25, 9);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+  }
+
   // Aiming tactical laser guide line
   if (!eco) {
     ctx.save();
@@ -498,6 +515,64 @@ function drawPlayer(p) {
     ctx.restore();
   }
 
+  ctx.restore();
+}
+
+function drawAttackTelegraph(z) {
+  if (z.charge?.state !== 'windup') return;
+
+  const isBoss = z.type === 'boss';
+  const length = isBoss ? Math.hypot(room.w, room.h) : 260;
+  const start = z.r + 8;
+  const endX = z.x + z.charge.directionX * length;
+  const endY = z.y + z.charge.directionY * length;
+  const perpX = -z.charge.directionY;
+  const perpY = z.charge.directionX;
+  const laneHalfWidth = isBoss ? 32 : 23;
+  const alpha = 0.76 + Math.sin(game.elapsed * 24) * 0.12;
+
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.lineCap = 'butt';
+  ctx.lineWidth = laneHalfWidth * 2 + 8;
+  ctx.strokeStyle = 'rgba(3, 8, 5, .88)';
+  ctx.beginPath();
+  ctx.moveTo(z.x + z.charge.directionX * start, z.y + z.charge.directionY * start);
+  ctx.lineTo(endX, endY);
+  ctx.stroke();
+
+  ctx.lineWidth = 2.4;
+  ctx.strokeStyle = '#f5fff7';
+  ctx.setLineDash([9, 7]);
+  for (const side of [-1, 1]) {
+    const offsetX = perpX * laneHalfWidth * side;
+    const offsetY = perpY * laneHalfWidth * side;
+    ctx.beginPath();
+    ctx.moveTo(z.x + z.charge.directionX * start + offsetX, z.y + z.charge.directionY * start + offsetY);
+    ctx.lineTo(endX + offsetX, endY + offsetY);
+    ctx.stroke();
+  }
+  ctx.setLineDash([]);
+
+  const chevronCount = Math.min(5, Math.floor((length - start) / 58));
+  for (let index = 0; index < chevronCount; index++) {
+    const distance = start + 34 + index * 58;
+    const centerX = z.x + z.charge.directionX * distance;
+    const centerY = z.y + z.charge.directionY * distance;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(centerX - z.charge.directionX * 9 - perpX * 9, centerY - z.charge.directionY * 9 - perpY * 9);
+    ctx.lineTo(centerX + z.charge.directionX * 3, centerY + z.charge.directionY * 3);
+    ctx.lineTo(centerX - z.charge.directionX * 9 + perpX * 9, centerY - z.charge.directionY * 9 + perpY * 9);
+    ctx.stroke();
+  }
+
+  ctx.setLineDash([4, 3]);
+  ctx.lineWidth = 2.4;
+  ctx.beginPath();
+  ctx.arc(z.x, z.y, z.r + 11, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.setLineDash([]);
   ctx.restore();
 }
 
@@ -1059,6 +1134,7 @@ export function draw() {
     ctx.fill();
   }
 
+  for (const z of game.zombies) drawAttackTelegraph(z);
   for (const z of game.zombies) drawZombie(z);
 
   const p = game.player;

@@ -1,6 +1,6 @@
-import { dom, ui, viewport, room, game, input, perf, scoreState } from './state.js';
+import { APP_VERSION, dom, ui, viewport, room, game, input, perf, scoreState } from './state.js';
 import { clamp } from './utils.js';
-import { resetGame, update, isDesktopControls, setPaused, togglePause, chooseUpgrade, currentUpgradeChoices, resolveObstacleCollision } from './entities.js';
+import { resetGame, update, isDesktopControls, setPaused, togglePause, chooseUpgrade, activateDash, currentUpgradeChoices, resolveObstacleCollision } from './entities.js';
 import { evaluatePerformance, refreshPerfLabel } from './effects.js';
 import { draw } from './render.js';
 import { initPwa, refreshPwaLabels } from './pwa.js';
@@ -11,6 +11,7 @@ import { flashMessage } from './ui.js';
 import { t } from './i18n.js';
 import { initAudio, playUiClick } from './audio.js';
 import { advancePlaytestTick, getPlaytestTick, isPlaytestReplaying, playtestConfig, PLAYTEST_FIXED_STEP_SECONDS, preparePlaytestReplay, recordPlaytestReplayMismatch, stopPlaytestReplay, takePlaytestReplayEvents } from './playtest.js';
+import { summarizePlaytestRuns } from './playtest-analysis.js';
 import { updateUpgradeDialog } from './game-ui.js';
 
 function resize() {
@@ -120,6 +121,9 @@ function applyPlaytestReplayEvents() {
       } else {
         chooseUpgrade(index, true);
       }
+    } else if (event.type === 'ability') {
+      const activated = activateDash(true, { x: event.dx, y: event.dy });
+      if (!activated) recordPlaytestReplayMismatch({ type: 'ability', id: event.id, dashReady: game.player?.dashCooldown <= 0 });
     }
   }
 }
@@ -213,6 +217,7 @@ dom.restartButton?.addEventListener('click', () => {
   if (!isPlaytestReplaying()) resetGame();
 });
 dom.pauseButton?.addEventListener('click', togglePause);
+dom.dashButton?.addEventListener('click', () => activateDash());
 dom.resumeButton?.addEventListener('click', () => setPaused(false, true));
 dom.pauseOverlay?.addEventListener('click', e => {
   if (e.target === dom.pauseOverlay) setPaused(false, true);
@@ -233,7 +238,7 @@ dom.shareButton?.addEventListener('click', () => {
 if (playtestConfig.enabled && typeof window !== 'undefined') {
   window.__zombieRoomPlaytestTools = Object.freeze({
     replay(record) {
-      const result = preparePlaytestReplay(record);
+      const result = preparePlaytestReplay(record, APP_VERSION);
       if (!result.ok) return result;
       resetInputState();
       playtestAccumulator = 0;
@@ -249,6 +254,9 @@ if (playtestConfig.enabled && typeof window !== 'undefined') {
     },
     exportRuns() {
       return JSON.stringify(window.__zombieRoomPlaytestRuns || [], null, 2);
+    },
+    summarizeRuns() {
+      return summarizePlaytestRuns(window.__zombieRoomPlaytestRuns || []);
     }
   });
 }
