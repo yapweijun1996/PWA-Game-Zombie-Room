@@ -65,7 +65,7 @@
             <div class="score-value" id="scoreText">0</div>
             <div class="best-line"><span data-i18n="hudBest">Best</span> <strong id="bestText">0</strong></div>
           </div>
-          <button class="settings-trigger" id="settingsTrigger" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="settingsPanel" data-i18n-aria="settingsTrigger" aria-label="More options">
+          <button class="settings-trigger" id="settingsTrigger" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="settingsPanel" data-i18n-aria="settingsTrigger" aria-label="More options">
             <svg class="settings-icon" viewBox="0 0 24 24" aria-hidden="true">
               <circle cx="5" cy="12" r="2.1"/><circle cx="12" cy="12" r="2.1"/><circle cx="19" cy="12" r="2.1"/>
             </svg>
@@ -94,7 +94,7 @@
     </div>
 
     <div class="settings-backdrop" id="settingsBackdrop" hidden></div>
-    <div class="settings-panel" id="settingsPanel" role="menu" data-i18n-aria="settingsTrigger" aria-label="Settings" hidden>
+    <div class="settings-panel" id="settingsPanel" role="dialog" aria-modal="true" data-i18n-aria="settingsDialogLabel" aria-label="Settings" hidden>
       <div class="settings-row">
         <span class="settings-label" data-i18n="languageLabel">Language</span>
         <select class="lang-select" id="languageSelect" data-i18n-aria="languageLabel" aria-label="Language"></select>
@@ -125,7 +125,7 @@
       </button>
       <button class="update-button settings-action" id="updateButton" type="button" data-i18n-aria="updateAriaCheck" aria-label="Check for Zombie Room updates">
         <span class="update-dot" aria-hidden="true"></span>
-        <span id="updateLabel">Update v3.5.1</span>
+        <span id="updateLabel">Update v3.5.6</span>
       </button>
       <div class="settings-diagnostics">
         <div class="settings-label" data-i18n="hudDiagnostics">Performance</div>

@@ -1,14 +1,31 @@
 import { input, keyMap, game } from './state.js';
 import { togglePause, chooseUpgrade } from './entities.js';
+import { isPlaytestReplaying, recordPlaytestInput } from './playtest.js';
+
+let resetInputHandler = () => {};
+
+export function resetInputState() {
+  resetInputHandler();
+}
+
+function recordInputState() {
+  recordPlaytestInput(input);
+}
 
 export function initInput(onRestart) {
   function setKeyboardInput(dir, pressed) {
     if (!Object.prototype.hasOwnProperty.call(input, dir)) return;
     if (pressed && !game.running) onRestart();
     input[dir] = pressed;
+    recordInputState();
   }
 
   addEventListener('keydown', e => {
+    if (isPlaytestReplaying()) {
+      const key = e.key.toLowerCase();
+      if (keyMap[key] || ['1', '2', '3', 'p', 'escape'].includes(key)) e.preventDefault();
+      return;
+    }
     if (game.upgradeModalOpen) {
       if (e.key === '1' || e.key === '2' || e.key === '3') {
         e.preventDefault();
@@ -33,6 +50,7 @@ export function initInput(onRestart) {
   }, { passive: false });
 
   addEventListener('keyup', e => {
+    if (isPlaytestReplaying()) return;
     const dir = keyMap[e.key.toLowerCase()];
     if (!dir) return;
     e.preventDefault();
@@ -67,6 +85,7 @@ export function initInput(onRestart) {
     }
 
     function onPointerDown(e) {
+      if (isPlaytestReplaying()) { e.preventDefault(); return; }
       if (activePointerId !== null || game.upgradeModalOpen) return;
       if (!game.running) {
         onRestart();
@@ -89,9 +108,11 @@ export function initInput(onRestart) {
       knob.style.transition = 'none';
       knob.style.transform = 'translate(0px, 0px)';
       input.active = true;
+      recordInputState();
     }
 
     function onPointerMove(e) {
+      if (isPlaytestReplaying()) { e.preventDefault(); return; }
       if (e.pointerId !== activePointerId) return;
       e.preventDefault();
       const dx = e.clientX - originX;
@@ -114,13 +135,16 @@ export function initInput(onRestart) {
       input.right = input.vx > 0.3;
       input.up = input.vy < -0.3;
       input.down = input.vy > 0.3;
+      recordInputState();
     }
 
     function onPointerEnd(e) {
+      if (isPlaytestReplaying()) { e.preventDefault(); return; }
       if (e.pointerId !== activePointerId) return;
       e.preventDefault();
       try { zone.releasePointerCapture(e.pointerId); } catch (_) {}
       resetJoystick();
+      recordInputState();
     }
 
     zone.addEventListener('pointerdown', onPointerDown, { passive: false });
@@ -142,10 +166,14 @@ export function initInput(onRestart) {
     input.vy = 0;
     input.active = false;
     if (releaseJoystick) releaseJoystick();
+    recordInputState();
   }
 
-  addEventListener('blur', clearMovementInput);
+  resetInputHandler = clearMovementInput;
+  addEventListener('blur', () => {
+    if (!isPlaytestReplaying()) clearMovementInput();
+  });
   document.addEventListener('visibilitychange', () => {
-    if (document.hidden) clearMovementInput();
+    if (document.hidden && !isPlaytestReplaying()) clearMovementInput();
   });
 }

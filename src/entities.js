@@ -1,7 +1,9 @@
-import { game, room, ui, dom, input, timers, perf, scoreState, viewport } from './state.js';
-import { clamp, dist2, rand, formatTime, shuffle } from './utils.js';
+import { APP_VERSION, game, room, ui, dom, input, timers, perf, scoreState, viewport, getActiveBoss, hasActiveBoss } from './state.js';
+import { clamp, dist2, rand, shuffle } from './utils.js';
+import { beginPlaytestRun, finishPlaytestRun, gameRandom, gameRand, isPlaytestReplaying, playtestConfig, recordPlaytestCheckpoint, recordPlaytestDamage, recordPlaytestInput, recordPlaytestPause, recordPlaytestUpgrade } from './playtest.js';
 import { burst, sprayBlood, makeDecal, particleBudget, spawnDamageText, spawnGore } from './effects.js';
 import { flashMessage, updateUI } from './ui.js';
+import { renderPausePresentation, showUpgradeDialog, updateUpgradeDialog, hideUpgradeDialog, showGameOver, hideGameOver, hideBossBar } from './game-ui.js';
 import { t } from './i18n.js';
 import { playShoot, playCrit, playKill, playXp, playLevelUp, playUpgradeSelect, playPlayerHit, playGameOver, playUiClick, playNuke, playOverdrive, playHeal, playMagnet, playShieldHit, playShieldBreak, playShieldRecharge, playBossRoar, playElectricZap, playComboMilestone, playBlackoutAlarm, playPowerRestored } from './audio.js';
 import { vibrateHit, vibrateCrit, vibrateLevelUp, vibrateBoss, vibrateDeath, vibrateUi, vibrateNuke, vibrateOverdrive, vibrateCombo } from './haptics.js';
@@ -59,41 +61,18 @@ export function isDesktopControls() {
   return innerWidth >= 800 && matchMedia('(pointer: fine)').matches;
 }
 
-export function setPaused(paused, userInitiated = false) {
+export function setPaused(paused, userInitiated = false, replayEvent = false, { showOverlay = true } = {}) {
+  if (isPlaytestReplaying() && !replayEvent) return;
   if (!game.running && paused) return;
+  const changed = game.paused !== paused;
   game.paused = paused;
+  if (changed) recordPlaytestPause(paused);
   if (userInitiated) {
     playUiClick();
     vibrateUi();
   }
-  if (dom.pauseOverlay) {
-    dom.pauseOverlay.hidden = !paused;
-    dom.pauseOverlay.classList.toggle('show', paused);
-  }
-  if (dom.canvas) {
-    if (paused) {
-      dom.canvas.classList.add('game-dimmed');
-    } else if (game.running && !game.upgradeModalOpen) {
-      dom.canvas.classList.remove('game-dimmed');
-    }
-  }
-  if (dom.pauseButton) {
-    dom.pauseButton.classList.toggle('active', paused);
-    const pauseIcon = dom.pauseButton.querySelector('.pause-icon');
-    const playIcon = dom.pauseButton.querySelector('.play-icon');
-    if (pauseIcon && playIcon) {
-      if (paused) {
-        pauseIcon.setAttribute('hidden', '');
-        playIcon.removeAttribute('hidden');
-      } else {
-        playIcon.setAttribute('hidden', '');
-        pauseIcon.removeAttribute('hidden');
-      }
-    }
-  }
-  if (!paused) {
-    perf.last = performance.now();
-  }
+  renderPausePresentation(paused, showOverlay);
+  if (!paused) perf.last = performance.now();
 }
 
 export function togglePause() {
@@ -101,8 +80,49 @@ export function togglePause() {
   setPaused(!game.paused, true);
 }
 
+function playtestSnapshot() {
+  const p = game.player;
+  if (!p) return null;
+  const round = value => Math.round(value * 100) / 100;
+  return {
+    elapsed: round(game.elapsed),
+    wave: game.wave,
+    kills: game.kills,
+    score: Math.floor(game.score),
+    zombies: game.zombies.length,
+    bosses: game.zombies.reduce((count, z) => count + (z.type === 'boss' ? 1 : 0), 0),
+    player: {
+      x: round(p.x),
+      y: round(p.y),
+      hp: round(p.hp),
+      maxHp: p.maxHp,
+      shield: round(p.shield),
+      maxShield: p.maxShield,
+      shieldCooldown: round(p.shieldCooldown || 0),
+      level: p.level
+    },
+    combo: game.combo,
+    maxCombo: game.maxCombo,
+    upgrades: { ...p.upgrades },
+    evolutions: { ...p.superWeapons }
+  };
+}
+
 export function resetGame() {
-  setPaused(false, false);
+  if (playtestConfig.enabled) {
+    beginPlaytestRun({
+      appVersion: APP_VERSION,
+      viewport: {
+        width: viewport.W,
+        height: viewport.H,
+        dpr: typeof devicePixelRatio === 'undefined' ? viewport.dpr : devicePixelRatio,
+        canvasDpr: viewport.dpr,
+        touchPoints: typeof navigator === 'undefined' ? 0 : navigator.maxTouchPoints || 0
+      }
+    }, playtestSnapshot());
+    recordPlaytestInput(input);
+  }
+  setPaused(false, false, true);
   closeUpgradeModal();
   game.pendingUpgrades = 0;
   game.running = true;
@@ -124,19 +144,16 @@ export function resetGame() {
   game.blackoutTimer = 0;
   game.blackoutTriggeredWave = 0;
   game.player = makePlayer();
+  // The large-room terminal can overlap the default center spawn.
+  resolveObstacleCollision(game.player);
   game.bossWave = 0;
   game.roomPhase = Math.random() * Math.PI * 2;
   game.cameraShake = 0;
   perf.lowFpsWindows = 0;
   perf.recoveredFpsWindows = 0;
   perf.perfWarmupUntil = performance.now() + 2200;
-  ui.gameover.classList.remove('show');
-  ui.gameover.hidden = true;
-  if (ui.gameoverNewBest) ui.gameoverNewBest.hidden = true;
-  if (ui.bossBar) {
-    ui.bossBar.classList.remove('show');
-    ui.bossBar.hidden = true;
-  }
+  hideGameOver();
+  hideBossBar();
   dom.canvas.classList.remove('game-blurred', 'game-dimmed');
   if (room.hazards && room.hazards.length) {
     room.hazards[0].state = 'dormant';
@@ -151,21 +168,22 @@ export function resetGame() {
   updateUI();
 }
 
+// Keep gameplay randomness separate from visual randomness so cosmetic effects cannot shift seeded outcomes.
 function spawnZombie() {
   if (game.zombies.length > 90) return;
   const p = game.player;
   const wave = game.wave;
-  const roll = Math.random();
+  const roll = gameRandom();
   let type = 'walker';
   if (wave >= 5 && roll < Math.min(.18, wave * .018)) type = 'tank';
   else if (wave >= 3 && roll < .34) type = 'runner';
 
-  const side = Math.floor(Math.random() * 4);
+  const side = Math.floor(gameRandom() * 4);
   let x, y;
-  if (side === 0) { x = rand(room.x, room.x + room.w); y = room.y - 18; }
-  if (side === 1) { x = room.x + room.w + 18; y = rand(room.y, room.y + room.h); }
-  if (side === 2) { x = rand(room.x, room.x + room.w); y = room.y + room.h + 18; }
-  if (side === 3) { x = room.x - 18; y = rand(room.y, room.y + room.h); }
+  if (side === 0) { x = gameRand(room.x, room.x + room.w); y = room.y - 18; }
+  if (side === 1) { x = room.x + room.w + 18; y = gameRand(room.y, room.y + room.h); }
+  if (side === 2) { x = gameRand(room.x, room.x + room.w); y = room.y + room.h + 18; }
+  if (side === 3) { x = room.x - 18; y = gameRand(room.y, room.y + room.h); }
 
   const scale = 1 + (wave - 1) * .08;
   const z = { x, y, type, hitFlash: 0, attackFlash: 0, walkTime: Math.random() * Math.PI * 2, facing: 0, affix: null };
@@ -173,9 +191,9 @@ function spawnZombie() {
   else if (type === 'tank') Object.assign(z, { r: 18, hp: 5.5 * scale, maxHp: 5.5 * scale, speed: 32 + wave * 1.2, damage: 17, color: '#7d9c75', score: 35, xp: 3 });
   else Object.assign(z, { r: 13, hp: 2.1 * scale, maxHp: 2.1 * scale, speed: 48 + wave * 1.7, damage: 11, color: '#79b86a', score: 10, xp: 1 });
 
-  if (wave >= 2 && Math.random() < Math.min(0.28, 0.12 + wave * 0.025)) {
+  if (wave >= 2 && gameRandom() < Math.min(0.28, 0.12 + wave * 0.025)) {
     const affixes = ['frost', 'swift', 'armored'];
-    z.affix = affixes[Math.floor(Math.random() * affixes.length)];
+    z.affix = affixes[Math.floor(gameRandom() * affixes.length)];
     if (z.affix === 'frost') {
       z.xp += 2;
       z.score = Math.round(z.score * 1.5);
@@ -222,7 +240,7 @@ function shootNearest() {
     const angle = startAngle + s * spreadAngle;
     const comboCritBonus = game.combo >= 50 ? 0.20 : (game.combo >= 25 ? 0.10 : 0);
     const effectiveCrit = Math.min(0.85, (p.critChance || 0) + comboCritBonus);
-    const isCrit = effectiveCrit > 0 && Math.random() < effectiveCrit;
+    const isCrit = effectiveCrit > 0 && gameRandom() < effectiveCrit;
     const damage = isCrit ? p.damage * 2.2 : p.damage;
 
     game.bullets.push({
@@ -254,9 +272,9 @@ export function spawnPickup(x, y, source = 'normal') {
   let type = 'medkit';
   if (source === 'boss') {
     const bossTypes = ['nuke', 'overdrive', 'medkit'];
-    type = bossTypes[Math.floor(Math.random() * bossTypes.length)];
+    type = bossTypes[Math.floor(gameRandom() * bossTypes.length)];
   } else {
-    const roll = Math.random();
+    const roll = gameRandom();
     if (roll < 0.35) type = 'medkit';
     else if (roll < 0.65) type = 'magnet';
     else if (roll < 0.85) type = 'overdrive';
@@ -319,14 +337,6 @@ function collectPickup(item, index) {
   }
 }
 
-export function hasActiveBoss() {
-  return game.zombies.some(z => z.type === 'boss');
-}
-
-export function getActiveBoss() {
-  return game.zombies.find(z => z.type === 'boss') || null;
-}
-
 export function resolveObstacleCollision(entity) {
   if (!room.obstacles) return;
   const r = entity.r || 13;
@@ -337,7 +347,22 @@ export function resolveObstacleCollision(entity) {
     const dy = entity.y - closestY;
     const distSq = dx * dx + dy * dy;
     if (distSq < r * r) {
-      const dist = Math.sqrt(distSq) || 0.001;
+      if (distSq === 0) {
+        // The closest-point normal is undefined when the center is inside the box.
+        const left = entity.x - obs.x;
+        const right = obs.x + obs.w - entity.x;
+        const top = entity.y - obs.y;
+        const bottom = obs.y + obs.h - entity.y;
+        const nearestFace = Math.min(left, right, top, bottom);
+
+        if (nearestFace === left) entity.x = obs.x - r;
+        else if (nearestFace === right) entity.x = obs.x + obs.w + r;
+        else if (nearestFace === top) entity.y = obs.y - r;
+        else entity.y = obs.y + obs.h + r;
+        continue;
+      }
+
+      const dist = Math.sqrt(distSq);
       const overlap = r - dist;
       entity.x += (dx / dist) * overlap;
       entity.y += (dy / dist) * overlap;
@@ -347,12 +372,12 @@ export function resolveObstacleCollision(entity) {
 
 function spawnBoss() {
   if (hasActiveBoss()) return;
-  const side = Math.floor(Math.random() * 4);
+  const side = Math.floor(gameRandom() * 4);
   let x, y;
-  if (side === 0) { x = rand(room.x + 40, room.x + room.w - 40); y = room.y - 44; }
-  if (side === 1) { x = room.x + room.w + 44; y = rand(room.y + 40, room.y + room.h - 40); }
-  if (side === 2) { x = rand(room.x + 40, room.x + room.w - 40); y = room.y + room.h + 44; }
-  if (side === 3) { x = room.x - 44; y = rand(room.y + 40, room.y + room.h - 40); }
+  if (side === 0) { x = gameRand(room.x + 40, room.x + room.w - 40); y = room.y - 44; }
+  if (side === 1) { x = room.x + room.w + 44; y = gameRand(room.y + 40, room.y + room.h - 40); }
+  if (side === 2) { x = gameRand(room.x + 40, room.x + room.w - 40); y = room.y + room.h + 44; }
+  if (side === 3) { x = room.x - 44; y = gameRand(room.y + 40, room.y + room.h - 40); }
   const scale = 1 + (game.wave - 1) * .14;
   const z = {
     x, y, type: 'boss', hitFlash: 0, attackFlash: 0, walkTime: 0, facing: 0, pulse: 0, entrance: 1.2,
@@ -513,11 +538,11 @@ export function getAvailableUpgrades() {
 
   if (availableEvos.length > 0) {
     const evo = availableEvos[0];
-    const otherChoices = shuffle([...availableRegular]).slice(0, 2);
+    const otherChoices = shuffle([...availableRegular], gameRandom).slice(0, 2);
     return [evo, ...otherChoices];
   }
 
-  const shuffled = shuffle([...availableRegular]);
+  const shuffled = shuffle([...availableRegular], gameRandom);
   return shuffled.slice(0, 3);
 }
 
@@ -537,55 +562,27 @@ export function openUpgradeModal() {
   vibrateLevelUp();
   if (dom.canvas) dom.canvas.classList.add('game-dimmed');
 
-  renderUpgradeCards(currentUpgradeChoices);
-
-  if (dom.upgradeModal) {
-    dom.upgradeModal.hidden = false;
-    dom.upgradeModal.classList.add('show');
-    dom.upgradeModal.focus();
-  }
+  showUpgradeDialog(currentUpgradeChoices, p, chooseUpgrade);
 }
 
-export function renderUpgradeCards(choices) {
-  if (!dom.upgradeCards) return;
-  dom.upgradeCards.innerHTML = '';
-  const p = game.player;
-
-  choices.forEach((choice, idx) => {
-    const isEvo = choice.isEvolution;
-    let lvlText = '';
-    if (isEvo) {
-      lvlText = t('evoBadge');
-    } else {
-      const curLvl = choice.level(p);
-      lvlText = curLvl === 0 ? 'NEW' : `Lv.${curLvl + 1}`;
-    }
-
-    const btn = document.createElement('button');
-    btn.className = 'upgrade-card' + (isEvo ? ' evolution' : '');
-    btn.type = 'button';
-    btn.setAttribute('data-index', String(idx));
-    btn.innerHTML = `
-      <div class="upgrade-card-icon" aria-hidden="true">${choice.icon}</div>
-      <div class="upgrade-card-content">
-        <div class="upgrade-card-header">
-          <span class="upgrade-card-name">${t(choice.titleKey)}</span>
-          <span class="upgrade-card-level${isEvo ? ' evo' : ''}">${lvlText}</span>
-        </div>
-        <div class="upgrade-card-desc">${t(choice.descKey)}</div>
-      </div>
-      <div class="upgrade-card-key" aria-hidden="true">${idx + 1}</div>
-    `;
-    btn.addEventListener('click', () => chooseUpgrade(idx));
-    dom.upgradeCards.appendChild(btn);
-  });
-}
-
-export function chooseUpgrade(index) {
+export function chooseUpgrade(index, replayEvent = false) {
+  if (isPlaytestReplaying() && !replayEvent) return;
   if (!game.upgradeModalOpen || !currentUpgradeChoices[index]) return;
   const chosen = currentUpgradeChoices[index];
   const p = game.player;
   chosen.apply(p);
+  if (playtestConfig.enabled) {
+    recordPlaytestUpgrade({
+      elapsed: Math.round(game.elapsed * 100) / 100,
+      wave: game.wave,
+      playerLevel: p.level,
+      index,
+      id: chosen.id,
+      titleKey: chosen.titleKey,
+      evolution: Boolean(chosen.isEvolution),
+      upgradeLevel: chosen.isEvolution ? null : chosen.level(p)
+    });
+  }
   playUpgradeSelect();
   vibrateUi();
 
@@ -603,7 +600,7 @@ export function chooseUpgrade(index) {
   if (game.pendingUpgrades > 0) {
     currentUpgradeChoices = getAvailableUpgrades();
     if (currentUpgradeChoices.length) {
-      renderUpgradeCards(currentUpgradeChoices);
+      updateUpgradeDialog(currentUpgradeChoices, p, chooseUpgrade);
       return;
     }
     p.hp = Math.min(p.maxHp, p.hp + 50);
@@ -616,13 +613,7 @@ export function chooseUpgrade(index) {
 
 export function closeUpgradeModal() {
   game.upgradeModalOpen = false;
-  if (dom.upgradeModal) {
-    dom.upgradeModal.classList.remove('show');
-    dom.upgradeModal.hidden = true;
-  }
-  if (dom.canvas && !game.paused && game.running) {
-    dom.canvas.classList.remove('game-dimmed');
-  }
+  hideUpgradeDialog(game.paused, game.running);
   perf.last = performance.now();
   updateUI();
 }
@@ -682,12 +673,12 @@ function killZombie(index, isCrit = false) {
     spawnPickup(z.x, z.y, 'boss');
   } else {
     const dropChance = z.type === 'tank' ? 0.14 : (z.type === 'runner' ? 0.05 : 0.025);
-    if (Math.random() < dropChance) {
+    if (gameRandom() < dropChance) {
       spawnPickup(z.x, z.y);
     }
   }
   for (let i = 0; i < z.xp; i++) {
-    game.orbs.push({ x: z.x + rand(-8, 8), y: z.y + rand(-8, 8), r: z.type === 'boss' ? 6 : 5, value: 1, pulse: Math.random() * Math.PI * 2 });
+    game.orbs.push({ x: z.x + gameRand(-8, 8), y: z.y + gameRand(-8, 8), r: z.type === 'boss' ? 6 : 5, value: 1, pulse: Math.random() * Math.PI * 2 });
   }
   game.zombies.splice(index, 1);
 }
@@ -696,6 +687,8 @@ function damagePlayer(amount, from) {
   const p = game.player;
   if (p.invuln > 0 || !game.running) return;
 
+  const hpBefore = p.hp;
+  const shieldBefore = p.shield;
   p.invuln = .58;
   timers.damageTimer = .16;
   p.shieldCooldown = 4.0;
@@ -731,6 +724,22 @@ function damagePlayer(amount, from) {
     sprayBlood(p.x, p.y, .7, '#d95b67');
   }
 
+  if (playtestConfig.enabled) {
+    const sourceIsHazard = room.hazards && room.hazards.includes(from);
+    recordPlaytestDamage({
+      elapsed: Math.round(game.elapsed * 100) / 100,
+      wave: game.wave,
+      source: sourceIsHazard ? 'hazard' : (from.type || 'unknown'),
+      affix: from.affix || null,
+      damage: amount,
+      shieldDamage: Math.max(0, Math.round((shieldBefore - p.shield) * 100) / 100),
+      hpDamage: Math.max(0, Math.round(Math.min(hpBefore, hpDamage) * 100) / 100),
+      playerHp: Math.max(0, Math.round(p.hp * 100) / 100),
+      playerPosition: { x: Math.round(p.x * 100) / 100, y: Math.round(p.y * 100) / 100 },
+      sourcePosition: { x: from.x, y: from.y }
+    });
+  }
+
   const dx = p.x - from.x;
   const dy = p.y - from.y;
   const len = Math.hypot(dx, dy) || 1;
@@ -748,63 +757,14 @@ export function calculateRunRank(wave, score, kills, maxCombo) {
   return 'C';
 }
 
-function renderBuildSummary(p) {
-  if (!ui.gameoverBuildGrid) return;
-  ui.gameoverBuildGrid.innerHTML = '';
-
-  if (p.superWeapons?.tesla) {
-    const evoChip = document.createElement('div');
-    evoChip.className = 'build-chip evo';
-    evoChip.innerHTML = `
-      <span class="build-chip-icon" aria-hidden="true">⚡</span>
-      <span class="build-chip-name">${t('evoTeslaTitle')}</span>
-      <span class="build-chip-level evo">${t('evoBadge')}</span>
-    `;
-    ui.gameoverBuildGrid.appendChild(evoChip);
-  }
-  if (p.superWeapons?.plasmaFlak) {
-    const evoChip = document.createElement('div');
-    evoChip.className = 'build-chip evo';
-    evoChip.innerHTML = `
-      <span class="build-chip-icon" aria-hidden="true">💥</span>
-      <span class="build-chip-name">${t('evoPlasmaTitle')}</span>
-      <span class="build-chip-level evo">${t('evoBadge')}</span>
-    `;
-    ui.gameoverBuildGrid.appendChild(evoChip);
-  }
-
-  const activeUpgrades = UPGRADES.filter(u => u.level(p) > (u.id === 'multiShot' ? 1 : 0));
-  if (!activeUpgrades.length) {
-    const emptyChip = document.createElement('div');
-    emptyChip.className = 'build-chip empty';
-    emptyChip.textContent = 'Lv.1 Standard Issue';
-    ui.gameoverBuildGrid.appendChild(emptyChip);
-    return;
-  }
-  activeUpgrades.forEach(u => {
-    const lvl = u.level(p);
-    const isMax = lvl >= u.maxLevel;
-    const chip = document.createElement('div');
-    chip.className = 'build-chip' + (isMax ? ' max' : '');
-    chip.innerHTML = `
-      <span class="build-chip-icon" aria-hidden="true">${u.icon}</span>
-      <span class="build-chip-name">${t(u.titleKey)}</span>
-      <span class="build-chip-level">${isMax ? t('upgradeMaxLevel') : 'Lv.' + lvl}</span>
-    `;
-    ui.gameoverBuildGrid.appendChild(chip);
-  });
-}
-
 function endGame() {
   const p = game.player;
   p.hp = 0;
   game.running = false;
-  setPaused(false, false);
+  if (playtestConfig.enabled) finishPlaytestRun('player-death', playtestSnapshot());
+  setPaused(false, false, true);
   closeUpgradeModal();
-  if (ui.bossBar) {
-    ui.bossBar.classList.remove('show');
-    ui.bossBar.hidden = true;
-  }
+  hideBossBar();
   playGameOver();
   vibrateDeath();
   const currentScore = Math.floor(game.score);
@@ -813,24 +773,19 @@ function endGame() {
   try {
     localStorage.setItem('zombie-room-best', String(scoreState.best));
   } catch (_) {}
-  ui.gameoverScore.textContent = currentScore;
-  if (ui.gameoverCombo) ui.gameoverCombo.textContent = game.maxCombo || 0;
-  if (ui.gameoverWave) ui.gameoverWave.textContent = game.wave;
-  ui.gameoverKills.textContent = game.kills;
-  ui.gameoverTime.textContent = formatTime(game.elapsed);
-  if (ui.gameoverNewBest) ui.gameoverNewBest.hidden = !isNewBest;
-
   const rank = calculateRunRank(game.wave, currentScore, game.kills, game.maxCombo || 0);
-  if (ui.gameoverRankBadge && ui.gameoverRankText) {
-    ui.gameoverRankText.textContent = t('rankLabel') + ' ' + rank;
-    ui.gameoverRankBadge.className = 'gameover-rank-badge rank-' + rank.toLowerCase();
-  }
-  renderBuildSummary(p);
-
-  dom.canvas.classList.add(game.performanceMode ? 'game-dimmed' : 'game-blurred');
-  ui.gameover.hidden = false;
-  ui.gameover.classList.add('show');
-  ui.gameover.focus();
+  showGameOver({
+    score: currentScore,
+    combo: game.maxCombo || 0,
+    wave: game.wave,
+    kills: game.kills,
+    elapsed: game.elapsed,
+    isNewBest,
+    rank,
+    player: p,
+    upgrades: UPGRADES,
+    performanceMode: game.performanceMode
+  });
   updateUI();
 }
 
@@ -982,9 +937,9 @@ export function update(dt) {
   game.spawnTimer -= dt;
   const spawnEvery = Math.max(.22, .82 - game.elapsed * .0038 - game.wave * .018);
   if (game.spawnTimer <= 0) {
-    if (!hasActiveBoss() || Math.random() < .42) spawnZombie();
-    if (game.wave >= 6 && !hasActiveBoss() && Math.random() < .17) spawnZombie();
-    game.spawnTimer = spawnEvery * rand(.72, 1.18);
+    if (!hasActiveBoss() || gameRandom() < .42) spawnZombie();
+    if (game.wave >= 6 && !hasActiveBoss() && gameRandom() < .17) spawnZombie();
+    game.spawnTimer = spawnEvery * gameRand(.72, 1.18);
   }
 
   if (p.shootTimer <= 0) {
@@ -1107,7 +1062,7 @@ export function update(dt) {
       if (z.dashCd <= 0 && len > minDistance) {
         z.attackFlash = z.frenzy ? .42 : .32;
         z.lunge = z.frenzy ? .32 : .22;
-        z.dashCd = z.frenzy ? rand(1.3, 2.3) : rand(2.6, 4.2);
+        z.dashCd = z.frenzy ? gameRand(1.3, 2.3) : gameRand(2.6, 4.2);
         game.cameraShake = Math.max(game.cameraShake, z.frenzy ? .28 : .18);
         if (z.frenzy) {
           burst(z.x, z.y, '#ff4359', 8, 80);
@@ -1214,4 +1169,5 @@ export function update(dt) {
 
   game.score += dt * (1 + game.wave * .12);
   updateUI();
+  if (playtestConfig.enabled) recordPlaytestCheckpoint(playtestSnapshot());
 }

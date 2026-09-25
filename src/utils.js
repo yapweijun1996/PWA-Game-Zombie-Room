@@ -7,9 +7,9 @@ export function formatTime(seconds) {
   return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
 }
 
-export function shuffle(arr) {
+export function shuffle(arr, random = Math.random) {
   for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
+    const j = Math.floor(random() * (i + 1));
     [arr[i], arr[j]] = [arr[j], arr[i]];
   }
   return arr;

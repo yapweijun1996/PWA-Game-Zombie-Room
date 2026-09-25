@@ -1,5 +1,6 @@
 import { game, dom, audioState, hapticsState } from './state.js';
 import { setPaused } from './entities.js';
+import { activateFocusTrap } from './focus-trap.js';
 import { t } from './i18n.js';
 import { playUiClick } from './audio.js';
 import { vibrateUi } from './haptics.js';
@@ -27,7 +28,10 @@ export function initSettingsMenu() {
   if (!trigger || !panel) return;
 
   let hideTimer = 0;
+  let closing = false;
+  let releaseFocusTrap = null;
   let wasPausedBySettings = false;
+  let wasPausedBeforeSettings = false;
 
   refreshSoundToggleUI();
   dom.soundToggle?.addEventListener('click', () => {
@@ -60,13 +64,19 @@ export function initSettingsMenu() {
     }
   }
 
-  function onOutsidePointer(e) {
-    if (!panel.contains(e.target) && e.target !== trigger) close({ returnFocus: false });
+  function onOutsidePointer(event) {
+    if (!panel.contains(event.target) && event.target !== trigger) {
+      close({ returnFocus: false, focusTarget: event.target });
+    }
   }
 
   function open() {
-    if (game.upgradeModalOpen) return;
+    if (game.upgradeModalOpen || closing) return;
     clearTimeout(hideTimer);
+    wasPausedBeforeSettings = game.paused;
+    wasPausedBySettings = game.running && !game.paused;
+    if (game.running) setPaused(true, false, false, { showOverlay: false });
+
     panel.hidden = false;
     if (backdrop) backdrop.hidden = false;
     requestAnimationFrame(() => {
@@ -74,32 +84,47 @@ export function initSettingsMenu() {
       if (backdrop) backdrop.classList.add('show');
     });
     trigger.setAttribute('aria-expanded', 'true');
-    if (game.running && !game.paused) {
-      wasPausedBySettings = true;
-      setPaused(true);
-    }
-    const focusable = panel.querySelector('select, button, [href], input, [tabindex]');
-    focusable?.focus();
+    releaseFocusTrap = activateFocusTrap(panel, {
+      initialFocus: 'select, button:not(:disabled), [href], input:not(:disabled), [tabindex]:not([tabindex="-1"])',
+      fallbackFocus: trigger
+    });
     document.addEventListener('keydown', onKeydown);
     document.addEventListener('pointerdown', onOutsidePointer, true);
   }
 
-  function close({ returnFocus = true } = {}) {
+  function close({ returnFocus = true, focusTarget = null } = {}) {
+    if (closing || panel.hidden) return;
+    closing = true;
     clearTimeout(hideTimer);
     panel.classList.remove('show');
     if (backdrop) backdrop.classList.remove('show');
     trigger.setAttribute('aria-expanded', 'false');
     document.removeEventListener('keydown', onKeydown);
     document.removeEventListener('pointerdown', onOutsidePointer, true);
-    if (wasPausedBySettings) {
-      wasPausedBySettings = false;
-      if (game.running) setPaused(false);
-    }
+
+    const resumeGame = wasPausedBySettings;
+    const restorePausedOverlay = wasPausedBeforeSettings;
+    wasPausedBySettings = false;
+    wasPausedBeforeSettings = false;
     hideTimer = setTimeout(() => {
       panel.hidden = true;
       if (backdrop) backdrop.hidden = true;
+      releaseFocusTrap?.({ restoreFocus: false });
+      releaseFocusTrap = null;
+
+      const pointerTargetSelector = 'a[href], button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])';
+      const pointerTarget = focusTarget?.matches?.(pointerTargetSelector) && focusTarget.getClientRects().length
+        ? focusTarget
+        : trigger;
+      const returnTarget = returnFocus ? trigger : pointerTarget;
+      returnTarget.focus({ preventScroll: true });
+      if (resumeGame && game.running) {
+        setPaused(false, false, false, { showOverlay: false });
+      } else if (restorePausedOverlay && game.running) {
+        setPaused(true, false, false, { showOverlay: true });
+      }
+      closing = false;
     }, CLOSE_TRANSITION_MS);
-    if (returnFocus) trigger.focus();
   }
 
   trigger.addEventListener('click', () => {

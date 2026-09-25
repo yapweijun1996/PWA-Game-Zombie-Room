@@ -1,4 +1,4 @@
-export const APP_VERSION = '3.5.1';
+export const APP_VERSION = '3.5.6';
 
 export const dom = {
   canvas: document.getElementById('game'),
@@ -183,3 +183,11 @@ export const game = {
   blackoutTriggeredWave: 0,
   performanceMode: false
 };
+
+export function hasActiveBoss() {
+  return game.zombies.some(zombie => zombie.type === 'boss');
+}
+
+export function getActiveBoss() {
+  return game.zombies.find(zombie => zombie.type === 'boss') || null;
+}

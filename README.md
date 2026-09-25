@@ -58,6 +58,8 @@ Zombie Room is an offline-first, canvas-based survival game for desktop and mobi
     ├── audio.js            # Web Audio API procedural sound synthesis and mute toggle
     ├── haptics.js          # Vibration API tactile pulse feedback and toggle
     ├── entities.js         # Simulation, enemies, combat, waves, and scoring
+    ├── game-ui.js          # Upgrade, pause, and game-over presentation
+    ├── focus-trap.js       # Keyboard focus containment for active dialogs
     ├── render.js           # Canvas map, lighting, entities, and effects rendering
     ├── effects.js          # Particles, decals, and adaptive performance mode
     ├── input.js            # Keyboard and pointer input
@@ -71,7 +73,7 @@ Zombie Room is an offline-first, canvas-based survival game for desktop and mobi
 
 ## Run Locally
 
-This is a static application and does not currently contain a package manager, build script, test script, or development server.
+This is a static application with no `package.json`, build script, or development server. Its automated checks use Node's built-in test runner and can be run with the command in **Verification Status**.
 
 Use any local HTTP server from the repository root. For example:
 
@@ -110,9 +112,7 @@ The current manifest and meta tags cover the main standalone experience. iOS beh
 
 ### Zoom and accessibility
 
-The viewport currently contains `user-scalable=no`, and the page uses `touch-action: none` to keep the game surface responsive. This intentionally prevents pinch-zoom during play, but it is not ideal for accessibility because it prevents users from zooming the interface.
-
-Before release, prefer a game-only interaction strategy that prevents accidental page gestures without globally disabling user zoom. Keep controls large, maintain visible focus styles for keyboard users, and verify the result with browser accessibility checks.
+The app intentionally disables page zoom with `maximum-scale=1` and `user-scalable=no`, and uses `touch-action: none` to preserve fixed, full-screen game controls and prevent page gestures from interrupting play. This is a product requirement; do not restore pinch-zoom without an explicit product decision. It does create an accessibility trade-off for users who rely on zoom, so keep controls legible and large, retain keyboard operation and visible focus styles, and verify the intended behavior on target iOS and Android browsers.
 
 ### Responsive behavior
 
@@ -130,7 +130,13 @@ Real-device testing remains necessary for Safari, Chrome Android, iOS standalone
 
 ### Gameplay
 
-The core loop is clear and immediately playable. The main improvement opportunity is adding meaningful player decisions beyond movement:
+The core loop is clear and immediately playable. Player feedback reports that the current game feels too easy. This is qualitative feedback, not yet backed by controlled playtest results; treat difficulty tuning as an open priority rather than assuming one numeric change will solve it.
+
+Likely factors to validate include the survivor's 180 speed versus a wave-1 walker's 49.7 speed, nearest-target auto-fire every 0.38 seconds, and the starting 100 HP plus 40-point shield that regenerates after damage-free time. Player damage, fire rate, projectile count, and movement can grow through upgrades; combo streaks also grant speed and critical-hit bonuses. By contrast, basic enemy health grows by 8% per wave, while contact-damage values stay fixed by enemy type. All incoming damage is gated by the same 0.58-second invulnerability window, so additional enemies do not stack damage during that interval. These differences may make early or mid-game kiting and survivability too forgiving, but they are hypotheses, not proof.
+
+The opposing pressure is also significant: the spawn interval falls from about 0.80 seconds at the start toward a 0.22-second floor, and enemy health continues scaling. Balance may therefore diverge between early and late waves or between upgrade builds. Compare runs by wave reached, duration, build, and cause of death before tuning. Initial scripted browser trials at the same narrow viewport produced very different outcomes; because upgrade and spawn randomness were not seeded and inputs were synthetic, treat them as exploratory evidence only (see Verification Status). Prefer readable enemy pressure and telegraphed attacks over an unmeasured blanket increase to health or spawn counts.
+
+With upgrades and combat pickups already in place, the main improvement opportunity is making threats more readable and gameplay decisions more consequential:
 
 1. Done: Roguelike 3-choice level-up upgrade system with 8 synergistic abilities (spread shot, rapid fire, heavy ammo, pierce, medkit, agility, magnet, critical strike), with number keys (1, 2, 3) or tap selection.
 2. Add distinct enemy telegraphs and attack patterns before increasing enemy health or spawn counts.
@@ -151,6 +157,7 @@ The core loop is clear and immediately playable. The main improvement opportunit
 The room has a strong industrial visual language with solid spatial tactical depth:
 
 - Done: Tactical industrial cover pillars with dynamic Circle-AABB physics collision, projectile spark absorption, hazard stripes, and status LEDs, supporting figure-8 kite loops.
+- Fixed desktop spawn collision: when the room is at least 640×380, the terminal pillar is placed at room center, where the player also spawns by default. `resetGame()` now resolves the player against obstacles, and the collision resolver ejects entities whose centers are already inside an AABB. Browser checks covered the 929×861 spawn, inside/edge collision cases, a resize that introduced an overlap, and a 390×844 reset; repeat on real devices.
 - Done: Dynamic environmental electrical hazard zones with alternating charge cycles, warning sparks, and high-voltage discharge for luring and frying zombie hordes.
 - Done: Off-screen tactical threat radar rendering edge warning chevrons (red double chevrons with localized badge for Bosses, amber chevrons for fast runners, olive for tanks) to prevent off-screen ambushes.
 - Use a small number of readable obstacles rather than dense decoration.
@@ -225,16 +232,19 @@ Before release, verify the following on HTTPS and localhost:
 ### P0 — Release safety and usability
 
 - Test the current PWA on real iOS and Android devices.
-- Reconsider global `user-scalable=no` and verify accessible zoom behavior.
-- Add focus-visible styles and non-color feedback for game states.
+- Verify intentional zoom prevention and full-screen gesture behavior on iOS Safari and Chrome Android; do not enable user zoom without an explicit product decision.
+- Audit focus-visible styling and non-color feedback across every interactive and game state.
 - Add a basic automated smoke check for manifest, service-worker registration, and offline navigation.
 
-### P1 — Gameplay depth
+### P1 — Gameplay depth and balance
 
-- Add level-up choices, active abilities, and a small set of telegraphed attacks.
-- Add room obstacles or hazards with predictable collision rules.
-- Add audio with a user-initiated mute toggle and mobile-safe activation.
-- Add run history or best-run metadata without collecting personal data.
+- Investigate the reported “too easy” feedback with repeated runs across early, mid, and late waves; establish a target survival curve before changing balance values.
+- Repeat balance trials with physical touch input on target devices and varied viewport sizes; the current scripted samples are too small to set a difficulty target.
+- Add distinct, telegraphed enemy attacks and tune movement, shield recharge, spawn pacing, and enemy composition from observed results; avoid increasing health or spawn counts blindly.
+- Refine the existing level-up choices and combat pickup balance based on observed builds and runs.
+- Verify existing room obstacles and hazards have predictable movement and collision behavior across viewport sizes.
+- Verify synthesized audio unlock and mute persistence across supported mobile and standalone browsers.
+- Add optional local run history only if playtest comparisons need it; do not collect personal data.
 
 ### P2 — Polish and scale
 
@@ -245,4 +255,14 @@ Before release, verify the following on HTTPS and localhost:
 
 ## Verification Status
 
-No package manager manifest (`package.json`), build configuration, or test configuration was present in the inspected working tree. The source includes seven UI locales, but translation completeness and language switching still require browser verification. The service-worker shell list also requires verification against all imported modules before claiming first-install offline support. This README documents the source and static assets; runtime, real-device, accessibility, offline, and install/update behavior still require explicit verification.
+No `package.json` or build configuration is present. Run the Node unit and browser replay checks with `node --test tests/playtest-rng.test.mjs tests/playtest-replay.browser.test.mjs`. The browser test uses Node's built-in WebSocket and an installed Edge/Chrome browser; it auto-skips locally if either is unavailable. It checks deterministic replay, normal unseeded startup and spawn clearance, and focus containment for upgrade, pause, game-over, and settings dialogs. Set `PLAYTEST_BROWSER` to select a browser executable, or `PLAYTEST_REQUIRE_BROWSER=1` to make missing browser support fail. GitHub Actions runs the same tests with browser support required, and deploys only after they pass. No packages are installed by the test.
+
+For opt-in repeatable local trials, load the app with `?playtestSeed=123456&playtestLimit=180&playtestProfile=offense&playtestInput=joystick-loop-v1`. The seed must be an unsigned 32-bit integer; the recording limit defaults to 180 game seconds, and `0` disables it. Reaching the limit finalizes the record but does not stop gameplay. Seeded mode uses a fixed 1/60-second simulation step and records ordered input-state, upgrade-choice, and pause events alongside five-second checkpoints, accepted damage events and sources, and the final outcome. Records remain in memory at `window.__zombieRoomPlaytest` and `window.__zombieRoomPlaytestRuns`; nothing is uploaded or persisted. To replay a completed schema-version-2 record, keep a copy with `const source = structuredClone(window.__zombieRoomPlaytest)` and call `window.__zombieRoomPlaytestTools.replay(source)` on a page with a valid `playtestSeed`. For a saved record, parse its JSON and pass that object instead. The replay produces `replayComparison` evidence; `window.__zombieRoomPlaytestTools.exportRuns()` returns the current JSON, and `window.__zombieRoomPlaytestTools.stopReplay()` returns to recording mode. Cosmetic effects remain unseeded and do not feed the simulation.
+
+Two initial exploratory Chrome DevTools runs used a 390×844 mobile/touch emulation, a repeating one-second diagonal WASD pattern, and a consistent upgrade preference (damage, rapid fire, multishot when offered; otherwise the first card). One ended at 19.5 seconds in wave 1 with 18 kills, likely from zombie contact; damage-source recording had not yet been implemented. The other reached the 180-second trial cap in wave 8 with 533 kills, 136/150 HP, 40 shield, and the Plasma Flak evolution. The desktop version was then tested at 929×861 with the same input pattern: it reached the trial cap in wave 8 with 523 kills, 89/100 HP, 40 shield, and both weapon evolutions. Collision fixtures for inside, edge-overlap, and clear positions passed; a resize test fixture placed the player at the future terminal position on a narrow layout and confirmed ejection after widening, and a 390×844 reset remained clear.
+
+Three further trials used 390×844, DPR-3 mobile/touch emulation and synthetic `PointerEvent` touch input through the virtual joystick, cycling eight directions every 0.75 wall seconds. With offense-priority upgrades, one run reached the 180-second cap in wave 8 with 538 kills, 125/125 HP, 40 shield, and both weapon evolutions. A defensive/XP-priority run (two Medkits, then Magnetic Collector; no offensive upgrade selected before death) ended at 44.8 seconds in wave 2 with 35 kills, 0/150 HP, 0 shield, and 33 zombies remaining. Selecting the first offered card each time reached the cap in wave 8 with 555 kills, 225/225 HP, 29 shield, and Tesla evolution. These outcomes suggest upgrade build and unseeded randomness strongly affect survival, but the small sample and repeated movement pattern do not establish overall difficulty.
+
+Before fixed-step replay was added, five seeded exploratory trials used 390×844, DPR-3 mobile/touch emulation, the same synthetic virtual-joystick route (eight directions, changed every 0.75 game seconds), and a 180-second cap. For seed 160501, offense-priority reached the cap in wave 8 with 565 kills, 175/175 HP, 40 shield, and both evolutions; survival-priority died at 41.38 seconds in wave 2 with 43 kills, 0/100 HP, no shield, and walker contact as the last damage source; first-card died at 42.52 seconds in wave 2 with 38 kills and walker contact. For seed 202602, offense-priority reached the cap in wave 8 with 544 kills, 125/125 HP, 40 shield, and both evolutions; first-card reached the cap with 526 kills, 225/225 HP, 40 shield, both evolutions, and one boss remaining. This indicates that upgrade offers/builds can dominate survival even when the movement route is held constant.
+
+A replay verification then recorded a 30-second seed-42 run with synthetic joystick input (390×844, DPR-3) and replayed its 45 ordered events without injecting further controls. The replay matched the source outcome, final snapshot, checkpoints, upgrades, damage events, and random draw count, with zero event mismatches (wave 2, 38 kills, score 489). Earlier seed-only retries differed (35 versus 32 kills), which motivated this replay check. The exact match verifies replay within the tested app/runtime, not bit-identical results across browsers or devices. Pointer input was synthetic rather than physical touch; real-device playtesting remains outstanding. Keyboard focus containment is covered for the tested dialogs, but screen-reader behavior, translation completeness, comprehensive accessibility, physical-device use, offline behavior, and full install/update flows remain unverified.

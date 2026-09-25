@@ -1,6 +1,5 @@
-import { ui, game, timers, scoreState } from './state.js';
+import { ui, game, timers, scoreState, getActiveBoss } from './state.js';
 import { clamp, formatTime } from './utils.js';
-import { getActiveBoss } from './entities.js';
 import { t } from './i18n.js';
 
 export function flashMessage(text) {
