@@ -13,12 +13,16 @@ const projectRoot = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const browserPath = findBrowser();
 const requireBrowser = process.env.PLAYTEST_REQUIRE_BROWSER === '1';
 const skipReason = !browserPath
-  ? 'Set PLAYTEST_BROWSER, EDGE_PATH, or CHROME_PATH to run the browser replay regression.'
+  ? (process.env.PLAYTEST_BROWSER !== undefined
+    ? `PLAYTEST_BROWSER does not point to a browser file: ${process.env.PLAYTEST_BROWSER || '(empty)'}`
+    : 'Set PLAYTEST_BROWSER, EDGE_PATH, or CHROME_PATH to run the browser replay regression.')
   : (typeof WebSocket !== 'function' ? 'This Node version does not provide the built-in WebSocket client.' : false);
 
 function findBrowser() {
+  if (process.env.PLAYTEST_BROWSER !== undefined) {
+    return process.env.PLAYTEST_BROWSER && existsSync(process.env.PLAYTEST_BROWSER) ? process.env.PLAYTEST_BROWSER : null;
+  }
   const candidates = [
-    process.env.PLAYTEST_BROWSER,
     process.env.EDGE_PATH,
     process.env.CHROME_PATH,
     ...windowsBrowserCandidates(),
@@ -116,7 +120,7 @@ async function readDevToolsPort(profilePath, browser, getBrowserStderr, timeoutM
   while (Date.now() < deadline) {
     const stderr = getBrowserStderr();
     if (browser.exitCode !== null) {
-      throw new Error(`Browser exited with code ${browser.exitCode}. Browser stderr: ${stderr.trim().slice(-4000) || '(empty)'}`);
+      throw new Error(`Browser ${browser.spawnfile} exited with code ${browser.exitCode}. Browser stderr: ${stderr.trim().slice(-4000) || '(empty)'}`);
     }
     // Chromium announces the endpoint even when the profile file is unavailable.
     const endpoint = stderr.match(/DevTools listening on (ws:\/\/[^\s]+)/);
@@ -133,7 +137,7 @@ async function readDevToolsPort(profilePath, browser, getBrowserStderr, timeoutM
     }
     await delay(100);
   }
-  throw new Error(`Timed out waiting for the browser DevTools endpoint. Browser stderr: ${getBrowserStderr().trim().slice(-4000) || '(empty)'}`);
+  throw new Error(`Timed out waiting for the browser DevTools endpoint from ${browser.spawnfile}. Browser stderr: ${getBrowserStderr().trim().slice(-4000) || '(empty)'}`);
 }
 
 async function readPageTarget(port, timeoutMs = 10000) {
