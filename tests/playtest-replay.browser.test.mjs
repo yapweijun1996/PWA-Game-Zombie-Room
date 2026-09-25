@@ -79,6 +79,11 @@ function createStaticServer() {
       return;
     }
     if (pathname === '/') pathname = '/index.html';
+    if (pathname === '/service-worker.js') {
+      // Keep first-control reloads out of this replay-focused browser test.
+      response.writeHead(404).end();
+      return;
+    }
     const filePath = resolve(projectRoot, '.' + pathname);
     if (filePath !== projectRoot && !filePath.startsWith(projectRoot + sep)) {
       response.writeHead(403).end();
