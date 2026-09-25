@@ -39,6 +39,7 @@ jobs:
         env:
           PLAYTEST_REQUIRE_BROWSER: '1'
           PLAYTEST_BROWSER: ${{ steps.setup-chrome.outputs.chrome-path }}
+          PLAYTEST_NO_SANDBOX: '1'
         run: node --test tests/playtest-rng.test.mjs tests/playtest-replay.browser.test.mjs tests/wave-director.test.mjs tests/telegraphed-charge.test.mjs tests/playtest-analysis.test.mjs
 
   deploy:

@@ -110,20 +110,30 @@ async function listen(server) {
   return server.address().port;
 }
 
-async function readDevToolsPort(profilePath, browser, timeoutMs = 20000) {
+async function readDevToolsPort(profilePath, browser, getBrowserStderr, timeoutMs = 20000) {
   const activePortFile = join(profilePath, 'DevToolsActivePort');
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    if (browser.exitCode !== null) throw new Error(`Browser exited with code ${browser.exitCode}.`);
+    const stderr = getBrowserStderr();
+    if (browser.exitCode !== null) {
+      throw new Error(`Browser exited with code ${browser.exitCode}. Browser stderr: ${stderr.trim().slice(-4000) || '(empty)'}`);
+    }
+    // Chromium announces the endpoint even when the profile file is unavailable.
+    const endpoint = stderr.match(/DevTools listening on (ws:\/\/[^\s]+)/);
+    if (endpoint) {
+      const port = Number(new URL(endpoint[1]).port);
+      if (Number.isInteger(port) && port > 0) return port;
+    }
     try {
       const [port] = readFileSync(activePortFile, 'utf8').trim().split(/\r?\n/);
-      if (Number.isInteger(Number(port))) return Number(port);
+      const parsedPort = Number(port);
+      if (Number.isInteger(parsedPort) && parsedPort > 0) return parsedPort;
     } catch (_) {
       // Wait for the browser to publish its debugging endpoint.
     }
     await delay(100);
   }
-  throw new Error('Timed out waiting for the browser DevTools endpoint.');
+  throw new Error(`Timed out waiting for the browser DevTools endpoint. Browser stderr: ${getBrowserStderr().trim().slice(-4000) || '(empty)'}`);
 }
 
 async function readPageTarget(port, timeoutMs = 10000) {
@@ -352,13 +362,17 @@ test('replay, dash controls, telegraphs, wave modifiers, and modal focus work to
       '--mute-audio',
       'about:blank'
     ];
-    if (process.platform !== 'win32' && typeof process.getuid === 'function' && process.getuid() === 0) {
+    if (process.env.PLAYTEST_NO_SANDBOX === '1' ||
+      (process.platform !== 'win32' && typeof process.getuid === 'function' && process.getuid() === 0)) {
       args.unshift('--no-sandbox');
     }
-    browser = spawn(browserPath, args, { stdio: 'ignore', windowsHide: true });
+    let browserStderr = '';
+    browser = spawn(browserPath, args, { stdio: ['ignore', 'ignore', 'pipe'], windowsHide: true });
+    browser.stderr.setEncoding('utf8');
+    browser.stderr.on('data', chunk => { browserStderr = (browserStderr + chunk).slice(-16384); });
 
     const browserStartError = new Promise((_, reject) => browser.once('error', reject));
-    const devToolsPort = await Promise.race([readDevToolsPort(profilePath, browser), browserStartError]);
+    const devToolsPort = await Promise.race([readDevToolsPort(profilePath, browser, () => browserStderr), browserStartError]);
     const page = await readPageTarget(devToolsPort);
     cdp = connectCdp(page.webSocketDebuggerUrl);
     await cdp.ready();
