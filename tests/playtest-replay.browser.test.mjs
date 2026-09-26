@@ -143,7 +143,11 @@ test('replay, dash controls, telegraphs, wave modifiers, and modal focus work to
       args.unshift('--no-sandbox');
     }
     let browserStderr = '';
-    browser = spawn(browserPath, args, { stdio: ['ignore', 'ignore', 'pipe'], windowsHide: true });
+    browser = spawn(browserPath, args, {
+      detached: process.platform !== 'win32',
+      stdio: ['ignore', 'ignore', 'pipe'],
+      windowsHide: true
+    });
     browser.stderr.setEncoding('utf8');
     browser.stderr.on('data', chunk => { browserStderr = (browserStderr + chunk).slice(-16384); });
 
@@ -354,7 +358,13 @@ test('replay, dash controls, telegraphs, wave modifiers, and modal focus work to
     assert.equal(await cdp.evaluate("matchMedia('(min-width: 800px) and (pointer: fine)').matches"), true,
       'desktop fixture should expose a fine pointer at desktop width');
     assert.equal(await cdp.evaluate("document.querySelector('#dashButton').getClientRects().length"), 0, 'touch control should yield to desktop keyboard layout');
-    await cdp.evaluate("(async () => { const { game } = await import('./src/state.js'); game.player.dashCooldown = 0; game.player.dashTimer = 0; })()");
+    await cdp.evaluate(`(async () => {
+      const { game } = await import('./src/state.js');
+      const { resetGame } = await import('./src/entities.js');
+      if (!game.player) resetGame();
+      // Keep the live startup fixture active while later UI checks run.
+      Object.assign(game.player, { dashCooldown: 0, dashTimer: 0, invuln: 180 });
+    })()`);
     await sendKey(cdp, 'keydown', ' ');
     const keyboardDash = await waitFor(
       cdp.evaluate.bind(cdp),
@@ -457,6 +467,6 @@ test('replay, dash controls, telegraphs, wave modifiers, and modal focus work to
     await stopBrowser(browser);
     if (server.listening) await new Promise(resolveClose => server.close(resolveClose));
     // Chromium helpers can finish profile writes just after the parent exits.
-    rmSync(profilePath, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+    rmSync(profilePath, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   }
 });

@@ -231,14 +231,34 @@ async function sendKey(cdp, type, key) {
 }
 
 async function stopBrowser(browser) {
-  if (!browser || browser.exitCode !== null) return;
+  if (!browser?.pid) return;
   const exited = once(browser, 'exit').catch(() => {});
-  browser.kill();
-  await Promise.race([exited, delay(3000)]);
-  if (browser.exitCode === null && process.platform === 'win32') {
-    const taskkill = spawn('taskkill.exe', ['/PID', String(browser.pid), '/T', '/F'], { stdio: 'ignore', windowsHide: true });
-    await once(taskkill, 'exit').catch(() => {});
+  if (process.platform === 'win32') {
+    if (browser.exitCode === null) {
+      browser.kill();
+      await Promise.race([exited, delay(3000)]);
+      if (browser.exitCode === null) {
+        const taskkill = spawn('taskkill.exe', ['/PID', String(browser.pid), '/T', '/F'], { stdio: 'ignore', windowsHide: true });
+        await once(taskkill, 'exit').catch(() => {});
+      }
+    }
+    await Promise.race([exited, delay(1000)]);
+    return;
   }
+
+  const signalGroup = signal => {
+    try {
+      process.kill(-browser.pid, signal);
+    } catch (error) {
+      if (error.code !== 'ESRCH') throw error;
+    }
+  };
+  signalGroup('SIGTERM');
+  await Promise.race([exited, delay(3000)]);
+  // Chromium can leave renderer processes writing to its profile after the
+  // browser process exits, so terminate the entire process group before cleanup.
+  signalGroup('SIGKILL');
+  await Promise.race([exited, delay(1000)]);
 }
 
 
@@ -259,7 +279,11 @@ export async function withBrowser(run, { serviceWorker = false } = {}) {
       `--user-data-dir=${profilePath}`, '--mute-audio', 'about:blank'
     ];
     if (process.env.PLAYTEST_NO_SANDBOX === '1' || (typeof process.getuid === 'function' && process.getuid() === 0)) args.unshift('--no-sandbox');
-    browser = spawn(browserPath, args, { stdio: ['ignore', 'ignore', 'pipe'], windowsHide: true });
+    browser = spawn(browserPath, args, {
+      detached: process.platform !== 'win32',
+      stdio: ['ignore', 'ignore', 'pipe'],
+      windowsHide: true
+    });
     browser.stderr.setEncoding('utf8');
     browser.stderr.on('data', chunk => { stderr = (stderr + chunk).slice(-16384); });
     const failed = new Promise((_, reject) => browser.once('error', reject));
@@ -273,6 +297,6 @@ export async function withBrowser(run, { serviceWorker = false } = {}) {
     cdp?.close();
     await stopBrowser(browser);
     if (server.listening) await new Promise(resolveClose => server.close(resolveClose));
-    rmSync(profilePath, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+    rmSync(profilePath, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   }
 }
