@@ -18,7 +18,8 @@ function buildSignature(snapshot) {
     .filter(([, active]) => Boolean(active))
     .sort(([left], [right]) => left.localeCompare(right))
     .map(([id]) => `evo:${id}`);
-  return [...upgrades, ...evolutions].join(',') || 'base';
+  const build = [snapshot?.build?.path, snapshot?.build?.specialization].filter(Boolean).map(id => `build:${id}`);
+  return [...build, ...upgrades, ...evolutions].join(',') || 'base';
 }
 
 function round(value, places = 3) {
@@ -129,6 +130,12 @@ export function summarizePlaytestRuns(records) {
 
   return {
     completedRuns: completedRuns.length,
+    director: {
+      reliefs: completedRuns.reduce((sum, run) => sum + (Array.isArray(run.directorEvents) ? run.directorEvents : []).filter(event => event.type === 'relief').length, 0),
+      recoveries: completedRuns.reduce((sum, run) => sum + (Array.isArray(run.directorEvents) ? run.directorEvents : []).filter(event => event.type === 'recovery').length, 0),
+      shots: completedRuns.reduce((sum, run) => sum + (Array.isArray(run.directorEvents) ? run.directorEvents : []).filter(event => event.type === 'spit').length, 0),
+      highestStage: completedRuns.reduce((highest, run) => Math.max(highest, run.final?.director?.stage || 0), 0)
+    },
     phaseDefinitions: RUN_PHASES.map(({ id, maxWave }) => ({ id, maxWave: Number.isFinite(maxWave) ? maxWave : null })),
     phases: Object.fromEntries([...phases].map(([id, stats]) => [id, {
       runs: stats.runIds.size,

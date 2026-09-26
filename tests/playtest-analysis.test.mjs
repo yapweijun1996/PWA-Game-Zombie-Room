@@ -61,3 +61,22 @@ test('empty and malformed inputs return an empty, serializable report', () => {
   assert.equal(summarizePlaytestRuns(null).completedRuns, 0);
   assert.doesNotThrow(() => JSON.stringify(summarizePlaytestRuns([{ status: 'finished', checkpoints: [null], damageEvents: [null] }])));
 });
+
+test('director summaries report pacing and ranged actions without counting replays', () => {
+  const sample = { status: 'finished', final: { wave: 13, director: { stage: 4 } }, directorEvents: [{ type: 'relief' }, { type: 'recovery' }, { type: 'spit' }, { type: 'spit' }] };
+  const summary = summarizePlaytestRuns([sample, { ...sample, mode: 'replay' }]);
+  assert.deepEqual(summary.director, { reliefs: 1, recoveries: 1, shots: 2, highestStage: 4 });
+  assert.doesNotThrow(() => summarizePlaytestRuns([{ status: 'finished', directorEvents: 'invalid' }]));
+});
+
+test('build summaries keep paths and specializations distinct despite identical upgrades', () => {
+  const records = ['fork', 'conductor'].map(specialization => ({
+    status: 'finished', outcome: 'time-cap',
+    final: { wave: 8, upgrades: { damage: 5 }, build: { path: 'arc', specialization, burstTimer: 0 } },
+    checkpoints: [], damageEvents: []
+  }));
+  const builds = summarizePlaytestRuns(records).finalOutcomes.map(outcome => outcome.build);
+  assert.equal(builds.length, 2);
+  assert.ok(builds.includes('build:arc,build:fork,damage:5'));
+  assert.ok(builds.includes('build:arc,build:conductor,damage:5'));
+});

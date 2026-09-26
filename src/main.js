@@ -7,7 +7,7 @@ import { initPwa, refreshPwaLabels } from './pwa.js';
 import { initInput, resetInputState } from './input.js';
 import { initI18n } from './i18n-apply.js';
 import { initSettingsMenu, refreshSoundToggleUI, refreshHapticsToggleUI } from './settings-menu.js';
-import { flashMessage } from './ui.js';
+import { flashMessage, updateUI } from './ui.js';
 import { t } from './i18n.js';
 import { initAudio, playUiClick } from './audio.js';
 import { advancePlaytestTick, getPlaytestTick, isPlaytestReplaying, playtestConfig, PLAYTEST_FIXED_STEP_SECONDS, preparePlaytestReplay, recordPlaytestReplayMismatch, stopPlaytestReplay, takePlaytestReplayEvents } from './playtest.js';
@@ -94,6 +94,7 @@ export function updateHazards() {
 }
 
 let playtestAccumulator = 0;
+const manualPlaytest = playtestConfig.enabled && new URLSearchParams(location.search).get('playtestManual') === '1';
 
 function applyPlaytestReplayEvents() {
   if (!playtestConfig.enabled) return;
@@ -131,9 +132,9 @@ function applyPlaytestReplayEvents() {
 function frame(now) {
   const dt = Math.min(.034, Math.max(0, (now - perf.last) / 1000));
   perf.last = now;
-  if (playtestConfig.enabled) applyPlaytestReplayEvents();
+  if (playtestConfig.enabled && !manualPlaytest) applyPlaytestReplayEvents();
 
-  if (!game.paused && !game.upgradeModalOpen) {
+  if (!manualPlaytest && !game.paused && !game.upgradeModalOpen) {
     perf.fpsFrames++;
     const fpsWindowMs = now - perf.fpsWindowStart;
     if (fpsWindowMs >= 500) {
@@ -202,6 +203,7 @@ initI18n(() => {
   refreshPerfLabel();
   refreshSoundToggleUI();
   refreshHapticsToggleUI();
+  updateUI();
   if (game.upgradeModalOpen && currentUpgradeChoices.length) {
     updateUpgradeDialog(currentUpgradeChoices, game.player, chooseUpgrade);
   }
@@ -236,6 +238,26 @@ dom.shareButton?.addEventListener('click', () => {
 });
 
 if (playtestConfig.enabled && typeof window !== 'undefined') {
+  window.render_game_to_text = () => JSON.stringify({
+    coordinates: 'CSS pixels; origin at top-left; x right, y down',
+    running: game.running, paused: game.paused, upgradeModal: game.upgradeModalOpen,
+    elapsed: game.elapsed, wave: game.wave, director: game.director,
+    room, player: game.player, enemies: game.zombies,
+    enemyProjectiles: game.enemyProjectiles, pickups: game.pickups,
+    score: game.score, kills: game.kills,
+    choices: currentUpgradeChoices.map(choice => choice.id)
+  });
+  if (manualPlaytest) window.advanceTime = (milliseconds) => {
+    if (!Number.isFinite(milliseconds) || milliseconds < 0) return;
+    const steps = Math.round(milliseconds / (PLAYTEST_FIXED_STEP_SECONDS * 1000));
+    for (let step = 0; step < steps; step++) {
+      applyPlaytestReplayEvents();
+      if (!game.running || game.paused || game.upgradeModalOpen) break;
+      advancePlaytestTick();
+      update(PLAYTEST_FIXED_STEP_SECONDS);
+    }
+    draw();
+  };
   window.__zombieRoomPlaytestTools = Object.freeze({
     replay(record) {
       const result = preparePlaytestReplay(record, APP_VERSION);

@@ -2,6 +2,7 @@ import { dom, game, ui } from './state.js';
 import { formatTime } from './utils.js';
 import { t } from './i18n.js';
 import { activateFocusTrap } from './focus-trap.js';
+import { BUILD_CONFIG, BUILD_PATHS, BUILD_SPECIALIZATIONS, BUILD_EVOLUTIONS, canUnlockEvolution } from './builds.js';
 
 let releasePauseFocusTrap = null;
 let releaseUpgradeFocusTrap = null;
@@ -44,16 +45,32 @@ export function renderPausePresentation(paused, showOverlay = true) {
 
 export function updateUpgradeDialog(choices, player, onChoose) {
   if (!dom.upgradeCards) return;
+  const isPathChoice = choices.some(choice => choice.isBuild && !choice.isSpecialization);
+  const isSpecChoice = choices.some(choice => choice.isSpecialization);
+  dom.upgradeModal.querySelector('.upgrade-title').textContent = t(isPathChoice ? 'buildPathTitle' : isSpecChoice ? 'buildSpecTitle' : 'upgradeModalTitle');
+  dom.upgradeModal.querySelector('.upgrade-subtitle').textContent = t(isPathChoice ? 'buildPathSubtitle' : isSpecChoice ? 'buildSpecSubtitle' : 'upgradeModalSubtitle');
+  const build = player.build;
+  const evolution = BUILD_EVOLUTIONS.find(choice => choice.path === build?.path);
+  const pathSummary = build?.path
+    ? t('path_' + build.path) + ' · ' + (build.specialization ? t(build.specialization) : t('buildNextSpec', { level: BUILD_CONFIG.specializationLevel }))
+    : t('buildNextPath', { level: BUILD_CONFIG.pathLevel });
+  const requirements = evolution ? Object.entries(evolution.requirements).map(([id, required]) =>
+    `${t('buildReq_' + id)} ${Math.min(player.upgrades[id] || 0, required)}/${required}`).join(' · ') : '';
+  const evolutionSummary = evolution ? (player.superWeapons[evolution.id] ? t('buildEvolutionOwned') : canUnlockEvolution(player, evolution) ? t('buildEvolutionReady') : requirements) : '';
+  dom.upgradeModal.querySelector('#upgradeBuildSummary').textContent = pathSummary + (evolution ? `\n${t(evolution.titleKey)} · ${evolutionSummary}` : '');
+  dom.upgradeModal.querySelector('.upgrade-keyboard-hint').textContent = t('upgradeKeys', { keys: choices.map((_, index) => index + 1).join(' / ') });
   dom.upgradeCards.replaceChildren();
+  dom.upgradeCards.scrollTop = 0;
 
   choices.forEach((choice, index) => {
     const isEvolution = choice.isEvolution;
-    const currentLevel = isEvolution ? null : choice.level(player);
-    const levelText = isEvolution ? t('evoBadge') : (currentLevel === 0 ? 'NEW' : `Lv.${currentLevel + 1}`);
+    const currentLevel = isEvolution || choice.isBuild ? null : choice.level(player);
+    const levelText = choice.isBuild ? t(choice.isSpecialization ? 'buildSpecBadge' : 'buildPathBadge') : isEvolution ? t('evoBadge') : (currentLevel === 0 ? t('upgradeNewBadge') : `Lv.${currentLevel + 1}`);
     const button = document.createElement('button');
-    button.className = 'upgrade-card' + (isEvolution ? ' evolution' : '');
+    button.className = 'upgrade-card' + (isEvolution ? ' evolution' : choice.isBuild ? ' build-choice' : '');
     button.type = 'button';
     button.setAttribute('data-index', String(index));
+    button.dataset.upgradeId = choice.id;
     button.innerHTML = `
       <div class="upgrade-card-icon" aria-hidden="true">${choice.icon}</div>
       <div class="upgrade-card-content">
@@ -75,6 +92,7 @@ export function updateUpgradeDialog(choices, player, onChoose) {
 }
 
 export function showUpgradeDialog(choices, player, onChoose) {
+  dom.upgradeModal?.parentElement.classList.add('upgrade-open');
   updateUpgradeDialog(choices, player, onChoose);
   if (dom.canvas) dom.canvas.classList.add('game-dimmed');
   if (!dom.upgradeModal) return;
@@ -93,6 +111,7 @@ export function hideUpgradeDialog(paused, running) {
     releaseUpgradeFocusTrap = null;
   }
   if (dom.upgradeModal) {
+    dom.upgradeModal.parentElement.classList.remove('upgrade-open');
     dom.upgradeModal.classList.remove('show');
     dom.upgradeModal.hidden = true;
   }
@@ -102,6 +121,14 @@ export function hideUpgradeDialog(paused, running) {
 function renderBuildSummary(player, upgrades) {
   if (!ui.gameoverBuildGrid) return;
   ui.gameoverBuildGrid.replaceChildren();
+
+  for (const choice of [...BUILD_PATHS, ...BUILD_SPECIALIZATIONS, ...BUILD_EVOLUTIONS.filter(item => item.id === 'phaseDrive')]) {
+    if (!(choice.isEvolution ? player.superWeapons?.[choice.id] : choice.isSpecialization ? player.build?.specialization === choice.id : player.build?.path === choice.path)) continue;
+    const chip = document.createElement('div');
+    chip.className = 'build-chip evo';
+    chip.textContent = `${choice.icon} ${t(choice.titleKey)}`;
+    ui.gameoverBuildGrid.appendChild(chip);
+  }
 
   if (player.superWeapons?.tesla) {
     const chip = document.createElement('div');

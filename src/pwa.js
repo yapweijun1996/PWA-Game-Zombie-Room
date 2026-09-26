@@ -171,6 +171,7 @@ export function initPwa() {
   });
 
   refreshInstallButton();
+  setUpdateState('idle');
   registerPwa();
 }
 

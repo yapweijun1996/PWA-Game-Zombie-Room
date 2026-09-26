@@ -738,6 +738,9 @@
     }
 
     .upgrade-modal {
+      display: flex;
+      flex-direction: column;
+      max-height: calc(100dvh - 32px);
       width: min(380px, calc(100vw - 28px));
       padding: 20px 18px 16px;
       text-align: left;
@@ -750,11 +753,18 @@
       transform: translateY(12px) scale(.96);
       transition: opacity .2s ease, transform .2s ease;
     }
+    .center-overlay.upgrade-open {
+      z-index: 26;
+      padding: 14px;
+      pointer-events: auto;
+      background: rgba(0, 0, 0, .25);
+    }
     .upgrade-modal.show { opacity: 1; transform: translateY(0) scale(1); }
     .upgrade-modal[hidden] { display: none; }
     .upgrade-modal:focus { outline: none; }
 
     .upgrade-header {
+      flex-shrink: 0;
       display: flex;
       align-items: center;
       gap: 12px;
@@ -792,8 +802,15 @@
       display: flex;
       flex-direction: column;
       gap: 8px;
+      min-height: 0;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      padding: 2px;
+      touch-action: pan-y;
     }
     .upgrade-card {
+      flex-shrink: 0;
+      min-height: 58px;
       display: flex;
       align-items: center;
       gap: 10px;
@@ -805,7 +822,7 @@
       cursor: pointer;
       text-align: left;
       transition: background .15s ease, border-color .15s ease, transform .12s ease;
-      touch-action: manipulation;
+      touch-action: pan-y;
       width: 100%;
     }
     .upgrade-card:hover, .upgrade-card:focus-visible {
@@ -846,6 +863,7 @@
       color: #fff;
     }
     .upgrade-card-level {
+      flex-shrink: 0;
       font-size: 8.5px;
       font-weight: 900;
       padding: 1.5px 5.5px;
@@ -892,6 +910,7 @@
       flex: 0 0 auto;
     }
     .upgrade-keyboard-hint {
+      flex-shrink: 0;
       margin: 10px 0 0;
       text-align: center;
       font-size: 9.5px;
@@ -1414,3 +1433,30 @@
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after { animation-duration: .001ms !important; transition-duration: .001ms !important; }
     }
+
+/* Keep the stage and encounter within the existing wave metric. */
+.hud-metrics-row .wave-metric b,
+.hud-metrics-row .encounter-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.legacy-best-note { max-width: 230px; margin: 0 0 8px; color: var(--muted); font-size: 11px; line-height: 1.4; }
+
+.upgrade-build-summary {
+  flex-shrink: 0;
+  margin: 0 0 10px;
+  color: #a8d7ef;
+  font-size: 10px;
+  line-height: 1.4;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+.upgrade-card.build-choice { border-color: rgba(129, 209, 255, .4); background: rgba(105, 182, 255, .08); }
+.upgrade-card.build-choice:focus-visible { outline: 2px solid #81d1ff; outline-offset: -2px; }
+#buildPathIcon { color: #81d1ff; }
+#buildPathIcon.burst-active { color: #ffd27a; }
+.meter-xp .meter-head .label { display: flex; align-items: center; gap: 2px; min-width: 0; }
+.meter-xp .label > [data-i18n] { overflow: hidden; text-overflow: ellipsis; }
+#levelText, #buildPathIcon { flex-shrink: 0; }
+@media (max-height: 450px) {
+  .upgrade-modal { padding: 12px; }
+  .upgrade-header { margin-bottom: 6px; }
+  .upgrade-build-summary { margin-bottom: 6px; }
+}

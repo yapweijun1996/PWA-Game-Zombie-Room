@@ -1,21 +1,18 @@
 import { APP_VERSION, game, room, ui, dom, input, timers, perf, scoreState, viewport, getActiveBoss, hasActiveBoss } from './state.js';
 import { clamp, dist2, rand, shuffle } from './utils.js';
-import { beginPlaytestRun, finishPlaytestRun, gameRandom, gameRand, getPlaytestSeed, isPlaytestReplaying, playtestConfig, recordPlaytestAbility, recordPlaytestCheckpoint, recordPlaytestDamage, recordPlaytestInput, recordPlaytestPause, recordPlaytestUpgrade, recordPlaytestWaveModifier } from './playtest.js';
+import { beginPlaytestRun, finishPlaytestRun, gameRandom, gameRand, getPlaytestSeed, isPlaytestReplaying, playtestConfig, recordPlaytestAbility, recordPlaytestCheckpoint, recordPlaytestDamage, recordPlaytestInput, recordPlaytestPause, recordPlaytestUpgrade, recordPlaytestWaveModifier, recordPlaytestDirectorEvent } from './playtest.js';
 import { burst, sprayBlood, makeDecal, particleBudget, spawnDamageText, spawnGore } from './effects.js';
 import { flashMessage, updateUI } from './ui.js';
 import { renderPausePresentation, showUpgradeDialog, updateUpgradeDialog, hideUpgradeDialog, showGameOver, hideGameOver, hideBossBar } from './game-ui.js';
 import { t } from './i18n.js';
 import { createTelegraphedCharge, updateTelegraphedCharge } from './telegraphed-charge.js';
-import { getWaveModifier, selectEliteAffix } from './wave-director.js';
+import { DIRECTOR_CONFIG, createDirectorState, getWavePlan, advanceDirector, recordDirectorDamage, startDirectorRecovery, selectEliteAffix, selectEnemyType, getSpawnInterval, capEnemySpeed } from './wave-director.js';
+import { SPITTER_CONFIG, createSpitAttack, advanceSpitter, createEnemyProjectile, advanceEnemyProjectile } from './ranged-combat.js';
+import { createBuildState, getBuildChoices, getBuildProfile, BUILD_EVOLUTIONS, canUnlockEvolution, applyEvolution } from './builds.js';
 
 import { playShoot, playCrit, playKill, playXp, playLevelUp, playUpgradeSelect, playPlayerHit, playGameOver, playUiClick, playNuke, playOverdrive, playHeal, playMagnet, playShieldHit, playShieldBreak, playShieldRecharge, playBossRoar, playElectricZap, playComboMilestone, playBlackoutAlarm, playPowerRestored } from './audio.js';
 import { vibrateHit, vibrateCrit, vibrateLevelUp, vibrateBoss, vibrateDeath, vibrateUi, vibrateNuke, vibrateOverdrive, vibrateCombo } from './haptics.js';
 
-const WAVE_MODIFIER_LABEL_KEYS = Object.freeze({
-  swift: 'waveModifierSwift',
-  armored: 'waveModifierArmored',
-  frost: 'waveModifierFrost'
-});
 const DASH_DURATION_SECONDS = 0.24;
 const DASH_COOLDOWN_SECONDS = 8;
 const DASH_SPEED_MULTIPLIER = 2.8;
@@ -57,9 +54,11 @@ export function makePlayer() {
     magnetRadius: 125,
     overdriveTimer: 0,
     stepTimer: 0,
+    build: createBuildState(),
     superWeapons: {
       tesla: false,
-      plasmaFlak: false
+      plasmaFlak: false,
+      phaseDrive: false
     },
     upgrades: {
       multiShot: 1,
@@ -145,7 +144,11 @@ export function activateDash(replayEvent = false, recordedDirection = null) {
   p.dashDirectionX = recordedDirection ? direction.x : direction.x / length;
   p.dashDirectionY = recordedDirection ? direction.y : direction.y / length;
   p.dashTimer = DASH_DURATION_SECONDS;
-  p.dashCooldown = DASH_COOLDOWN_SECONDS;
+  const profile = getBuildProfile(p);
+  p.dashCooldownMax = profile.dashCooldown;
+  p.dashCooldown = profile.dashCooldown;
+  p.build.burstTimer = profile.burstDuration;
+  if (profile.burstDuration > 0) p.shootTimer = 0;
   p.invuln = Math.max(p.invuln, DASH_DURATION_SECONDS);
   burst(p.x - p.dashDirectionX * p.r, p.y - p.dashDirectionY * p.r, '#d7ffe0', 10, 95);
   recordPlaytestAbility('dash', p.dashDirectionX, p.dashDirectionY);
@@ -160,6 +163,13 @@ function playtestSnapshot() {
     elapsed: round(game.elapsed),
     wave: game.wave,
     waveModifier: game.waveModifierId,
+    director: {
+      stage: getWavePlan(game.scenarioSeed, game.wave).stage,
+      encounterId: getWavePlan(game.scenarioSeed, game.wave).encounterId,
+      recoveryUntil: round(game.director?.recoveryUntil || 0),
+      reliefUntil: round(game.director?.reliefUntil || 0)
+    },
+    enemyProjectiles: game.enemyProjectiles.length,
     kills: game.kills,
     score: Math.floor(game.score),
     zombies: game.zombies.length,
@@ -179,6 +189,7 @@ function playtestSnapshot() {
     combo: game.combo,
     maxCombo: game.maxCombo,
     upgrades: { ...p.upgrades },
+    build: { ...p.build, burstTimer: round(p.build.burstTimer) },
     evolutions: { ...p.superWeapons }
   };
 }
@@ -213,8 +224,11 @@ export function resetGame() {
   game.preparedWave = 0;
   game.scenarioSeed = scenarioSeed;
   game.swiftChargeCooldown = 0;
+  game.spitCooldown = 0;
+  game.director = createDirectorState(scenarioSeed);
   game.spawnTimer = 0.3;
   game.bullets.length = 0;
+  game.enemyProjectiles.length = 0;
   game.zombies.length = 0;
   game.orbs.length = 0;
   game.particles.length = 0;
@@ -252,14 +266,17 @@ export function resetGame() {
 }
 
 // Keep gameplay randomness separate from visual randomness so cosmetic effects cannot shift seeded outcomes.
-function spawnZombie() {
-  if (game.zombies.length > 90) return;
+function spawnZombie(directive) {
+  // Reserve one slot for the scheduled boss without exceeding the shared cap.
+  if (game.zombies.length >= DIRECTOR_CONFIG.maxEnemies - (hasActiveBoss() ? 0 : 1)) return;
   const p = game.player;
   const wave = game.wave;
   const roll = gameRandom();
-  let type = 'walker';
-  if (wave >= 5 && roll < Math.min(.18, wave * .018)) type = 'tank';
-  else if (wave >= 3 && roll < .34) type = 'runner';
+  const type = selectEnemyType(directive.plan, roll, {
+    walkersOnly: directive.walkersOnly,
+    allowSpitter: directive.allowSpitter,
+    spitterCount: game.zombies.filter(z => z.type === 'spitter').length
+  });
 
   const side = Math.floor(gameRandom() * 4);
   let x, y;
@@ -268,13 +285,14 @@ function spawnZombie() {
   if (side === 2) { x = gameRand(room.x, room.x + room.w); y = room.y + room.h + 18; }
   if (side === 3) { x = room.x - 18; y = gameRand(room.y, room.y + room.h); }
 
-  const scale = 1 + (wave - 1) * .08;
+  const scale = directive.plan.healthScale;
   const z = { x, y, type, hitFlash: 0, attackFlash: 0, walkTime: Math.random() * Math.PI * 2, facing: 0, affix: null, charge: null };
-  if (type === 'runner') Object.assign(z, { r: 10, hp: 1.2 * scale, maxHp: 1.2 * scale, speed: 82 + wave * 2.2, damage: 8, color: '#e5a84d', score: 14, xp: 1 });
+  if (type === 'spitter') Object.assign(z, { r: SPITTER_CONFIG.radius, hp: SPITTER_CONFIG.hp * scale, maxHp: SPITTER_CONFIG.hp * scale, speed: SPITTER_CONFIG.speed, damage: SPITTER_CONFIG.contactDamage, color: '#dc8bff', score: SPITTER_CONFIG.score, xp: SPITTER_CONFIG.xp, spit: createSpitAttack() });
+  else if (type === 'runner') Object.assign(z, { r: 10, hp: 1.2 * scale, maxHp: 1.2 * scale, speed: 82 + wave * 2.2, damage: 8, color: '#e5a84d', score: 14, xp: 1 });
   else if (type === 'tank') Object.assign(z, { r: 18, hp: 5.5 * scale, maxHp: 5.5 * scale, speed: 32 + wave * 1.2, damage: 17, color: '#7d9c75', score: 35, xp: 3 });
   else Object.assign(z, { r: 13, hp: 2.1 * scale, maxHp: 2.1 * scale, speed: 48 + wave * 1.7, damage: 11, color: '#79b86a', score: 10, xp: 1 });
 
-  if (wave >= 2 && gameRandom() < Math.min(0.28, 0.12 + wave * 0.025)) {
+  if (type !== 'spitter' && !directive.walkersOnly && wave >= 2 && gameRandom() < directive.plan.eliteChance) {
     z.affix = selectEliteAffix(game.waveModifierId, gameRandom());
     if (z.affix === 'frost') {
       z.xp += 2;
@@ -315,8 +333,9 @@ function shootNearest() {
   p.muzzleFlash = .075;
   p.recoil = 1;
 
-  const projectileCount = p.superWeapons?.plasmaFlak ? Math.max(p.projectiles || 1, 5) : (p.projectiles || 1);
-  const spreadAngle = p.superWeapons?.plasmaFlak ? 0.22 : 0.16;
+  const profile = getBuildProfile(p);
+  const projectileCount = profile.projectiles;
+  const spreadAngle = profile.spread;
   const startAngle = baseAngle - ((projectileCount - 1) * spreadAngle) / 2;
 
   for (let s = 0; s < projectileCount; s++) {
@@ -324,7 +343,7 @@ function shootNearest() {
     const comboCritBonus = game.combo >= 50 ? 0.20 : (game.combo >= 25 ? 0.10 : 0);
     const effectiveCrit = Math.min(0.85, (p.critChance || 0) + comboCritBonus);
     const isCrit = effectiveCrit > 0 && gameRandom() < effectiveCrit;
-    const damage = isCrit ? p.damage * 2.2 : p.damage;
+    const damage = isCrit ? profile.damage * 2.2 : profile.damage;
 
     game.bullets.push({
       x: p.x,
@@ -333,9 +352,15 @@ function shootNearest() {
       vy: Math.sin(angle) * p.bulletSpeed,
       r: isCrit ? 4.8 : 3.5,
       damage,
-      pierce: p.pierce || 1,
+      pierce: profile.pierce,
+      hitTargets: new Set(),
+      chainTargets: profile.chainTargets,
+      chainRange: profile.chainRange,
+      chainDamage: profile.chainDamage,
+      knockback: profile.knockback,
+      path: p.build.path,
       isCrit,
-      life: 1.35
+      life: profile.life
     });
   }
   playShoot(projectileCount, p.damage >= 1.6);
@@ -377,6 +402,7 @@ function collectPickup(item, index) {
   game.pickups.splice(index, 1);
 
   if (item.type === 'nuke') {
+    game.enemyProjectiles.length = 0;
     playNuke();
     vibrateNuke();
     flashMessage(t('msgNuke'));
@@ -454,14 +480,14 @@ export function resolveObstacleCollision(entity) {
 }
 
 function spawnBoss() {
-  if (hasActiveBoss()) return;
+  if (hasActiveBoss() || game.zombies.length >= DIRECTOR_CONFIG.maxEnemies) return;
   const side = Math.floor(gameRandom() * 4);
   let x, y;
   if (side === 0) { x = gameRand(room.x + 40, room.x + room.w - 40); y = room.y - 44; }
   if (side === 1) { x = room.x + room.w + 44; y = gameRand(room.y + 40, room.y + room.h - 40); }
   if (side === 2) { x = gameRand(room.x + 40, room.x + room.w - 40); y = room.y + room.h + 44; }
   if (side === 3) { x = room.x - 44; y = gameRand(room.y + 40, room.y + room.h - 40); }
-  const scale = 1 + (game.wave - 1) * .14;
+  const scale = getWavePlan(game.scenarioSeed, game.wave).bossHealthScale;
   const z = {
     x, y, type: 'boss', hitFlash: 0, attackFlash: 0, walkTime: 0, facing: 0, pulse: 0, entrance: 1.2,
     r: 26,
@@ -584,36 +610,19 @@ export const UPGRADES = [
   }
 ];
 
-export const EVOLUTIONS = [
-  {
-    id: 'tesla',
-    icon: '⚡',
-    titleKey: 'evoTeslaTitle',
-    descKey: 'evoTeslaDesc',
-    isEvolution: true,
-    canUnlock: p => (p.upgrades.multiShot || 1) >= 3 && (p.upgrades.pierce || 1) >= 3 && !p.superWeapons?.tesla,
-    apply: p => {
-      p.superWeapons.tesla = true;
-    }
-  },
-  {
-    id: 'plasmaFlak',
-    icon: '💥',
-    titleKey: 'evoPlasmaTitle',
-    descKey: 'evoPlasmaDesc',
-    isEvolution: true,
-    canUnlock: p => (p.upgrades.damage || 0) >= 3 && (p.upgrades.rapidFire || 0) >= 3 && !p.superWeapons?.plasmaFlak,
-    apply: p => {
-      p.superWeapons.plasmaFlak = true;
-    }
-  }
-];
+export const EVOLUTIONS = BUILD_EVOLUTIONS.map(evolution => ({
+  ...evolution,
+  canUnlock: player => canUnlockEvolution(player, evolution),
+  apply: player => applyEvolution(player, evolution)
+}));
 
 export let currentUpgradeChoices = [];
 
 export function getAvailableUpgrades() {
   const p = game.player;
   if (!p) return [];
+  const buildChoices = getBuildChoices(p);
+  if (buildChoices.length) return buildChoices;
 
   const availableEvos = EVOLUTIONS.filter(e => e.canUnlock(p));
   const availableRegular = UPGRADES.filter(u => u.level(p) < u.maxLevel);
@@ -652,7 +661,10 @@ export function chooseUpgrade(index, replayEvent = false) {
   if (!game.upgradeModalOpen || !currentUpgradeChoices[index]) return;
   const chosen = currentUpgradeChoices[index];
   const p = game.player;
+  if (chosen.isBuild && !getBuildChoices(p).some(choice => choice.id === chosen.id)) return;
+  if (chosen.isEvolution && !chosen.canUnlock(p)) return;
   chosen.apply(p);
+  p.dashCooldownMax = getBuildProfile(p).dashCooldown;
   if (playtestConfig.enabled) {
     recordPlaytestUpgrade({
       elapsed: Math.round(game.elapsed * 100) / 100,
@@ -662,13 +674,17 @@ export function chooseUpgrade(index, replayEvent = false) {
       id: chosen.id,
       titleKey: chosen.titleKey,
       evolution: Boolean(chosen.isEvolution),
-      upgradeLevel: chosen.isEvolution ? null : chosen.level(p)
+      buildChoice: Boolean(chosen.isBuild),
+      upgradeLevel: chosen.isEvolution || chosen.isBuild ? null : chosen.level(p)
     });
   }
   playUpgradeSelect();
   vibrateUi();
 
-  if (chosen.isEvolution) {
+  if (chosen.isBuild) {
+    flashMessage(t('msgBuildChosen', { build: t(chosen.titleKey) }));
+    burst(p.x, p.y, '#81d1ff', 20, 120);
+  } else if (chosen.isEvolution) {
     flashMessage('⚡ ' + t(chosen.titleKey) + ' · ' + t('evoBadge'));
     burst(p.x, p.y, '#ffd700', 30, 160);
     game.cameraShake = Math.max(game.cameraShake, .4);
@@ -752,6 +768,7 @@ function killZombie(index, isCrit = false) {
   if (z.type === 'boss') {
     game.cameraShake = Math.max(game.cameraShake, .45);
     flashMessage(t('msgBossDown'));
+    if (game.director) recordPlaytestDirectorEvent(startDirectorRecovery(game.director, game.elapsed));
     spawnPickup(z.x, z.y, 'boss');
   } else {
     const dropChance = z.type === 'tank' ? 0.14 : (z.type === 'runner' ? 0.05 : 0.025);
@@ -806,6 +823,8 @@ function damagePlayer(amount, from) {
     sprayBlood(p.x, p.y, .7, '#d95b67');
   }
 
+  recordDirectorDamage(game.director, game.elapsed, Math.max(0, shieldBefore - p.shield) + Math.max(0, hpBefore - Math.max(0, p.hp)));
+
   if (playtestConfig.enabled) {
     const sourceIsHazard = room.hazards && room.hazards.includes(from);
     recordPlaytestDamage({
@@ -852,8 +871,12 @@ function endGame() {
   const currentScore = Math.floor(game.score);
   const isNewBest = currentScore > scoreState.best;
   scoreState.best = Math.max(scoreState.best, currentScore);
+  if (isNewBest) scoreState.bestVersion = APP_VERSION;
   try {
     localStorage.setItem('zombie-room-best', String(scoreState.best));
+    if (isNewBest) {
+      localStorage.setItem('zombie-room-best-version', APP_VERSION);
+    }
   } catch (_) {}
   const rank = calculateRunRank(game.wave, currentScore, game.kills, game.maxCombo || 0);
   showGameOver({
@@ -871,31 +894,36 @@ function endGame() {
   updateUI();
 }
 
-function prepareWaveModifier(wave) {
-  game.preparedWave = wave;
-  game.pendingWaveModifierId = getWaveModifier(game.scenarioSeed, wave);
-  if (!game.pendingWaveModifierId) return;
-
-  flashMessage(t('msgWaveModifierWarning', {
-    wave,
-    modifier: t(WAVE_MODIFIER_LABEL_KEYS[game.pendingWaveModifierId])
-  }));
+function waveLabel(plan) {
+  return t(plan.encounterId ? 'encounter_' + plan.encounterId : 'phase_' + plan.phaseId);
 }
 
-function enterWave(wave) {
-  if (game.preparedWave !== wave) prepareWaveModifier(wave);
-  game.wave = wave;
-  game.waveModifierId = game.pendingWaveModifierId;
-  game.waveModifierWave = game.waveModifierId ? wave : 0;
-  game.pendingWaveModifierId = null;
-  game.preparedWave = 0;
-
-  if (game.waveModifierId) {
-    const modifier = t(WAVE_MODIFIER_LABEL_KEYS[game.waveModifierId]);
-    flashMessage(t('msgWaveModifierStart', { wave, modifier }));
-    recordPlaytestWaveModifier(wave, game.waveModifierId, game.elapsed);
-  } else {
-    flashMessage(t('msgWave', { wave }));
+function applyDirector(directive) {
+  const { plan } = directive;
+  if (directive.enteredWave) {
+    game.wave = plan.wave;
+    game.waveModifierId = plan.modifierId;
+    game.waveModifierWave = plan.modifierId ? plan.wave : 0;
+    game.pendingWaveModifierId = null;
+    game.preparedWave = 0;
+    flashMessage(t('msgDirectorWave', { wave: plan.wave, stage: plan.stage, encounter: waveLabel(plan) }));
+    if (plan.modifierId) recordPlaytestWaveModifier(plan.wave, plan.modifierId, game.elapsed);
+  }
+  if (directive.warning) {
+    const next = directive.warning;
+    game.preparedWave = next.wave;
+    game.pendingWaveModifierId = next.modifierId;
+    flashMessage(t('msgDirectorWarning', { wave: next.wave, stage: next.stage, encounter: waveLabel(next) }));
+  }
+  for (const event of directive.events) recordPlaytestDirectorEvent(event);
+  if (directive.event === 'boss') spawnBoss();
+  if (directive.event === 'blackout') {
+    game.blackoutTriggeredWave = game.wave;
+    game.blackoutTimer = DIRECTOR_CONFIG.blackoutSeconds;
+    flashMessage(t('msgBlackout'));
+    playBlackoutAlarm();
+    vibrateBoss();
+    game.cameraShake = Math.max(game.cameraShake, .35);
   }
 }
 
@@ -939,7 +967,9 @@ export function update(dt) {
   const dashThisStep = p.dashTimer > 0;
   p.dashTimer = Math.max(0, p.dashTimer - dt);
   p.dashCooldown = Math.max(0, p.dashCooldown - dt);
+  p.build.burstTimer = Math.max(0, p.build.burstTimer - dt);
   game.swiftChargeCooldown = Math.max(0, game.swiftChargeCooldown - dt);
+  game.spitCooldown = Math.max(0, game.spitCooldown - dt);
   p.invuln = Math.max(0, p.invuln - dt);
   p.shootTimer -= dt;
   p.muzzleFlash = Math.max(0, p.muzzleFlash - dt);
@@ -965,26 +995,6 @@ export function update(dt) {
     }
   }
 
-  const nextWave = 1 + Math.floor(game.elapsed / 25);
-  const secondsUntilNextWave = game.wave * 25 - game.elapsed;
-  if (nextWave === game.wave && secondsUntilNextWave > 0 && secondsUntilNextWave <= 3 && game.preparedWave !== game.wave + 1) {
-    prepareWaveModifier(game.wave + 1);
-  }
-  if (nextWave !== game.wave) enterWave(nextWave);
-  if (game.wave >= 4 && game.wave % 4 === 0 && game.bossWave !== game.wave && !hasActiveBoss()) {
-    spawnBoss();
-  }
-
-  // Reactor Blackout Event: triggers on waves 3, 6, 9... about 8s in
-  if (game.wave >= 3 && game.wave % 3 === 0 && game.blackoutTriggeredWave !== game.wave && !hasActiveBoss() && (game.elapsed % 25) >= 8) {
-    game.blackoutTriggeredWave = game.wave;
-    game.blackoutTimer = 12.0;
-    flashMessage(t('msgBlackout'));
-    playBlackoutAlarm();
-    vibrateBoss();
-    game.cameraShake = Math.max(game.cameraShake, .35);
-  }
-
   if (game.blackoutTimer > 0) {
     game.blackoutTimer -= dt;
     if (game.blackoutTimer <= 0) {
@@ -998,6 +1008,14 @@ export function update(dt) {
       burst(room.x + room.w * 0.5, room.y + room.h * 0.5, '#ffd700', 28, 140);
     }
   }
+
+  if (!game.director) game.director = createDirectorState(game.scenarioSeed);
+  const directive = advanceDirector(game.director, {
+    elapsed: game.elapsed, maxHp: p.maxHp,
+    nearbyEnemies: game.zombies.reduce((count, z) => count + (dist2(p, z) <= DIRECTOR_CONFIG.nearbyRadius ** 2 ? 1 : 0), 0),
+    hasBoss: hasActiveBoss(), blackoutActive: game.blackoutTimer > 0
+  });
+  applyDirector(directive);
 
   let mx = (input.right ? 1 : 0) - (input.left ? 1 : 0);
   let my = (input.down ? 1 : 0) - (input.up ? 1 : 0);
@@ -1056,17 +1074,19 @@ export function update(dt) {
   p.x = clamp(p.x, room.x + p.r, room.x + room.w - p.r);
   p.y = clamp(p.y, room.y + p.r, room.y + room.h - p.r);
 
-  game.spawnTimer -= dt;
-  const spawnEvery = Math.max(.22, .82 - game.elapsed * .0038 - game.wave * .018);
-  if (game.spawnTimer <= 0) {
-    if (!hasActiveBoss() || gameRandom() < .42) spawnZombie();
-    if (game.wave >= 6 && !hasActiveBoss() && gameRandom() < .17) spawnZombie();
-    game.spawnTimer = spawnEvery * gameRand(.72, 1.18);
+  // Freeze the remaining interval during relief; never accrue missed spawns.
+  const spawnEvery = getSpawnInterval(game.elapsed, game.wave, directive.spawnRate);
+  if (!directive.pausedSpawns) {
+    game.spawnTimer = Math.min(game.spawnTimer, spawnEvery * 1.18) - dt;
+    if (game.spawnTimer <= 0) {
+      spawnZombie(directive);
+      game.spawnTimer = spawnEvery * gameRand(.72, 1.18);
+    }
   }
 
   if (p.shootTimer <= 0) {
     shootNearest();
-    p.shootTimer = p.overdriveTimer > 0 ? p.fireRate * 0.48 : p.fireRate;
+    p.shootTimer = getBuildProfile(p).fireRate * (p.overdriveTimer > 0 ? 0.48 : 1);
   }
 
   for (let i = game.bullets.length - 1; i >= 0; i--) {
@@ -1077,8 +1097,11 @@ export function update(dt) {
     let hit = false;
     for (let j = game.zombies.length - 1; j >= 0; j--) {
       const z = game.zombies[j];
+      if (b.hitTargets?.has(z)) continue;
       const rr = b.r + z.r;
       if ((b.x - z.x) ** 2 + (b.y - z.y) ** 2 <= rr * rr) {
+        // Piercing is a target budget, not permission to hit the same enemy each frame.
+        (b.hitTargets ||= new Set()).add(z);
         let dealt = b.damage;
         if (z.type === 'boss') dealt *= (z.armor || .86);
         else if (z.affix === 'armored') dealt *= (z.armor || .60);
@@ -1092,15 +1115,15 @@ export function update(dt) {
         burst(b.x, b.y, b.isCrit ? '#ffd27a' : (z.affix === 'armored' ? '#69b6ff' : '#eaf7ed'), b.isCrit ? 6 : 3, b.isCrit ? 75 : 45);
         sprayBlood(b.x, b.y, z.type === 'boss' ? 1.1 : .45, z.type === 'boss' ? '#e06c78' : '#ba4956');
 
-        if (p.superWeapons?.plasmaFlak) {
-          const knockDist = z.type === 'boss' ? 12 : 36;
+        if (b.knockback > 0) {
+          const knockDist = b.knockback * (z.type === 'boss' ? 1 / 3 : 1);
           const bulletSpeed = p.bulletSpeed || 460;
           z.x += (b.vx / bulletSpeed) * knockDist;
           z.y += (b.vy / bulletSpeed) * knockDist;
           resolveObstacleCollision(z);
         }
 
-        if (p.superWeapons?.tesla && !b.hasChained) {
+        if (b.chainTargets > 0 && !b.hasChained) {
           b.hasChained = true;
           let chainCount = 0;
           for (let k = game.zombies.length - 1; k >= 0; k--) {
@@ -1108,13 +1131,15 @@ export function update(dt) {
             const cz = game.zombies[k];
             const cdx = cz.x - z.x;
             const cdy = cz.y - z.y;
-            if (cdx * cdx + cdy * cdy < 110 * 110) {
-              const chainDmg = Math.max(1, Math.round(dealt * 0.75));
+            if (cdx * cdx + cdy * cdy < b.chainRange * b.chainRange) {
+              const chainDmg = b.damage * b.chainDamage * (cz.type === 'boss' ? (cz.armor || .86) : cz.affix === 'armored' ? (cz.armor || .60) : 1);
               cz.hp -= chainDmg;
               cz.hitFlash = 0.08;
               spawnDamageText(cz.x, cz.y - cz.r, chainDmg, false, false);
               game.particles.push({
                 shape: 'arc',
+                vx: 0,
+                vy: 0,
                 x: z.x,
                 y: z.y,
                 tx: cz.x,
@@ -1128,7 +1153,7 @@ export function update(dt) {
                 if (k < j) j--;
               }
               chainCount++;
-              if (chainCount >= 3) break;
+              if (chainCount >= b.chainTargets) break;
             }
           }
         }
@@ -1177,8 +1202,18 @@ export function update(dt) {
     let moveX = dx / distance;
     let moveY = dy / distance;
     let moveScale = 1;
+    let chargingThisStep = false;
 
-    if (z.type === 'boss') {
+    if (z.type === 'spitter') {
+      const spit = advanceSpitter(z, dt, p, room, game.spitCooldown <= 0 && game.enemyProjectiles.length < SPITTER_CONFIG.maxProjectiles);
+      moveX = spit.moveX;
+      moveY = spit.moveY;
+      if (spit.started) game.spitCooldown = SPITTER_CONFIG.globalCooldown;
+      if (spit.fire && game.enemyProjectiles.length < SPITTER_CONFIG.maxProjectiles) {
+        game.enemyProjectiles.push(createEnemyProjectile(z));
+        recordPlaytestDirectorEvent({ type: 'spit', wave: game.wave, elapsed: game.elapsed, x: z.x, y: z.y, dx: z.spit.directionX, dy: z.spit.directionY });
+      }
+    } else if (z.type === 'boss') {
       const baseScale = z.frenzy ? 1.42 : 1;
       const wasWinding = z.charge.state === 'windup';
       const charge = updateTelegraphedCharge(z.charge, dt, dx, dy, {
@@ -1188,6 +1223,7 @@ export function update(dt) {
         windupMultiplier: .12,
         dashMultiplier: z.frenzy ? 2.85 : 2.15
       });
+      chargingThisStep = charge.mode === 'dash';
       if (wasWinding && charge.state === 'dash') z.attackFlash = z.frenzy ? .42 : .32;
       if (charge.started) {
         z.charge.cooldown = z.frenzy ? gameRand(1.3, 2.3) : gameRand(2.6, 4.2);
@@ -1214,6 +1250,7 @@ export function update(dt) {
         dashMultiplier: 2.2,
         canStart: game.swiftChargeCooldown <= 0
       });
+      chargingThisStep = charge.mode === 'dash';
       if (wasWinding && charge.state === 'dash') z.attackFlash = .18;
       if (charge.started) {
         z.charge.cooldown = gameRand(2.8, 3.8);
@@ -1227,8 +1264,9 @@ export function update(dt) {
     }
 
     z.facing = Math.atan2(moveY, moveX);
-    z.x += moveX * z.speed * moveScale * dt;
-    z.y += moveY * z.speed * moveScale * dt;
+    const movementSpeed = capEnemySpeed(z.speed * moveScale, chargingThisStep);
+    z.x += moveX * movementSpeed * dt;
+    z.y += moveY * movementSpeed * dt;
     resolveObstacleCollision(z);
 
     const contactDx = p.x - z.x;
@@ -1237,7 +1275,16 @@ export function update(dt) {
     if (contactDx * contactDx + contactDy * contactDy <= contactRadius * contactRadius) {
       if (p.invuln <= 0) z.attackFlash = z.type === 'boss' ? .24 : .18;
       damagePlayer(z.damage, z);
+      if (!game.running) return;
     }
+  }
+
+  for (let i = game.enemyProjectiles.length - 1; i >= 0; i--) {
+    const projectile = game.enemyProjectiles[i];
+    const hit = advanceEnemyProjectile(projectile, dt, p, room);
+    if (hit) game.enemyProjectiles.splice(i, 1);
+    if (hit === 'player') damagePlayer(projectile.damage, projectile);
+    if (!game.running) return;
   }
 
   const magnetDist = p.magnetRadius || 125;

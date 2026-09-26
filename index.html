@@ -46,14 +46,14 @@
             </div>
             <div class="hud-meter meter-xp">
               <div class="meter-head">
-                <span class="label"><span data-i18n="hudXpLevelPrefix">XP · LV</span> <b id="levelText">1</b></span>
+                <span class="label"><span data-i18n="hudXpLevelPrefix">XP · LV</span> <b id="levelText">1</b> <span id="buildPathIcon" hidden></span></span>
                 <span class="value" id="xpText">0 / 5</span>
               </div>
               <div class="bar"><i id="xpFill"></i></div>
             </div>
           </div>
           <div class="hud-metrics-row">
-            <div class="metric"><span data-i18n="hudWave">Wave</span><b id="waveText">1</b></div>
+            <div class="metric wave-metric"><span data-i18n="hudWave">Wave</span><b id="waveText">1</b><span id="encounterText" class="encounter-label"></span></div>
             <div class="metric"><span data-i18n="hudKills">Kills</span><b id="killsText">0</b></div>
             <div class="metric"><span data-i18n="hudTime">Time</span><b id="timeText">0:00</b></div>
           </div>
@@ -125,7 +125,7 @@
       </button>
       <button class="update-button settings-action" id="updateButton" type="button" data-i18n-aria="updateAriaCheck" aria-label="Check for Zombie Room updates">
         <span class="update-dot" aria-hidden="true"></span>
-        <span id="updateLabel">Update v3.5.7</span>
+        <span id="updateLabel">Update v3.7.0</span>
       </button>
       <div class="settings-diagnostics">
         <div class="settings-label" data-i18n="hudDiagnostics">Performance</div>
@@ -133,6 +133,7 @@
           <div class="fps-line"><span data-i18n="hudFps">FPS</span> <strong id="fpsText">--</strong></div>
           <div class="perf-line" id="perfLine"><span data-i18n="hudAuto">Auto</span> · <strong id="perfText">FULL</strong></div>
         </div>
+        <p id="legacyBestNote" class="legacy-best-note" hidden></p>
       </div>
     </div>
     <div class="install-tip" id="installTip" role="status" aria-live="polite"></div>
@@ -150,6 +151,7 @@
             <p class="upgrade-subtitle" data-i18n="upgradeModalSubtitle">Choose an upgrade to survive</p>
           </div>
         </div>
+        <p class="upgrade-build-summary" id="upgradeBuildSummary"></p>
         <div class="upgrade-cards" id="upgradeCards"></div>
         <p class="upgrade-keyboard-hint" data-i18n="upgradeKeyboardHint">Press 1, 2, or 3 on keyboard</p>
       </div>

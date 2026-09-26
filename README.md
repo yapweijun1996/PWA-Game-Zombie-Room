@@ -9,7 +9,7 @@ Zombie Room is an offline-first, canvas-based survival game for desktop and mobi
 - Tactile haptic vibration feedback via the Vibration API with multi-pattern pulses for damage, crits, level-ups, boss spawns, and death, with persisted toggle.
 - Dynamic floating combat damage numbers with pop-in scaling, upward drift, alpha fade-out, and distinct gold critical strike callouts.
 - 360-degree analog floating virtual joystick for touch devices with dynamic thumb-centering and speed scaling, plus WASD / arrow-key support on desktop.
-- Walker, runner, tank, and boss enemy types.
+- Walker, runner, tank, telegraphed ranged spitter, and boss enemy types.
 - Cinematic Boss encounters with heavy screen rumble, warning haptics, and a dedicated glowing Boss health bar.
 - Boss Phase 2 Frenzy (< 50% HP) with terrifying beast roar audio, flaming red magma visuals, blazing golden eyes, halved dash cooldown, and rapid charges.
 - Tactical industrial obstacles and cover pillars providing strategic kiting, line-of-sight protection, and projectile absorption.
@@ -18,7 +18,7 @@ Zombie Room is an offline-first, canvas-based survival game for desktop and mobi
 - Visceral zombie dismemberment physics with flying severed limbs, spinning bone splinters, and landing blood decals on critical kills, Boss defeats, and Nuke blasts.
 - Elite Affix mutation system (Frost slowing aura, Swift sprint with a telegraphed rush, Armored barrier) with distinct crests and threat radar tracking.
 - Boss and Swift-elite charges use direction-locked, dashed-lane telegraphs before impact; mobile players can evade with the Dash button, while desktop players press Space.
-- Seeded, preannounced elite waves (Swift, Armored, or Frost emphasis) vary affix distribution only—no extra spawns or global health scaling—and skip boss / blackout waves.
+- Endless director: four-wave stages with buildup, pressure, blackout, and boss phases; independently seeded encounter bags; bounded relief after damage or crowding; and six-second boss-defeat recovery windows.
 - Dynamic combo kill streak system with decay timer, rising kill pitch synthesis, multi-tier speed/crit buffs (×10, ×25, ×50), fanfare bursts, and defeat screen Max Combo tracking.
 - Survivor visual polish: Tactical Combat Helmet, dynamic state-colored illuminated visor, pulsing shoulder beacon, footstep dust kick, aiming laser guide ray, and holographic distress invulnerability shimmer.
 - Off-screen tactical threat radar rendering edge warning chevrons for approaching fast runners, armored tanks, and lunging bosses.
@@ -26,7 +26,7 @@ Zombie Room is an offline-first, canvas-based survival game for desktop and mobi
 - High-energy laser beam tracers with color-coded plasma cores (gold for crits, cyan for piercing, neon emerald for standard) and adaptive multi-spark muzzle flare.
 - Tiered weapon audio synthesis with layered harmonic resonance for multi-shot volleys and heavy caliber sub-bass kick.
 - Roguelike 3-choice level-up upgrade system with 8 build-crafting abilities (Spread Shot, Rapid Fire, Heavy Ammo, Piercing Rounds, Field Medkit, Agility, Magnetic Collector, Critical Strike).
-- Super Weapon Synergy Evolutions (Tesla Chain-Lightning & Plasma Flak Cannon) unlocking devastating secondary electric chain arcs and shotgun knockback bursts.
+- Three exclusive build paths with six specializations and path-specific Tesla, Plasma, or Phase Drive evolutions.
 - Dynamic Reactor Blackout events with factory lights shutdown, tactical conical flashlight beam, glowing zombie predator eyes, and guaranteed dual-drop supply cache rewards.
 - Waves, experience orbs, automatic level upgrades, score, kills, and local best score.
 - Responsive HUD, safe-area handling, portrait and landscape mobile layouts.
@@ -60,7 +60,8 @@ Zombie Room is an offline-first, canvas-based survival game for desktop and mobi
     ├── audio.js            # Web Audio API procedural sound synthesis and mute toggle
     ├── haptics.js          # Vibration API tactile pulse feedback and toggle
     ├── entities.js         # Simulation, enemies, combat, waves, and scoring
-    ├── wave-director.js    # Seed-independent modifier selection and elite-affix weighting
+    ├── wave-director.js    # Wave plans, encounter bags, difficulty, event scheduling, and relief
+    ├── ranged-combat.js    # Spitter attack state and shared projectile/telegraph collision geometry
     ├── telegraphed-charge.js # Deterministic windup / charge state machine
     ├── playtest-analysis.js # Phase, build, damage, and outcome summaries
     ├── game-ui.js          # Upgrade, pause, and game-over presentation
@@ -135,21 +136,73 @@ Real-device testing remains necessary for Safari, Chrome Android, iOS standalone
 
 ### Gameplay
 
-The core loop is clear and immediately playable. Player feedback reports that the current game feels too easy. This is qualitative feedback, not yet backed by controlled playtest results; treat difficulty tuning as an open priority rather than assuming one numeric change will solve it.
+Version 3.6.0 introduces the endless director. The product target is for familiar players to feel substantial pressure after 3–5 minutes, with no final wave. This is a tuning target, not a verified human-playtest result. Version 3.7.0 adds exclusive build paths. Nine synthetic runs across all three paths still reached five minutes at full health/shield; the pressure target remains unverified. See the versioned verification evidence below.
 
-Likely factors to validate include the survivor's 180 speed versus a wave-1 walker's 49.7 speed, nearest-target auto-fire every 0.38 seconds, and the starting 100 HP plus 40-point shield that regenerates after damage-free time. Player damage, fire rate, projectile count, and movement can grow through upgrades; combo streaks also grant speed and critical-hit bonuses. By contrast, basic enemy health grows by 8% per wave, while contact-damage values stay fixed by enemy type. All incoming damage is gated by the same 0.58-second invulnerability window, so additional enemies do not stack damage during that interval. These differences may make early or mid-game kiting and survivability too forgiving, but they are hypotheses, not proof.
+The player retains automatic targeting, Dash, eight ordinary upgrades, combo bonuses, pickups, and the regenerating shield. Each run can now gain one of three path-specific weapon evolutions. All incoming damage, including enemy projectiles, uses the existing 0.58-second invulnerability window. No adaptive changes are made to enemy attributes, player upgrades, or rewards.
 
-The opposing pressure is also significant: the spawn interval falls from about 0.80 seconds at the start toward a 0.22-second floor, and enemy health continues scaling. Balance may therefore diverge between early and late waves or between upgrade builds. Compare runs by wave reached, duration, build, and cause of death before tuning. Initial scripted browser trials at the same narrow viewport produced very different outcomes; because upgrade and spawn randomness were not seeded and inputs were synthetic, treat them as exploratory evidence only (see Verification Status). Prefer readable enemy pressure and telegraphed attacks over an unmeasured blanket increase to health or spawn counts.
+#### Director rules
 
-With upgrades and combat pickups already in place, the current gameplay focus is making threats readable, adding one deliberate movement decision, and collecting phase/build evidence before tuning difficulty:
+A wave lasts 25 simulation seconds. Each four-wave stage lasts 100 seconds:
 
-1. Done: Roguelike 3-choice level-up upgrade system with 8 synergistic abilities (spread shot, rapid fire, heavy ammo, pierce, medkit, agility, magnet, critical strike), with number keys (1, 2, 3) or tap selection.
-2. Done: Boss and Swift-elite attacks now have direction-locked dashed-lane telegraphs and a windup; continue validating reaction windows before numeric difficulty changes.
-3. Done: Dynamic tactical combat pickups (Tactical Nuke screen-clearing shockwave, Overdrive 2x attack speed, Field Medkit, Super Magnet vacuum).
-4. Done: Comprehensive run summary with S/A/B/C Survival Rank evaluation, active tactical build matrix with ability level chips, Max Combo, and one-tap clipboard run sharing.
-5. Done: pause/resume for mobile app switching, settings menu opening, and visibility changes.
-6. Done: optional evasive Dash on Space / touch, with visible, localized accessible cooldown state while auto-fire remains unchanged.
-7. Done: seeded, warned wave affix variations and in-memory phase/build/death-cause summaries; no automatic balance tuning or blanket HP/spawn changes.
+| Wave within stage | Phase | Spawn rate multiplier |
+| --- | --- | --- |
+| 1 | Buildup | 0.75 |
+| 2 | Pressure | 1.00 |
+| 3 | Blackout | 0.65 |
+| 4 | Boss | 0.42 |
+
+The first Boss is due at 75 seconds. Blackouts occur on waves 3, 7, 11, and so on, eight seconds into the wave, and last 12 seconds. The director is the only event scheduler. A living Boss prevents another Boss or blackout; blocked requests are discarded instead of accumulating. Defeating a Boss gives six seconds at a 0.25 spawn rate, with only unaffixed walkers. Recovery can delay an event within its wave; a blackout that no longer fits is skipped. A Boss continuing into another wave keeps the ordinary spawn rate at or below 0.42 while the wave and difficulty continue growing.
+
+Rate multipliers divide the base spawn interval: 0.25 means a four-times-longer interval. The base remains `max(0.22, 0.82 - elapsed * 0.0038 - wave * 0.018)`. There is no extra random double-spawn rule. With zero-based stage index `c = floor((wave - 1) / 4)`, ordinary health scales by `1 + 0.08 * (wave - 1) + 0.25 * c`; Boss health uses `0.14` per wave. Elite probability is capped at 40%. Enemy movement is capped at 160 CSS pixels/second, or 360 during a charge. Telegraph durations do not shrink with difficulty.
+
+Total enemies are capped at 90; ordinary spawns reserve a slot for the Boss. Starting at wave 5, buildup and pressure waves draw from a seed-derived shuffle bag with no adjacent repeats. The bag is independent of combat/upgrade RNG:
+
+| Encounter | Walker / runner / tank / spitter | Preferred elite affix |
+| --- | --- | --- |
+| Rush | 45% / 40% / 5% / 10% | Swift |
+| Blockade | 40% / 15% / 35% / 10% | Armored |
+| Crossfire | 45% / 15% / 15% / 25% | Frost |
+
+Preferred affixes receive 60% of elite selections. Special phases, a living Boss, blackout, and recovery suppress new spitters. Spitter quotas are two in stage 2, three in stage 3, and four thereafter; a rejected spitter selection immediately becomes a walker.
+
+Actual shield plus HP loss of at least 20% of maximum HP within five seconds, or eight enemies within 90 pixels, can pause new enemy spawns for three seconds. Relief has a global 25-second cooldown. Existing enemies/attacks remain active; the wave clock keeps advancing. The spawn countdown freezes without banking a burst, and relief cannot extend or stack with recovery.
+
+#### Ranged combat and readability
+
+Spitters have base HP 3, speed 65, contact damage 8, score 20, and XP 2. They approach to 120–220 pixels, retreat when too close, and may begin an attack only fully inside the room with clear line of sight. A 0.8-second telegraph locks the shot direction; a single non-homing projectile follows, then a 3.2-second cooldown. A shared 1.2-second gate staggers windups. Spitters do not receive elite affixes.
+
+Projectiles travel at 170 pixels/second, have radius 5, deal 8 damage, and expire after two seconds; at most 12 may exist. Swept collision consumes them on pillars, room boundaries, or the player, including during invulnerability. Killing a winding-up spitter cancels its attack; a Nuke clears existing enemy projectiles. The telegraph ends at the same cover/boundary as the shot. Enemy shots and their warning lines remain visible above blackout lighting in ECO mode.
+
+The compact wave HUD shows stage, wave, and encounter, with a full accessible label and a three-second upcoming-wave message. New strings cover all seven supported locales. Existing best scores remain stored; scores recorded under a different app version receive an asterisk and an explanation in Settings until exceeded under the new rules.
+
+#### Build paths (v3.7)
+
+Level 4 replaces one normal upgrade choice with three exclusive paths. Level 8 replaces one choice with two specializations for the selected path. Each selection consumes one earned upgrade and is locked for the run; queued level-ups continue normally, and restarting clears the entire build. Auto-fire and ordinary upgrade choices remain available.
+
+| Path | Combat behavior and cost | Exclusive evolution and prerequisites |
+| --- | --- | --- |
+| Arc Circuit | Direct damage ×0.85; each bullet's first hit arcs to one enemy within 110 px for 55% of bullet damage | Tesla: multishot 3 and piercing 3; three arc targets at 75% damage |
+| Scatter Cannon | Two extra pellets, 0.22-radian spacing, 16 px knockback; pellet damage ×0.65 and lifetime 0.55s (253 px range) | Plasma: damage 3 and rapid fire 3; two more pellets and 36 px knockback |
+| Mobile Striker | Dash cooldown 5s; after Dash, fire interval ×0.65 for 2s; bullet damage ×0.85 | Phase Drive: agility 2 and critical 2; burst lasts 1s longer and bullets pierce two extra enemies during it |
+
+Each specialization preserves a tradeoff, including after evolution:
+
+| Path | Specialization | Change |
+| --- | --- | --- |
+| Arc | Forked Circuit | Two extra arc targets; arc damage ×0.65 |
+| Arc | Long Conductor | Arc radius 160 px; firing interval ×1.15 |
+| Scatter | Tight Choke | Spacing 0.10 radians and lifetime 0.85s (391 px); one fewer pellet |
+| Scatter | Concussion Shells | Knockback ×1.7; pellet damage ×0.85 |
+| Mobility | Slipstream | Dash cooldown 4s; base burst duration 1.2s |
+| Mobility | Ambush | Burst damage ×1.6; Dash cooldown 6s |
+
+The modal explains costs before selection and shows evolution prerequisites with current progress. Only the selected path's evolution can appear. An icon beside the player level and the defeat-screen build summary retain the choice; mobility bursts also show chevrons behind the player. New interface text covers all seven locales. Short-screen dialogs scroll their card list while keeping the title visible, above the HUD and transient messages.
+
+`src/builds.js` owns build choices, gates, and derived combat profiles; the player owns selected IDs and the burst timer. Stats are derived from ordinary upgrades rather than repeatedly multiplying stored player attributes. `src/entities.js` executes those profiles and snapshots bullet properties at firing time. Piercing bullets now hit each enemy at most once instead of applying damage repeatedly during overlap. Secondary arcs respect their own target's armor. Burst timers freeze during pause/upgrade dialogs. The director rules remain unchanged.
+
+Build choices use the existing ordered upgrade events; checkpoints/final snapshots and analysis signatures include path and specialization. Replay format remains 4, with exact app-version rejection preventing older recordings from being interpreted under v3.7 rules. Scores/settings are preserved; previous-version best scores remain explicitly marked. The service-worker version and precache include the new build module.
+
+Ordinary upgrades still have finite caps. Six final build combinations preserve different combat patterns after those caps; they do not provide unlimited new content. Optional objectives remain future work.
 
 ### UI and UX
 
@@ -262,13 +315,39 @@ Before release, verify the following on HTTPS and localhost:
 
 ## Verification Status
 
-No `package.json` or build configuration is present. Run all checks with `node --test tests/playtest-rng.test.mjs tests/playtest-replay.browser.test.mjs tests/wave-director.test.mjs tests/telegraphed-charge.test.mjs tests/playtest-analysis.test.mjs`. The browser test uses Node's built-in WebSocket and an installed Edge/Chrome browser; it auto-skips locally if either is unavailable. It checks seeded replay (including Dash), mobile and desktop controls, charge and wave transitions, normal unseeded startup, and dialog focus behavior. Set `PLAYTEST_BROWSER` to select a browser executable, or `PLAYTEST_REQUIRE_BROWSER=1` to make missing browser support fail. GitHub Actions requires the browser test and deploys only after all checks pass. No packages are installed by the tests.
+No `package.json` or build configuration is present. Run all checks with `node --test tests/*.test.mjs`. Browser tests use Node's built-in WebSocket and an installed Edge/Chrome browser; they auto-skip locally if unavailable. Set `PLAYTEST_BROWSER` to an executable or `PLAYTEST_REQUIRE_BROWSER=1` to require browser support. GitHub Actions runs the same suite and deploys only after it passes. No packages are installed by the tests.
+
+Unit checks cover 1,000-wave growth, shuffled encounter bags, pacing boundaries, ranged state transitions, shared collision geometry, and descriptive analysis. Browser checks retain controls/focus/replay regressions, add ranged combat, caps, pause/reset, seeded balance comparisons, controlled late/saturated scenarios, and real service-worker offline startup. Browser harness utilities are shared without adding runtime dependencies.
 
 The browser fixture explicitly sets a fine desktop pointer through Chromium's Blink settings (`primaryPointerType=4,availablePointerTypes=4`). Disabling touch emulation alone restores the host's pointer capabilities, which can be `pointer: none` on headless Linux runners. Apply the desktop viewport and disable touch before navigation so the new page receives those settings. The test asserts coarse pointers in portrait/landscape and a fine pointer on desktop before checking controls; keep these preconditions when changing browser setup, and verify on Linux as well as a local desktop.
 
 Wait for the game's debounced viewport update after resizing, and reset the game before manually advancing a new simulation scenario. A fixed sleep can leave a previous live Dash active and change the next scenario's charge direction.
 
-For opt-in repeatable local trials, load the app with `?playtestSeed=123456&playtestLimit=180&playtestProfile=offense&playtestInput=joystick-loop-v1`. The seed must be an unsigned 32-bit integer; the recording limit defaults to 180 game seconds, and `0` disables it. Reaching the limit finalizes the record but does not stop gameplay. Seeded mode uses a fixed 1/60-second simulation step and records ordered input-state, upgrade-choice, pause, and Dash events alongside five-second checkpoints, damage sources, wave modifiers, and the final outcome. Scenario modifiers are derived from the run seed and wave, independent of build-related gameplay RNG draws. Records remain in memory at `window.__zombieRoomPlaytest` and `window.__zombieRoomPlaytestRuns`; nothing is uploaded or persisted. To replay a completed schema-version-3 record from the same app version, keep a copy with `const source = structuredClone(window.__zombieRoomPlaytest)` and call `window.__zombieRoomPlaytestTools.replay(source)` on a page with a valid `playtestSeed`. The replay produces `replayComparison` evidence; `window.__zombieRoomPlaytestTools.exportRuns()` returns current JSON, and `window.__zombieRoomPlaytestTools.summarizeRuns()` groups completed runs by early (waves 1–2), mid (3–5), and late (6+) phases, build, health samples, damage sources, death causes, outcomes, and modifiers. `window.__zombieRoomPlaytestTools.stopReplay()` returns to recording mode. Results are in-memory only; the report is descriptive and never tunes balance. Do not increase enemy HP or spawn rate from small or build-skewed samples; compare repeated seeded runs across phases and builds first. Cosmetic effects remain unseeded and do not feed the simulation.
+For opt-in repeatable local trials, load the app with `?playtestSeed=123456&playtestLimit=180&playtestProfile=offense&playtestInput=joystick-loop-v1`. The seed must be an unsigned 32-bit integer; the recording limit defaults to 180 game seconds, and `0` disables it. Reaching the limit finalizes the record but does not stop gameplay. Seeded mode uses a fixed 1/60-second simulation step and records ordered input-state, upgrade-choice, pause, and Dash events alongside five-second checkpoints, damage sources, wave modifiers, director events (including relief, recovery, and shots), and the final outcome. Scenario modifiers are derived from the run seed and wave, independent of build-related gameplay RNG draws. Records remain in memory at `window.__zombieRoomPlaytest` and `window.__zombieRoomPlaytestRuns`; nothing is uploaded or persisted. To replay a completed schema-version-4 record from the same app version, keep a copy with `const source = structuredClone(window.__zombieRoomPlaytest)` and call `window.__zombieRoomPlaytestTools.replay(source)` on a page with a valid `playtestSeed`. The replay produces `replayComparison` evidence; `window.__zombieRoomPlaytestTools.exportRuns()` returns current JSON, and `window.__zombieRoomPlaytestTools.summarizeRuns()` groups completed runs by early (waves 1–2), mid (3–5), and late (6+) phases, build, health samples, damage sources, death causes, outcomes, and modifiers, plus director event counts and the highest stage. `window.__zombieRoomPlaytestTools.stopReplay()` returns to recording mode. Results are in-memory only; the report is descriptive and never tunes balance. Do not increase enemy HP or spawn rate from small or build-skewed samples; compare repeated seeded runs across phases and builds first. Cosmetic effects remain unseeded and do not feed the simulation.
+
+For deterministic automation, also set `playtestManual=1` with a valid seed. This disables automatic simulation stepping and exposes `window.advanceTime(milliseconds)` and `window.render_game_to_text()`; real gameplay is unchanged without this explicit test flag. Profile/input query parameters are descriptive labels, not autopilots. The synthetic controller is implemented in the browser test. Replay format 4 rejects older schemas and other app versions; director decisions are recomputed and compared rather than injected from the source record.
+
+### Version 3.7 development evidence
+
+All 38 checks passed locally with Chrome required and no skips. The automated suite includes build gates, exclusive evolutions, every specialization's cost, non-compounding stats, real combat effects, single-hit piercing, burst expiry, queued upgrades, reset/pause, and build-aware analysis. Browser checks cover all seven locales at 320×568, 390×844, 844×390, 667×320, and 1280×720, including keyboard/touch selection, visible wrapped focus, actual internal scrolling, and dialog layering. Physical devices and human enjoyment remain unverified.
+
+Nine natural synthetic runs used seeds 42, 160501, and 202602 with three policies: offense-priority selected Scatter/Tight Choke; first-card selected Arc/Forked Circuit; mobility-priority selected Mobile Striker/Ambush. All reached the 300-second cap in wave 13, fully upgraded, at 225 HP and 40 shield. Kills ranged 726–747, spitter shots 5–22, and damage events 1–13. Scatter runs recorded one damage event each; Mobility recorded 6–13. These are descriptive results from a controller with full world-state access, not evidence of a best build, representative difficulty, or human retention. The director was not retuned from these results.
+
+Each path completed an exact replay of a naturally recorded run, including its build decisions and director events. Controlled invulnerable Arc fixtures at 10 and 20 minutes exercised another 30 seconds; a separate stationary/no-fire fixture reached 89 enemies/four spitters within caps. Controlled late scenarios are not survival evidence. The new build module is precached and the app starts offline after the HTTP cache is cleared.
+
+### Version 3.6 development evidence (historical)
+
+All 29 local checks passed with Chrome required and no skips, covering the director, ranged combat, controls, exact replay comparisons, and offline startup after clearing the HTTP cache. Controlled screenshots at 390×844, 844×390, and 1280×720 showed the new HUD and ranged warnings; blackout/ECO warnings remained visible with no layout overflow or page exceptions.
+
+The mobile synthetic controller compared seeds 42, 160501, and 202602 with offense-priority and first-card upgrade selection. All six runs reached the 300-second recording cap in wave 13, fully upgraded, at 225 HP and 40 shield. They recorded 738–751 kills, 1–18 spitter shots, and 0–8 damage events. This controller directly reads world positions, avoids enemies/hazards, collects XP, and uses Dash; it is not a human or a retention test. These results flag low ranged-attack exposure and strong-build survivability for further tuning, not achievement of the 3–5-minute pressure target.
+
+Invulnerable, fully upgraded fixtures at 10 and 20 minutes exercised another 30 seconds each; a separate stationary/no-fire saturation fixture reached 89 ordinary enemies and four spitters without exceeding the caps. CPU timings from accelerated browser fixtures are diagnostics, not physical-device FPS measurements or survival evidence.
+
+Human acceptance remains outstanding: recruit at least five familiar players; at least three should report a clear pressure increase around minutes 3–5, identify the main damage source/counterplay, and want another run. Physical iOS/Android behavior and human enjoyment are not verified by the automated suite. Initial tuning constants are intentionally retained pending representative evidence.
+
+### Historical trials before version 3.6
+
+The following results used earlier balance and recording rules and are retained as historical context only.
 
 Two initial exploratory Chrome DevTools runs used a 390×844 mobile/touch emulation, a repeating one-second diagonal WASD pattern, and a consistent upgrade preference (damage, rapid fire, multishot when offered; otherwise the first card). One ended at 19.5 seconds in wave 1 with 18 kills, likely from zombie contact; damage-source recording had not yet been implemented. The other reached the 180-second trial cap in wave 8 with 533 kills, 136/150 HP, 40 shield, and the Plasma Flak evolution. The desktop version was then tested at 929×861 with the same input pattern: it reached the trial cap in wave 8 with 523 kills, 89/100 HP, 40 shield, and both weapon evolutions. Collision fixtures for inside, edge-overlap, and clear positions passed; a resize test fixture placed the player at the future terminal position on a narrow layout and confirmed ejection after widening, and a 390×844 reset remained clear.
 

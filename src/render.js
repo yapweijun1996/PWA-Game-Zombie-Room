@@ -1,6 +1,7 @@
 import { ctx, game, room, viewport } from './state.js';
 import { clamp, rand } from './utils.js';
 import { t } from './i18n.js';
+import { getSpitEndpoint, SPITTER_CONFIG } from './ranged-combat.js';
 
 const BULLET_TRAIL_SPEC = {
   crit: [[0, 'rgba(255, 214, 102, 0)'], [0.5, 'rgba(255, 180, 50, 0.45)'], [1, '#fff6d6']],
@@ -576,7 +577,91 @@ function drawAttackTelegraph(z) {
   ctx.restore();
 }
 
+function drawSpitter(z) {
+  ctx.save();
+  ctx.translate(z.x, z.y);
+  ctx.rotate(z.spit?.state === 'windup' ? Math.atan2(z.spit.directionY, z.spit.directionX) : z.facing);
+  const color = z.hitFlash > 0 ? '#ffffff' : '#9345a9';
+  ctx.fillStyle = '#41224b';
+  ctx.strokeStyle = '#180e1c';
+  ctx.lineWidth = 3;
+  for (const side of [-1, 1]) {
+    ctx.beginPath();
+    ctx.ellipse(-8, side * 9, 8, 4, side * 0.3, 0, Math.PI * 2);
+    ctx.fill(); ctx.stroke();
+  }
+  ctx.fillStyle = color;
+  ctx.strokeStyle = '#27142e';
+  ctx.beginPath();
+  ctx.ellipse(-3, 0, 11, 12, 0, 0, Math.PI * 2);
+  ctx.fill(); ctx.stroke();
+  ctx.fillStyle = color;
+  ctx.strokeStyle = '#f9d8ff';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(z.r + 4, 0);
+  ctx.lineTo(-z.r, -z.r);
+  ctx.lineTo(-z.r * 0.55, 0);
+  ctx.lineTo(-z.r, z.r);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(1, -6, 4, 3);
+  ctx.fillRect(1, 3, 4, 3);
+  if (z.spit?.state === 'windup') {
+    ctx.strokeStyle = '#ffd479';
+    ctx.beginPath();
+    ctx.arc(0, 0, z.r + 5, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (1 - z.spit.timer / SPITTER_CONFIG.windup));
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawRangedThreats() {
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(room.x, room.y, room.w, room.h);
+  ctx.clip();
+  // Draw after room lighting: visibility of incoming attacks is part of the combat contract.
+  for (const z of game.zombies) {
+    if (z.spit?.state !== 'windup') continue;
+    ctx.save();
+    ctx.strokeStyle = '#140b1b';
+    ctx.lineWidth = 9;
+    ctx.beginPath();
+    ctx.moveTo(z.x, z.y);
+    const end = getSpitEndpoint(z, room);
+    ctx.lineTo(end.x, end.y);
+    ctx.stroke();
+    ctx.strokeStyle = '#f9c7ff';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([7, 5]);
+    ctx.stroke();
+    ctx.restore();
+  }
+  for (const b of game.enemyProjectiles) {
+    ctx.save();
+    ctx.translate(b.x, b.y);
+    ctx.rotate(Math.atan2(b.vy, b.vx));
+    ctx.fillStyle = '#f18bff';
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 1.8;
+    ctx.beginPath();
+    ctx.moveTo(b.r + 3, 0);
+    ctx.lineTo(0, -b.r);
+    ctx.lineTo(-b.r - 3, 0);
+    ctx.lineTo(0, b.r);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+  }
+  ctx.restore();
+}
+
 function drawZombie(z) {
+  if (z.type === 'spitter') { drawSpitter(z); return; }
   const isRunner = z.type === 'runner';
   const isTank = z.type === 'tank';
   const isBoss = z.type === 'boss';
@@ -1129,7 +1214,13 @@ export function draw() {
 
     // Hot plasma core
     ctx.beginPath();
-    ctx.arc(b.x, b.y, b.r * 0.9, 0, Math.PI * 2);
+    if (b.path === 'scatter') {
+      ctx.moveTo(b.x, b.y - b.r * 1.2);
+      ctx.lineTo(b.x + b.r * 1.2, b.y);
+      ctx.lineTo(b.x, b.y + b.r * 1.2);
+      ctx.lineTo(b.x - b.r * 1.2, b.y);
+      ctx.closePath();
+    } else ctx.arc(b.x, b.y, b.r * 0.9, 0, Math.PI * 2);
     ctx.fillStyle = b.isCrit ? '#fffbe8' : (b.pierce > 1 ? '#eaf4ff' : '#ffffff');
     ctx.fill();
   }
@@ -1139,6 +1230,21 @@ export function draw() {
 
   const p = game.player;
   if (p) drawPlayer(p);
+  if (p?.build?.burstTimer > 0) {
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    ctx.rotate(p.aimAngle);
+    ctx.strokeStyle = '#ffd27a';
+    ctx.lineWidth = 2;
+    for (const offset of [0, 6]) {
+      ctx.beginPath();
+      ctx.moveTo(-p.r - 6 - offset, -7);
+      ctx.lineTo(-p.r - offset, 0);
+      ctx.lineTo(-p.r - 6 - offset, 7);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
 
   for (const q of game.particles) {
     ctx.globalAlpha = clamp(q.life / q.maxLife, 0, 1);
@@ -1214,6 +1320,7 @@ export function draw() {
   ctx.globalAlpha = 1;
 
   drawRoomLighting();
+  drawRangedThreats();
   drawThreatRadar();
   ctx.restore();
 }
@@ -1290,7 +1397,7 @@ function drawThreatRadar() {
 
     const isOffscreen = z.x < room.x || z.x > room.x + room.w || z.y < room.y || z.y > room.y + room.h;
 
-    if (isBoss || (isOffscreen && (isRunner || isTank || z.affix))) {
+    if (isBoss || (isOffscreen && (isRunner || isTank || z.type === 'spitter' || z.affix))) {
       threats.push(z);
     }
   }

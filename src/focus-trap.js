@@ -37,6 +37,12 @@ function focusElement(element) {
   return false;
 }
 
+function focusInsideDialog(element) {
+  element.focus({ preventScroll: true });
+  // Wrapping focus must also reveal controls inside a scrollable card list.
+  element.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'instant' });
+}
+
 export function activateFocusTrap(container, { initialFocus, fallbackFocus } = {}) {
   if (!container) return () => {};
 
@@ -63,17 +69,17 @@ export function activateFocusTrap(container, { initialFocus, fallbackFocus } = {
     const activeElement = document.activeElement;
     if (event.shiftKey && (activeElement === first || !container.contains(activeElement))) {
       event.preventDefault();
-      last.focus({ preventScroll: true });
+      focusInsideDialog(last);
     } else if (!event.shiftKey && (activeElement === last || !container.contains(activeElement))) {
       event.preventDefault();
-      first.focus({ preventScroll: true });
+      focusInsideDialog(first);
     }
   };
 
   trap.onFocusIn = event => {
     if (activeTraps[activeTraps.length - 1] !== trap || container.contains(event.target)) return;
     const focusable = getFocusableElements(container);
-    (focusable[0] || container).focus({ preventScroll: true });
+    focusInsideDialog(focusable[0] || container);
   };
 
   activeTraps.push(trap);

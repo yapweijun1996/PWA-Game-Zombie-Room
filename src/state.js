@@ -1,4 +1,4 @@
-export const APP_VERSION = '3.5.7';
+export const APP_VERSION = '3.7.0';
 
 export const dom = {
   canvas: document.getElementById('game'),
@@ -44,8 +44,10 @@ export const ui = {
   xpText: document.getElementById('xpText'),
   xpFill: document.getElementById('xpFill'),
   levelText: document.getElementById('levelText'),
+  buildPathIcon: document.getElementById('buildPathIcon'),
   levelMetric: document.getElementById('levelMetric'),
   waveText: document.getElementById('waveText'),
+  encounterText: document.getElementById('encounterText'),
   killsText: document.getElementById('killsText'),
   timeText: document.getElementById('timeText'),
   scoreText: document.getElementById('scoreText'),
@@ -53,6 +55,7 @@ export const ui = {
   fpsText: document.getElementById('fpsText'),
   perfLine: document.getElementById('perfLine'),
   perfText: document.getElementById('perfText'),
+  legacyBestNote: document.getElementById('legacyBestNote'),
   message: document.getElementById('message'),
   damageFlash: document.getElementById('damageFlash'),
   gameover: document.getElementById('gameover'),
@@ -147,7 +150,11 @@ function readHapticsSetting() {
 }
 
 export const scoreState = {
-  best: readBestScore()
+  best: readBestScore(),
+  bestVersion: (() => {
+    try { return localStorage.getItem('zombie-room-best-version') || 'pre-3.6'; }
+    catch (_) { return 'pre-3.6'; }
+  })()
 };
 
 export const audioState = {
@@ -176,8 +183,11 @@ export const game = {
   preparedWave: 0,
   scenarioSeed: 0,
   swiftChargeCooldown: 0,
+  spitCooldown: 0,
+  director: null,
   spawnTimer: 0,
   bullets: [],
+  enemyProjectiles: [],
   zombies: [],
   orbs: [],
   particles: [],

@@ -107,7 +107,7 @@ export function beginPlaytestRun(metadata, previousSnapshot) {
   lastInputState = null;
 
   activeRun = {
-    schemaVersion: 3,
+    schemaVersion: 4,
     appVersion: metadata.appVersion,
     scenarioSeed: metadata.scenarioSeed,
     seed: activeSeed,
@@ -133,6 +133,8 @@ export function beginPlaytestRun(metadata, previousSnapshot) {
     upgrades: [],
     abilities: [],
     waveModifiers: [],
+    directorEvents: [],
+    directorEventsTruncated: false,
     damageEvents: [],
     events: replaySource ? replaySource.events.map(event => ({ ...event })) : [],
     eventsTruncated: replaySource ? replaySource.eventsTruncated : false,
@@ -227,6 +229,15 @@ export function recordPlaytestWaveModifier(wave, id, elapsed) {
   });
 }
 
+export function recordPlaytestDirectorEvent(event) {
+  if (!activeRun || activeRun.status !== 'running') return;
+  if (activeRun.directorEvents.length >= MAX_PLAYTEST_EVENTS) {
+    activeRun.directorEventsTruncated = true;
+    return;
+  }
+  activeRun.directorEvents.push({ ...event, elapsed: Math.round(event.elapsed * 100) / 100, tick: playtestTick });
+}
+
 export function recordPlaytestDamage(event) {
   if (!activeRun || activeRun.status !== 'running') return;
   const recorded = { ...event, tick: playtestTick, randomDraws };
@@ -275,6 +286,7 @@ export function finishPlaytestRun(outcome, snapshot, details = {}) {
       checkpointsMatch: equalJson(activeRun.checkpoints, replaySource.checkpoints),
       upgradesMatch: equalJson(activeRun.upgrades, replaySource.upgrades),
       abilitiesMatch: equalJson(activeRun.abilities, replaySource.abilities),
+      directorEventsMatch: equalJson(activeRun.directorEvents, replaySource.directorEvents),
       waveModifiersMatch: equalJson(activeRun.waveModifiers, replaySource.waveModifiers),
       damageEventsMatch: equalJson(activeRun.damageEvents, replaySource.damageEvents),
       randomDrawsMatch: randomDraws === replaySource.randomDraws,
@@ -294,16 +306,16 @@ export function preparePlaytestReplay(record, expectedAppVersion = null) {
     return { ok: false, reason: 'The replay record must be JSON data.' };
   }
 
-  if (!source || source.schemaVersion !== 3) return { ok: false, reason: 'Replay requires a schemaVersion 3 record.' };
+  if (!source || source.schemaVersion !== 4) return { ok: false, reason: 'Replay requires a schemaVersion 4 record.' };
   if (expectedAppVersion && source.appVersion !== expectedAppVersion) {
     return { ok: false, reason: 'Replay records must come from the same app version.' };
   }
   if (!['player-death', 'time-cap'].includes(source.outcome) || source.status !== 'finished') {
     return { ok: false, reason: 'Only completed death or time-cap runs can be replayed.' };
   }
-  if (source.eventsTruncated) return { ok: false, reason: 'The input event limit was reached; this record is not replayable.' };
+  if (source.eventsTruncated || source.directorEventsTruncated) return { ok: false, reason: 'The input event limit was reached; this record is not replayable.' };
   if (!Array.isArray(source.events) || source.events.length > MAX_PLAYTEST_EVENTS || !Number.isInteger(source.seed) || source.seed < 0 || source.seed > UINT32_MAX ||
-    !Array.isArray(source.abilities) || !Array.isArray(source.waveModifiers) || !Number.isInteger(source.scenarioSeed) ||
+    !Array.isArray(source.abilities) || !Array.isArray(source.directorEvents) || source.directorEvents.length > MAX_PLAYTEST_EVENTS || !Array.isArray(source.waveModifiers) || !Number.isInteger(source.scenarioSeed) ||
     source.scenarioSeed !== source.seed) {
     return { ok: false, reason: 'The replay record has invalid seed or event data.' };
   }
@@ -344,6 +356,16 @@ export function preparePlaytestReplay(record, expectedAppVersion = null) {
     source.abilities.some(ability => ability.id !== 'dash' || !Number.isFinite(ability.dx) || !Number.isFinite(ability.dy) ||
       Math.abs(Math.hypot(ability.dx, ability.dy) - 1) > 0.001 || !Number.isInteger(ability.tick) || ability.tick < 0)) {
     return { ok: false, reason: 'The replay record has malformed ability data.' };
+  }
+
+  const directorTypes = ['wave', 'relief', 'recovery', 'event', 'event-skipped', 'spit'];
+  let previousDirectorTick = -1;
+  for (const event of source.directorEvents) {
+    if (!event || !directorTypes.includes(event.type) || !Number.isInteger(event.tick) || event.tick < previousDirectorTick ||
+        !Number.isFinite(event.elapsed) || event.elapsed < 0 || !Number.isInteger(event.wave) || event.wave < 1) {
+      return { ok: false, reason: 'The replay record has malformed director events.' };
+    }
+    previousDirectorTick = event.tick;
   }
 
   let previousModifierWave = 0;
