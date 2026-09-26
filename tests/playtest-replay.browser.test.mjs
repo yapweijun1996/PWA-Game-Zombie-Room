@@ -360,6 +360,8 @@ test('replay, dash controls, telegraphs, wave modifiers, and modal focus work to
       '--disable-background-timer-throttling',
       '--disable-renderer-backgrounding',
       '--disable-backgrounding-occluded-windows',
+      // Linux headless runners may have no mouse; make the desktop fixture explicit.
+      '--blink-settings=primaryPointerType=4,availablePointerTypes=4',
       '--remote-debugging-port=0',
       '--remote-allow-origins=*',
       `--user-data-dir=${profilePath}`,
@@ -389,6 +391,7 @@ test('replay, dash controls, telegraphs, wave modifiers, and modal focus work to
     });
 
     await waitFor(cdp.evaluate.bind(cdp), 'Boolean(window.__zombieRoomPlaytestTools && window.__zombieRoomPlaytest?.mode === "record")', Boolean);
+    assert.equal(await cdp.evaluate("matchMedia('(pointer: coarse)').matches"), true, 'portrait fixture should expose a touch pointer');
     const appVersion = await cdp.evaluate("import('./src/state.js').then(({ APP_VERSION }) => APP_VERSION)");
     assert.equal(typeof appVersion, 'string');
     assert.ok(appVersion.length > 0);
@@ -552,6 +555,10 @@ test('replay, dash controls, telegraphs, wave modifiers, and modal focus work to
     })()`);
     assert.deepEqual(resumedPause, { paused: false, pauseHidden: true });
 
+    // Disabling touch restores host capabilities. Navigate afterward to reapply
+    // the explicit desktop Blink settings instead of inheriting a missing mouse.
+    await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: false });
+    await cdp.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 720, deviceScaleFactor: 1, mobile: false });
     await cdp.send('Page.navigate', { url: `http://127.0.0.1:${serverPort}/` });
     const normalStartup = await waitFor(
       cdp.evaluate.bind(cdp),
@@ -573,9 +580,8 @@ test('replay, dash controls, telegraphs, wave modifiers, and modal focus work to
     assert.equal(normalStartup.recorder, false);
     assert.equal(normalStartup.tools, false);
 
-    await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: false });
-    await cdp.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 720, deviceScaleFactor: 1, mobile: false });
-    await delay(180);
+    assert.equal(await cdp.evaluate("matchMedia('(min-width: 800px) and (pointer: fine)').matches"), true,
+      'desktop fixture should expose a fine pointer at desktop width');
     assert.equal(await cdp.evaluate("document.querySelector('#dashButton').getClientRects().length"), 0, 'touch control should yield to desktop keyboard layout');
     await cdp.evaluate("(async () => { const { game } = await import('./src/state.js'); game.player.dashCooldown = 0; game.player.dashTimer = 0; })()");
     await sendKey(cdp, 'keydown', ' ');
@@ -588,21 +594,30 @@ test('replay, dash controls, telegraphs, wave modifiers, and modal focus work to
 
     await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 1 });
     await cdp.send('Emulation.setDeviceMetricsOverride', { width: 844, height: 390, deviceScaleFactor: 1, mobile: true });
-    await delay(180);
-    const landscapeDash = await cdp.evaluate(`(() => {
-      const rect = document.querySelector('#dashButton').getBoundingClientRect();
-      return { visible: rect.width >= 48 && rect.height >= 48, left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom };
-    })()`);
+    const landscapeDash = await waitFor(
+      cdp.evaluate.bind(cdp),
+      `(async () => {
+        const { viewport } = await import('./src/state.js');
+        const rect = document.querySelector('#dashButton').getBoundingClientRect();
+        return { width: innerWidth, height: innerHeight, coarsePointer: matchMedia('(pointer: coarse)').matches,
+          resized: viewport.W === innerWidth && viewport.H === Math.max(420, innerHeight),
+          visible: rect.width >= 48 && rect.height >= 48, left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom };
+      })()`,
+      value => value.width === 844 && value.height === 390 && value.coarsePointer && value.resized,
+      5000
+    );
     assert.equal(landscapeDash.visible, true, 'dash control should remain usable in landscape');
     assert.ok(landscapeDash.left >= 0 && landscapeDash.right <= 844 && landscapeDash.top >= 0 && landscapeDash.bottom <= 390,
       'landscape dash control should remain inside the viewport');
 
     const waveAndCharge = await cdp.evaluate(`(async () => {
       const { game, ui, room } = await import('./src/state.js');
-      const { update } = await import('./src/entities.js');
+      const { update, resetGame } = await import('./src/entities.js');
       const { getWaveModifier } = await import('./src/wave-director.js');
       const { t } = await import('./src/i18n.js');
       const { createTelegraphedCharge } = await import('./src/telegraphed-charge.js');
+      // Isolate manual simulation steps from the preceding live keyboard dash.
+      resetGame();
       game.scenarioSeed = 1337;
       game.wave = 1;
       game.waveModifierId = null;
@@ -668,6 +683,7 @@ test('replay, dash controls, telegraphs, wave modifiers, and modal focus work to
     cdp?.close();
     await stopBrowser(browser);
     if (server.listening) await new Promise(resolveClose => server.close(resolveClose));
-    rmSync(profilePath, { recursive: true, force: true });
+    // Chromium helpers can finish profile writes just after the parent exits.
+    rmSync(profilePath, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
   }
 });
