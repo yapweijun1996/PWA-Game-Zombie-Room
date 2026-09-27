@@ -56,7 +56,8 @@ Original prompt: Implement the approved endless difficulty director plan: 25-sec
 - Complete: all 39 checks passed with Chrome required and no skips; this includes the existing 1,000-wave/director, build, replay, and offline tests plus new touch-origin, audio-unlock/music-toggle, haptics-capability, Settings-focus, and auto-upgrade regressions.
 - Inspected 390×844 mobile Settings and upgrade-dialog screenshots. Automated browser checks also cover short portrait, landscape, and desktop layouts.
 - The supplied game Playwright client could not load because its `playwright` package is absent from the local skill runtime; the repository's Chrome DevTools browser suite and direct screenshots provided the UI verification instead.
-- Remaining: push v3.8.0 to `main`, confirm the GitHub Pages workflow deploys, and have the user confirm real-iPhone audio/standalone behavior. Haptics remain unsupported in iOS web content, and human usability is not established by browser tests.
+- Published v3.8.0 to `main` and confirmed the GitHub Pages `verify` and `deploy` jobs passed. Checked the live page, service worker, and music module over HTTPS; all returned HTTP 200 with the v3.8.0 release markers.
+- Remaining real-device check: confirm audible music/effects and standalone lifecycle on the user's iPhone. iOS web content still has no Taptic Engine access, and human usability is not established by browser tests.
 
 ## Build delivery result
 
