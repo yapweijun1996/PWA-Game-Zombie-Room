@@ -1,9 +1,11 @@
-import { game, dom, audioState, hapticsState } from './state.js';
+import { game, dom, audioState, hapticsState, musicState, autoUpgradeState, setMusicEnabled, setAutoUpgradeEnabled } from './state.js';
 import { setPaused } from './entities.js';
 import { activateFocusTrap } from './focus-trap.js';
 import { t } from './i18n.js';
-import { playUiClick } from './audio.js';
-import { vibrateUi } from './haptics.js';
+import { playUiClick, resumeAudioContext } from './audio.js';
+import { isHapticsSupported, vibrateUi } from './haptics.js';
+import { startMusic, stopMusic } from './music.js';
+import { syncAutoUpgradePreference } from './game-ui.js';
 
 const CLOSE_TRANSITION_MS = 220;
 
@@ -16,9 +18,32 @@ export function refreshSoundToggleUI() {
 
 export function refreshHapticsToggleUI() {
   if (!dom.hapticsToggle || !dom.hapticsStatusText) return;
-  dom.hapticsToggle.classList.toggle('active', hapticsState.enabled);
-  dom.hapticsToggle.setAttribute('aria-checked', String(hapticsState.enabled));
-  dom.hapticsStatusText.textContent = hapticsState.enabled ? t('soundOn') : t('soundOff');
+  const supported = isHapticsSupported();
+  dom.hapticsToggle.disabled = !supported;
+  dom.hapticsToggle.classList.toggle('active', supported && hapticsState.enabled);
+  dom.hapticsToggle.setAttribute('aria-checked', String(supported && hapticsState.enabled));
+  dom.hapticsToggle.setAttribute('aria-label', t(supported ? 'hapticsLabel' : 'hapticsUnavailable'));
+  dom.hapticsStatusText.textContent = supported ? (hapticsState.enabled ? t('soundOn') : t('soundOff')) : 'N/A';
+  if (dom.hapticsAvailabilityNote) {
+    dom.hapticsAvailabilityNote.hidden = supported;
+    dom.hapticsAvailabilityNote.textContent = t('hapticsUnavailable');
+  }
+}
+
+export function refreshMusicToggleUI() {
+  if (!dom.musicToggle || !dom.musicStatusText) return;
+  dom.musicToggle.classList.toggle('active', musicState.enabled);
+  dom.musicToggle.setAttribute('aria-checked', String(musicState.enabled));
+  dom.musicStatusText.textContent = musicState.enabled ? t('soundOn') : t('soundOff');
+}
+
+export function refreshAutoUpgradeToggleUI() {
+  if (!dom.autoUpgradeToggle) return;
+  dom.autoUpgradeToggle.classList.toggle('active', autoUpgradeState.enabled);
+  dom.autoUpgradeToggle.setAttribute('aria-checked', String(autoUpgradeState.enabled));
+  const status = document.getElementById('autoUpgradeStatusText');
+  if (status) status.textContent = autoUpgradeState.enabled ? t('soundOn') : t('soundOff');
+  if (dom.upgradeAutoToggle) dom.upgradeAutoToggle.checked = autoUpgradeState.enabled;
 }
 
 export function initSettingsMenu() {
@@ -40,7 +65,19 @@ export function initSettingsMenu() {
       localStorage.setItem('zombie-room-sound', String(audioState.enabled));
     } catch (_) {}
     refreshSoundToggleUI();
-    if (audioState.enabled) playUiClick();
+    if (audioState.enabled) {
+      resumeAudioContext({ force: true }).then(running => {
+        if (running) playUiClick();
+      });
+    }
+  });
+
+  refreshMusicToggleUI();
+  dom.musicToggle?.addEventListener('click', () => {
+    setMusicEnabled(!musicState.enabled);
+    refreshMusicToggleUI();
+    if (musicState.enabled) startMusic();
+    else stopMusic();
   });
 
   refreshHapticsToggleUI();
@@ -51,6 +88,13 @@ export function initSettingsMenu() {
     } catch (_) {}
     refreshHapticsToggleUI();
     if (hapticsState.enabled) vibrateUi();
+  });
+
+  refreshAutoUpgradeToggleUI();
+  dom.autoUpgradeToggle?.addEventListener('click', () => {
+    setAutoUpgradeEnabled(!autoUpgradeState.enabled);
+    refreshAutoUpgradeToggleUI();
+    syncAutoUpgradePreference();
   });
 
   function isOpen() {
@@ -77,6 +121,11 @@ export function initSettingsMenu() {
     wasPausedBySettings = game.running && !game.paused;
     if (game.running) setPaused(true, false, false, { showOverlay: false });
 
+    refreshSoundToggleUI();
+    refreshMusicToggleUI();
+    refreshHapticsToggleUI();
+    refreshAutoUpgradeToggleUI();
+
     panel.hidden = false;
     if (backdrop) backdrop.hidden = false;
     requestAnimationFrame(() => {
@@ -85,7 +134,7 @@ export function initSettingsMenu() {
     });
     trigger.setAttribute('aria-expanded', 'true');
     releaseFocusTrap = activateFocusTrap(panel, {
-      initialFocus: 'select, button:not(:disabled), [href], input:not(:disabled), [tabindex]:not([tabindex="-1"])',
+      initialFocus: dom.soundToggle,
       fallbackFocus: trigger
     });
     document.addEventListener('keydown', onKeydown);

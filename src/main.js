@@ -6,10 +6,11 @@ import { draw } from './render.js';
 import { initPwa, refreshPwaLabels } from './pwa.js';
 import { initInput, resetInputState } from './input.js';
 import { initI18n } from './i18n-apply.js';
-import { initSettingsMenu, refreshSoundToggleUI, refreshHapticsToggleUI } from './settings-menu.js';
+import { initSettingsMenu, refreshSoundToggleUI, refreshMusicToggleUI, refreshHapticsToggleUI, refreshAutoUpgradeToggleUI } from './settings-menu.js';
 import { flashMessage, updateUI } from './ui.js';
 import { t } from './i18n.js';
 import { initAudio, playUiClick } from './audio.js';
+import { initMusic } from './music.js';
 import { advancePlaytestTick, getPlaytestTick, isPlaytestReplaying, playtestConfig, PLAYTEST_FIXED_STEP_SECONDS, preparePlaytestReplay, recordPlaytestReplayMismatch, stopPlaytestReplay, takePlaytestReplayEvents } from './playtest.js';
 import { summarizePlaytestRuns } from './playtest-analysis.js';
 import { updateUpgradeDialog } from './game-ui.js';
@@ -202,13 +203,16 @@ initI18n(() => {
   refreshPwaLabels();
   refreshPerfLabel();
   refreshSoundToggleUI();
+  refreshMusicToggleUI();
   refreshHapticsToggleUI();
+  refreshAutoUpgradeToggleUI();
   updateUI();
   if (game.upgradeModalOpen && currentUpgradeChoices.length) {
     updateUpgradeDialog(currentUpgradeChoices, game.player, chooseUpgrade);
   }
 });
 initAudio();
+initMusic();
 resize();
 ui.bestText.textContent = scoreState.best;
 resetGame();

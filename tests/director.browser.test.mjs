@@ -253,11 +253,12 @@ test('PWA precaches combat/build modules and starts offline', browserOptions, as
     await waitFor(cdp.evaluate.bind(cdp), 'Boolean(navigator.serviceWorker.controller)', Boolean);
     const cached = await cdp.evaluate(`(async () => {
       await navigator.serviceWorker.ready;
-      return { caches: await caches.keys(), ranged: Boolean(await caches.match('./src/ranged-combat.js')), builds: Boolean(await caches.match('./src/builds.js')) };
+      return { caches: await caches.keys(), ranged: Boolean(await caches.match('./src/ranged-combat.js')), builds: Boolean(await caches.match('./src/builds.js')), music: Boolean(await caches.match('./src/music.js')) };
     })()`);
-    assert.ok(cached.caches.includes('zombie-room-v3.7.0'));
+    assert.ok(cached.caches.includes('zombie-room-v3.8.0'));
     assert.equal(cached.ranged, true);
     assert.equal(cached.builds, true);
+    assert.equal(cached.music, true);
     await cdp.send('Network.enable');
     await cdp.send('Network.emulateNetworkConditions', { offline: true, latency: 0, downloadThroughput: 0, uploadThroughput: 0 });
     await cdp.send('Network.clearBrowserCache');
@@ -267,7 +268,7 @@ test('PWA precaches combat/build modules and starts offline', browserOptions, as
       const { APP_VERSION, game } = await import('./src/state.js');
       return { version: APP_VERSION, running: game.running, hasDirector: Boolean(game.director), offline: !navigator.onLine };
     })()`, value => value?.hasDirector);
-    assert.deepEqual(offline, { version: '3.7.0', running: true, hasDirector: true, offline: true });
+    assert.deepEqual(offline, { version: '3.8.0', running: true, hasDirector: true, offline: true });
     assert.deepEqual(cdp.runtimeExceptions, []);
   }, { serviceWorker: true });
 });
@@ -289,7 +290,7 @@ test('legacy best scores survive and all seven locales refresh while paused', br
       })()`);
       assert.equal(translated.encounter, expected);
       assert.ok(translated.label.includes(expected) && !translated.label.includes('{'));
-      assert.ok(translated.note.includes('v3.7'));
+      assert.ok(translated.note.includes('v3.8'));
       assert.equal(translated.noteHidden, false);
       assert.equal(translated.overflow, false);
     }
@@ -302,7 +303,7 @@ test('legacy best scores survive and all seven locales refresh while paused', br
       update(1 / 60);
       return { best: localStorage.getItem('zombie-room-best'), version: localStorage.getItem('zombie-room-best-version'), text: document.querySelector('#bestText').textContent, hidden: document.querySelector('#legacyBestNote').hidden };
     })()`);
-    assert.deepEqual(newBest, { best: '1000000', version: '3.7.0', text: '1000000', hidden: true });
+    assert.deepEqual(newBest, { best: '1000000', version: '3.8.0', text: '1000000', hidden: true });
     assert.deepEqual(cdp.runtimeExceptions, []);
   });
 });

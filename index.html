@@ -101,6 +101,15 @@
       </div>
       <div class="settings-row">
         <div class="settings-toggle-row">
+          <span class="settings-label" data-i18n="musicLabel">Music</span>
+          <button class="settings-toggle-btn active" id="musicToggle" type="button" role="switch" aria-checked="true" data-i18n-aria="musicLabel" aria-label="Toggle music">
+            <span class="toggle-track"><span class="toggle-thumb"></span></span>
+            <span class="toggle-text" id="musicStatusText" data-i18n="soundOn">ON</span>
+          </button>
+        </div>
+      </div>
+      <div class="settings-row">
+        <div class="settings-toggle-row">
           <span class="settings-label" data-i18n="soundLabel">Sound</span>
           <button class="settings-toggle-btn active" id="soundToggle" type="button" role="switch" aria-checked="true" data-i18n-aria="soundLabel" aria-label="Toggle sound">
             <span class="toggle-track"><span class="toggle-thumb"></span></span>
@@ -116,6 +125,16 @@
             <span class="toggle-text" id="hapticsStatusText" data-i18n="soundOn">ON</span>
           </button>
         </div>
+        <p class="settings-note" id="hapticsAvailabilityNote" hidden data-i18n="hapticsUnavailable">This browser cannot vibrate the phone.</p>
+      </div>
+      <div class="settings-row">
+        <div class="settings-toggle-row">
+          <span class="settings-label" data-i18n="autoUpgradeSettingsLabel">Auto-pick upgrades</span>
+          <button class="settings-toggle-btn active" id="autoUpgradeToggle" type="button" role="switch" aria-checked="true" data-i18n-aria="autoUpgradeSettingsLabel" aria-label="Toggle automatic upgrade selection">
+            <span class="toggle-track"><span class="toggle-thumb"></span></span>
+            <span class="toggle-text" id="autoUpgradeStatusText" data-i18n="soundOn">ON</span>
+          </button>
+        </div>
       </div>
       <button class="install-button settings-action" id="installButton" type="button" data-i18n-aria="installAriaInstall" aria-label="Install Zombie Room PWA">
         <svg class="install-icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -125,7 +144,7 @@
       </button>
       <button class="update-button settings-action" id="updateButton" type="button" data-i18n-aria="updateAriaCheck" aria-label="Check for Zombie Room updates">
         <span class="update-dot" aria-hidden="true"></span>
-        <span id="updateLabel">Update v3.7.0</span>
+        <span id="updateLabel">Update v3.8.0</span>
       </button>
       <div class="settings-diagnostics">
         <div class="settings-label" data-i18n="hudDiagnostics">Performance</div>
@@ -153,6 +172,14 @@
         </div>
         <p class="upgrade-build-summary" id="upgradeBuildSummary"></p>
         <div class="upgrade-cards" id="upgradeCards"></div>
+        <label class="upgrade-auto-row" id="upgradeAutoRow" for="upgradeAutoToggle">
+          <input id="upgradeAutoToggle" type="checkbox" checked />
+          <span class="upgrade-auto-label" data-i18n="autoUpgradeLabel">Auto-select the first option in 3 seconds</span>
+          <span class="upgrade-auto-countdown" id="upgradeAutoCountdown" aria-live="polite">3</span>
+        </label>
+        <div class="upgrade-auto-progress" id="upgradeAutoProgress" role="progressbar" aria-label="Automatic choice countdown" aria-valuemin="0" aria-valuemax="3" aria-valuenow="0">
+          <i id="upgradeAutoProgressFill"></i>
+        </div>
         <p class="upgrade-keyboard-hint" data-i18n="upgradeKeyboardHint">Press 1, 2, or 3 on keyboard</p>
       </div>
 

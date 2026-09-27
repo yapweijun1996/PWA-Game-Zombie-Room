@@ -72,10 +72,18 @@ export function initInput(onRestart) {
   if (zone && base && knob) {
     const MAX_RADIUS = 36;
     let activePointerId = null;
+    let pointerCaptureTarget = null;
     let originX = 0;
     let originY = 0;
+    const ignoredTargets = 'button, a[href], input, select, textarea, [role="dialog"], .settings-backdrop';
 
     function resetJoystick() {
+      const pointerId = activePointerId;
+      if (pointerId !== null) {
+        try { pointerCaptureTarget?.releasePointerCapture(pointerId); } catch (_) {}
+      }
+      pointerCaptureTarget?.removeEventListener('lostpointercapture', onPointerEnd);
+      pointerCaptureTarget = null;
       activePointerId = null;
       input.active = false;
       input.vx = 0;
@@ -93,14 +101,19 @@ export function initInput(onRestart) {
 
     function onPointerDown(e) {
       if (isPlaytestReplaying()) { e.preventDefault(); return; }
+      if (e.pointerType !== 'touch' && e.pointerType !== 'pen') return;
+      if (e.target instanceof Element && e.target.closest(ignoredTargets)) return;
       if (activePointerId !== null || game.upgradeModalOpen) return;
+      if (game.paused) return;
       if (!game.running) {
         onRestart();
         return;
       }
       e.preventDefault();
       activePointerId = e.pointerId;
-      try { zone.setPointerCapture(e.pointerId); } catch (_) {}
+      pointerCaptureTarget = e.target instanceof Element ? e.target : zone;
+      try { pointerCaptureTarget.setPointerCapture(e.pointerId); } catch (_) {}
+      pointerCaptureTarget.addEventListener('lostpointercapture', onPointerEnd, { once: true });
 
       const zoneRect = zone.getBoundingClientRect();
       originX = e.clientX;
@@ -149,17 +162,17 @@ export function initInput(onRestart) {
       if (isPlaytestReplaying()) { e.preventDefault(); return; }
       if (e.pointerId !== activePointerId) return;
       e.preventDefault();
-      try { zone.releasePointerCapture(e.pointerId); } catch (_) {}
+      try { pointerCaptureTarget?.releasePointerCapture(e.pointerId); } catch (_) {}
       resetJoystick();
       recordInputState();
     }
 
-    zone.addEventListener('pointerdown', onPointerDown, { passive: false });
-    zone.addEventListener('pointermove', onPointerMove, { passive: false });
-    zone.addEventListener('pointerup', onPointerEnd, { passive: false });
-    zone.addEventListener('pointercancel', onPointerEnd, { passive: false });
+    document.addEventListener('pointerdown', onPointerDown, { passive: false });
+    document.addEventListener('pointermove', onPointerMove, { passive: false });
+    document.addEventListener('pointerup', onPointerEnd, { passive: false });
+    document.addEventListener('pointercancel', onPointerEnd, { passive: false });
     zone.addEventListener('lostpointercapture', onPointerEnd, { passive: false });
-    zone.addEventListener('contextmenu', e => e.preventDefault());
+    document.addEventListener('contextmenu', e => e.preventDefault());
 
     releaseJoystick = resetJoystick;
   }

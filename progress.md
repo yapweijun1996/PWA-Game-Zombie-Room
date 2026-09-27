@@ -44,6 +44,20 @@ Original prompt: Implement the approved endless difficulty director plan: 25-sec
 - Final visual review also caught arc particles losing coordinates after their first update: their stationary velocity was missing. Set both components to zero and verified finite coordinates across frames plus visible arcs in screenshots.
 - Reserved HUD space for the path icon and player level on narrow screens. Added a visibility regression; targeted combat/layout tests pass across five viewports.
 
+## Mobile audio, input, and upgrade flow (v3.8)
+
+- User reported silent music/effects and no vibration in iOS standalone PWA, a fixed-location joystick on phone, forced language selection when Settings opens, and requested optional automatic upgrade choice.
+- Added procedural background music (the app previously had no music track), independent persisted music/effects settings, and Web Audio unlock/recovery on touch, keyboard, page restore, and foreground return.
+- On platforms with no `navigator.vibrate`, Settings disables the Haptics switch and explains the browser capability limit. iOS Taptic Engine cannot be invoked from the current web/PWA API surface; a physical iPhone check is still required for all mobile behavior.
+- Mobile movement now starts from one touch anywhere in the non-interactive play area, with the joystick anchored under that finger and Dash left as a separate button.
+- Upgrade dialogs now offer a three-second first-choice timer with progress; it can be stopped in the dialog or persisted from Settings. The timer pauses when the page is hidden and uses normal upgrade recording/replay logic.
+- Settings initial focus now goes to the Sound switch instead of the language `<select>`, preventing iOS from opening the native language picker on panel open.
+- Bumped the app/service-worker cache to v3.8.0, retained stored scores/settings, and added browser checks for mobile touch origins, timer behavior, Settings focus, haptic capability UI, music setting persistence, and offline music caching.
+- Complete: all 39 checks passed with Chrome required and no skips; this includes the existing 1,000-wave/director, build, replay, and offline tests plus new touch-origin, audio-unlock/music-toggle, haptics-capability, Settings-focus, and auto-upgrade regressions.
+- Inspected 390×844 mobile Settings and upgrade-dialog screenshots. Automated browser checks also cover short portrait, landscape, and desktop layouts.
+- The supplied game Playwright client could not load because its `playwright` package is absent from the local skill runtime; the repository's Chrome DevTools browser suite and direct screenshots provided the UI verification instead.
+- Remaining: push v3.8.0 to `main`, confirm the GitHub Pages workflow deploys, and have the user confirm real-iPhone audio/standalone behavior. Haptics remain unsupported in iOS web content, and human usability is not established by browser tests.
+
 ## Build delivery result
 
 - DONE: v3.7.0 build paths, specializations, path-specific evolutions, compatible recording/analysis, localization, score preservation, and offline precache are implemented.

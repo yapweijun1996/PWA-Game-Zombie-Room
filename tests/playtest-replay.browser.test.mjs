@@ -280,7 +280,7 @@ test('replay, dash controls, telegraphs, wave modifiers, and modal focus work to
     assert.equal(settingsState.ariaModal, 'true');
     assert.equal(settingsState.ariaLabel, 'Settings');
     assert.equal(settingsState.expanded, 'true');
-    assert.equal(settingsState.activeElement, 'languageSelect');
+    assert.equal(settingsState.activeElement, 'soundToggle');
     assert.equal(settingsState.paused, true);
 
     const settingsFocus = await verifyFocusTrap(cdp, '#settingsPanel');

@@ -97,7 +97,9 @@ test('build choice queues, keyboard/touch selection, seven locales and bounded m
     await open(cdp, url);
     await cdp.evaluate(`(async () => {
       const { game } = await import('./src/state.js');
+      const { setAutoUpgradeEnabled } = await import('./src/state.js');
       const { openUpgradeModal } = await import('./src/entities.js');
+      setAutoUpgradeEnabled(false);
       game.player.level = 8; game.pendingUpgrades = 3; openUpgradeModal();
     })()`);
     await sendKey(cdp, 'keydown', '3');
@@ -144,10 +146,12 @@ test('build choice queues, keyboard/touch selection, seven locales and bounded m
             cards.scrollTop = top;
             return { scroll: cards.scrollTop, titleTop: title.getBoundingClientRect().top, outerScroll: modal.scrollTop };
           });
-          const translated = [...BUILD_PATHS, ...BUILD_SPECIALIZATIONS, ...BUILD_EVOLUTIONS].every(c => t(c.titleKey) !== c.titleKey && t(c.descKey) !== c.descKey);
+          const translated = [...BUILD_PATHS, ...BUILD_SPECIALIZATIONS, ...BUILD_EVOLUTIONS].every(c => t(c.titleKey) !== c.titleKey && t(c.descKey) !== c.descKey) && t('autoUpgradeProgressLabel') !== 'autoUpgradeProgressLabel';
           const buttons = [...cards.querySelectorAll('button')];
+          const focusables = [...modal.querySelectorAll('button:not(:disabled), input:not(:disabled), select:not(:disabled), [tabindex]:not([tabindex="-1"])')]
+            .filter(element => !element.hidden && element.getClientRects().length);
           const last = buttons.at(-1).getBoundingClientRect(), area = cards.getBoundingClientRect();
-          buttons.at(-1).focus();
+          focusables.at(-1).focus();
           const tab = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true }); document.dispatchEvent(tab);
           const focused = buttons[0].getBoundingClientRect();
           return { width: innerWidth, pageWidth: document.documentElement.scrollWidth, modalWidth: modal.clientWidth, scrollWidth: modal.scrollWidth,

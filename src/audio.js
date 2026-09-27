@@ -1,29 +1,91 @@
-import { audioState } from './state.js';
+import { audioState, musicState } from './state.js';
 
 let audioCtx = null;
+let resumeContext = null;
+let resumePromise = null;
+let lastResumeAttempt = 0;
 
-function getContext() {
-  if (!audioState.enabled) return null;
-  if (!audioCtx && typeof AudioContext !== 'undefined') {
+function audioIsEnabled() {
+  return audioState.enabled || musicState.enabled;
+}
+
+function discardAudioContext(context = audioCtx) {
+  if (!context) return;
+  if (audioCtx === context) audioCtx = null;
+  if (resumeContext === context) {
+    resumeContext = null;
+    resumePromise = null;
+  }
+  try { context.close().catch(() => {}); } catch (_) {}
+}
+
+function getOrCreateAudioContext() {
+  if (!audioIsEnabled() || typeof window === 'undefined') return null;
+  if (audioCtx?.state === 'interrupted') discardAudioContext(audioCtx);
+  if (!audioCtx || audioCtx.state === 'closed') {
     const AudioCtxClass = window.AudioContext || window.webkitAudioContext;
     if (AudioCtxClass) {
-      audioCtx = new AudioCtxClass();
+      try { audioCtx = new AudioCtxClass(); } catch (_) { audioCtx = null; }
     }
-  }
-  if (audioCtx && audioCtx.state === 'suspended') {
-    audioCtx.resume().catch(() => {});
   }
   return audioCtx;
 }
 
+export function getAudioContext() {
+  return getOrCreateAudioContext();
+}
+
+export function resumeAudioContext({ force = false } = {}) {
+  let context = getOrCreateAudioContext();
+  if (!context) return Promise.resolve(false);
+  if (context.state === 'running') return Promise.resolve(true);
+  if (resumeContext === context && resumePromise) {
+    if (!force || Date.now() - lastResumeAttempt < 1200) return resumePromise;
+    discardAudioContext(context);
+    context = getOrCreateAudioContext();
+    if (!context) return Promise.resolve(false);
+  }
+  if (!force && Date.now() - lastResumeAttempt < 500) return Promise.resolve(false);
+
+  lastResumeAttempt = Date.now();
+  resumeContext = context;
+  try {
+    resumePromise = Promise.resolve(context.resume())
+      .then(() => context.state === 'running')
+      .catch(() => false)
+      .finally(() => {
+        if (resumeContext === context) {
+          resumeContext = null;
+          resumePromise = null;
+        }
+      });
+  } catch (_) {
+    resumeContext = null;
+    resumePromise = null;
+    return Promise.resolve(false);
+  }
+  return resumePromise;
+}
+
+function getContext() {
+  if (!audioState.enabled) return null;
+  const context = getOrCreateAudioContext();
+  if (context && context.state !== 'running') void resumeAudioContext();
+  return context;
+}
+
 export function initAudio() {
   const unlock = () => {
-    if (audioState.enabled) getContext();
-    removeEventListener('pointerdown', unlock);
-    removeEventListener('keydown', unlock);
+    if (audioIsEnabled()) void resumeAudioContext({ force: true });
   };
-  addEventListener('pointerdown', unlock, { passive: true });
-  addEventListener('keydown', unlock, { passive: true });
+  const restore = () => {
+    if (!document.hidden && audioIsEnabled()) void resumeAudioContext({ force: true });
+  };
+  window.addEventListener('pointerdown', unlock, { passive: true });
+  window.addEventListener('touchstart', unlock, { passive: true });
+  window.addEventListener('keydown', unlock, { passive: true });
+  window.addEventListener('pageshow', restore);
+  document.addEventListener('visibilitychange', restore);
 }
 
 // 1. Shoot Sound: Tiered laser/cannon pitch drop adapting to upgrades

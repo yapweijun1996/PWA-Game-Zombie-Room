@@ -1,6 +1,6 @@
 'use strict';
 
-const APP_VERSION = '3.7.0';
+const APP_VERSION = '3.8.0';
 const CACHE_NAME = 'zombie-room-v' + APP_VERSION;
 const APP_SHELL = [
   './',
@@ -12,6 +12,7 @@ const APP_SHELL = [
   './src/main.js',
   './src/state.js',
   './src/audio.js',
+  './src/music.js',
   './src/haptics.js',
   './src/utils.js',
   './src/playtest.js',

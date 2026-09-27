@@ -1,4 +1,4 @@
-export const APP_VERSION = '3.7.0';
+export const APP_VERSION = '3.8.0';
 
 export const dom = {
   canvas: document.getElementById('game'),
@@ -16,8 +16,16 @@ export const dom = {
   upgradeCards: document.getElementById('upgradeCards'),
   soundToggle: document.getElementById('soundToggle'),
   soundStatusText: document.getElementById('soundStatusText'),
+  musicToggle: document.getElementById('musicToggle'),
+  musicStatusText: document.getElementById('musicStatusText'),
   hapticsToggle: document.getElementById('hapticsToggle'),
   hapticsStatusText: document.getElementById('hapticsStatusText'),
+  hapticsAvailabilityNote: document.getElementById('hapticsAvailabilityNote'),
+  autoUpgradeToggle: document.getElementById('autoUpgradeToggle'),
+  upgradeAutoToggle: document.getElementById('upgradeAutoToggle'),
+  upgradeAutoCountdown: document.getElementById('upgradeAutoCountdown'),
+  upgradeAutoProgress: document.getElementById('upgradeAutoProgress'),
+  upgradeAutoProgressFill: document.getElementById('upgradeAutoProgressFill'),
   comboBadge: document.getElementById('comboBadge'),
   comboText: document.getElementById('comboText'),
   comboBar: document.getElementById('comboBar'),
@@ -149,6 +157,15 @@ function readHapticsSetting() {
   }
 }
 
+function readBooleanSetting(key, fallback) {
+  try {
+    const saved = localStorage.getItem(key);
+    return saved === null ? fallback : saved === 'true';
+  } catch (_) {
+    return fallback;
+  }
+}
+
 export const scoreState = {
   best: readBestScore(),
   bestVersion: (() => {
@@ -164,6 +181,24 @@ export const audioState = {
 export const hapticsState = {
   enabled: readHapticsSetting()
 };
+
+export const musicState = {
+  enabled: readBooleanSetting('zombie-room-music', true)
+};
+
+export const autoUpgradeState = {
+  enabled: readBooleanSetting('zombie-room-auto-upgrade', true)
+};
+
+export function setMusicEnabled(enabled) {
+  musicState.enabled = Boolean(enabled);
+  try { localStorage.setItem('zombie-room-music', String(musicState.enabled)); } catch (_) {}
+}
+
+export function setAutoUpgradeEnabled(enabled) {
+  autoUpgradeState.enabled = Boolean(enabled);
+  try { localStorage.setItem('zombie-room-auto-upgrade', String(autoUpgradeState.enabled)); } catch (_) {}
+}
 
 export const game = {
   running: true,

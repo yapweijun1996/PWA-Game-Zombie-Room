@@ -21,10 +21,14 @@ function hasUserActivation() {
   return userHasInteracted;
 }
 
+export function isHapticsSupported() {
+  return typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function';
+}
+
 function vibrate(pattern) {
   if (!hapticsState.enabled) return;
   if (!hasUserActivation()) return;
-  if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+  if (isHapticsSupported()) {
     try {
       navigator.vibrate(pattern);
     } catch (_) {}

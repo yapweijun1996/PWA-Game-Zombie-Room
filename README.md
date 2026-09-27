@@ -5,10 +5,11 @@ Zombie Room is an offline-first, canvas-based survival game for desktop and mobi
 ## Current Features
 
 - Canvas game loop with automatic targeting and shooting.
-- Zero-asset procedural sound effects synthesized via Web Audio API (gunshots, crits, kills, pentatonic XP suction, level-up arpeggios, UI taps) with persisted sound toggle.
-- Tactile haptic vibration feedback via the Vibration API with multi-pattern pulses for damage, crits, level-ups, boss spawns, and death, with persisted toggle.
+- Zero-asset procedural sound effects and synthesized background music via Web Audio API, each with a persisted setting and iOS foreground/audio-context recovery.
+- Vibration API feedback for damage, crits, level-ups, boss spawns, and death where supported. iOS Safari/PWA does not expose the iPhone Taptic Engine to web pages; Settings reports unsupported vibration instead of showing a misleading active switch.
 - Dynamic floating combat damage numbers with pop-in scaling, upward drift, alpha fade-out, and distinct gold critical strike callouts.
-- 360-degree analog floating virtual joystick for touch devices with dynamic thumb-centering and speed scaling, plus WASD / arrow-key support on desktop.
+- Full-screen touch movement for phones: a one-finger touch starts the analog joystick at that finger's position, with the separate Dash button preserved; desktop retains WASD / arrow keys.
+- Upgrade cards can auto-select the first option after a three-second visible countdown, controlled in the dialog or Settings.
 - Walker, runner, tank, telegraphed ranged spitter, and boss enemy types.
 - Cinematic Boss encounters with heavy screen rumble, warning haptics, and a dedicated glowing Boss health bar.
 - Boss Phase 2 Frenzy (< 50% HP) with terrifying beast roar audio, flaming red magma visuals, blazing golden eyes, halved dash cooldown, and rapid charges.
@@ -57,8 +58,9 @@ Zombie Room is an offline-first, canvas-based survival game for desktop and mobi
 └── src/
     ├── main.js             # Resize handling and animation frame loop
     ├── state.js            # DOM references and game state
-    ├── audio.js            # Web Audio API procedural sound synthesis and mute toggle
-    ├── haptics.js          # Vibration API tactile pulse feedback and toggle
+    ├── audio.js            # Web Audio API sound effects and iOS audio-context recovery
+    ├── music.js            # Procedural background music scheduler and toggle
+    ├── haptics.js          # Vibration API capability detection and pulse feedback
     ├── entities.js         # Simulation, enemies, combat, waves, and scoring
     ├── wave-director.js    # Wave plans, encounter bags, difficulty, event scheduling, and relief
     ├── ranged-combat.js    # Spitter attack state and shared projectile/telegraph collision geometry
@@ -100,7 +102,7 @@ In the repository settings, open **Settings → Pages** and set the source to **
 ## Controls
 
 - **Desktop:** `W`, `A`, `S`, `D`, or arrow keys to move; `Space` to evasive-dash; `P` or `Escape` to pause/resume.
-- **Mobile:** 360-degree floating virtual joystick with analog deflection and speed scaling; tap **Dash** for a directional evade (8-second prototype cooldown).
+- **Mobile:** touch anywhere in the play area to place and steer the floating joystick under one finger; tap **Dash** for a directional evade (8-second prototype cooldown).
 - **Restart after defeat:** tap the joystick, press any movement direction, or tap the Restart button.
 - **Combat:** shooting and target selection are automatic.
 
@@ -114,7 +116,7 @@ The app provides a web app manifest, icons, service-worker registration, install
 
 iOS does not expose the Chromium `beforeinstallprompt` flow. The app detects iOS and provides **Share → Add to Home Screen** instructions. Standalone mode is detected with both `display-mode: standalone` and `navigator.standalone`.
 
-The current manifest and meta tags cover the main standalone experience. iOS behavior should still be verified on a real device, especially safe-area spacing, viewport height, audio policy if audio is added later, and the Home Screen launch path.
+Web Audio starts after a touch or keyboard gesture and is resumed when the app returns to the foreground. Background music and sound effects have separate settings. iOS Safari and installed PWAs do not expose the iPhone Taptic Engine to web content; the Haptics switch is disabled there and explains the limitation. Verify audio, safe-area spacing, viewport height, and the Home Screen launch path on a real device.
 
 ### Zoom and accessibility
 
@@ -326,6 +328,14 @@ Wait for the game's debounced viewport update after resizing, and reset the game
 For opt-in repeatable local trials, load the app with `?playtestSeed=123456&playtestLimit=180&playtestProfile=offense&playtestInput=joystick-loop-v1`. The seed must be an unsigned 32-bit integer; the recording limit defaults to 180 game seconds, and `0` disables it. Reaching the limit finalizes the record but does not stop gameplay. Seeded mode uses a fixed 1/60-second simulation step and records ordered input-state, upgrade-choice, pause, and Dash events alongside five-second checkpoints, damage sources, wave modifiers, director events (including relief, recovery, and shots), and the final outcome. Scenario modifiers are derived from the run seed and wave, independent of build-related gameplay RNG draws. Records remain in memory at `window.__zombieRoomPlaytest` and `window.__zombieRoomPlaytestRuns`; nothing is uploaded or persisted. To replay a completed schema-version-4 record from the same app version, keep a copy with `const source = structuredClone(window.__zombieRoomPlaytest)` and call `window.__zombieRoomPlaytestTools.replay(source)` on a page with a valid `playtestSeed`. The replay produces `replayComparison` evidence; `window.__zombieRoomPlaytestTools.exportRuns()` returns current JSON, and `window.__zombieRoomPlaytestTools.summarizeRuns()` groups completed runs by early (waves 1–2), mid (3–5), and late (6+) phases, build, health samples, damage sources, death causes, outcomes, and modifiers, plus director event counts and the highest stage. `window.__zombieRoomPlaytestTools.stopReplay()` returns to recording mode. Results are in-memory only; the report is descriptive and never tunes balance. Do not increase enemy HP or spawn rate from small or build-skewed samples; compare repeated seeded runs across phases and builds first. Cosmetic effects remain unseeded and do not feed the simulation.
 
 For deterministic automation, also set `playtestManual=1` with a valid seed. This disables automatic simulation stepping and exposes `window.advanceTime(milliseconds)` and `window.render_game_to_text()`; real gameplay is unchanged without this explicit test flag. Profile/input query parameters are descriptive labels, not autopilots. The synthetic controller is implemented in the browser test. Replay format 4 rejects older schemas and other app versions; director decisions are recomputed and compared rather than injected from the source record.
+
+### Version 3.8 mobile experience
+
+The phone joystick now accepts a touch anywhere outside interactive controls and anchors its visual base to the finger's starting point. Settings opens on a safe toggle instead of focusing the native language selector, so opening the panel does not summon the iOS language picker. Upgrade dialogs show a three-second progress indicator and allow auto-selection to be disabled per dialog or in Settings; the timer pauses while the page is backgrounded. The service-worker shell includes the synthesized music module.
+
+This release adds procedural background music because the app previously had sound effects but no music track. Both use the same recovered Web Audio context with separate persisted switches. Automatic upgrade choices use the existing upgrade event path, so they remain recorded and replayable. iOS haptics remain unavailable to browser content; no physical iPhone or iOS standalone test was available for this release, so audible output on a real iPhone remains to be confirmed by the user.
+
+The required-Chrome suite passed all 39 checks with no skips. Browser tests verified phone touch origins, audio-context unlock and music scheduling, auto-upgrade timing/settings, Settings focus, localization, and offline music caching. Inspected 390×844 Settings and upgrade-dialog screenshots; browser emulation does not replace a real iPhone check.
 
 ### Version 3.7 development evidence
 

@@ -1,8 +1,134 @@
-import { dom, game, ui } from './state.js';
+import { dom, game, ui, autoUpgradeState, setAutoUpgradeEnabled } from './state.js';
 import { formatTime } from './utils.js';
 import { t } from './i18n.js';
 import { activateFocusTrap } from './focus-trap.js';
 import { BUILD_CONFIG, BUILD_PATHS, BUILD_SPECIALIZATIONS, BUILD_EVOLUTIONS, canUnlockEvolution } from './builds.js';
+
+const AUTO_UPGRADE_DELAY_MS = 3000;
+let autoUpgradeFrame = 0;
+let autoUpgradeDeadline = 0;
+let autoUpgradeRemaining = null;
+let autoUpgradeChooser = null;
+let lastAnnouncedCountdown = null;
+
+function syncAutoUpgradeControls() {
+  if (dom.upgradeAutoProgress) dom.upgradeAutoProgress.setAttribute('aria-label', t('autoUpgradeProgressLabel'));
+  if (dom.upgradeAutoToggle) dom.upgradeAutoToggle.checked = autoUpgradeState.enabled;
+  if (dom.autoUpgradeToggle) {
+    dom.autoUpgradeToggle.classList.toggle('active', autoUpgradeState.enabled);
+    dom.autoUpgradeToggle.setAttribute('aria-checked', String(autoUpgradeState.enabled));
+    const status = document.getElementById('autoUpgradeStatusText');
+    if (status) status.textContent = autoUpgradeState.enabled ? t('soundOn') : t('soundOff');
+  }
+}
+
+function hideAutoUpgradeProgress() {
+  if (dom.upgradeAutoProgress) dom.upgradeAutoProgress.hidden = true;
+  if (dom.upgradeAutoCountdown) {
+    dom.upgradeAutoCountdown.hidden = true;
+    dom.upgradeAutoCountdown.textContent = '';
+  }
+}
+
+export function stopAutoUpgradeCountdown() {
+  if (autoUpgradeFrame) cancelAnimationFrame(autoUpgradeFrame);
+  autoUpgradeFrame = 0;
+  autoUpgradeDeadline = 0;
+  autoUpgradeRemaining = null;
+  autoUpgradeChooser = null;
+  lastAnnouncedCountdown = null;
+  hideAutoUpgradeProgress();
+}
+
+function updateAutoUpgradeCountdown(now) {
+  autoUpgradeFrame = 0;
+  if (!autoUpgradeChooser || !game.upgradeModalOpen || dom.upgradeModal?.hidden || !autoUpgradeState.enabled) {
+    stopAutoUpgradeCountdown();
+    return;
+  }
+  if (document.hidden) return;
+
+  const remaining = Math.max(0, autoUpgradeDeadline - now);
+  const progress = Math.min(1, Math.max(0, 1 - remaining / AUTO_UPGRADE_DELAY_MS));
+  const seconds = Math.min(AUTO_UPGRADE_DELAY_MS / 1000, Math.max(1, Math.ceil(remaining / 1000)));
+  if (dom.upgradeAutoCountdown) {
+    dom.upgradeAutoCountdown.hidden = false;
+    if (seconds !== lastAnnouncedCountdown) {
+      dom.upgradeAutoCountdown.textContent = t('autoUpgradeCountdown', { seconds });
+      lastAnnouncedCountdown = seconds;
+    }
+  }
+  if (dom.upgradeAutoProgress) dom.upgradeAutoProgress.hidden = false;
+  if (dom.upgradeAutoProgressFill) {
+    dom.upgradeAutoProgressFill.style.transform = `scaleX(${progress})`;
+  }
+  if (dom.upgradeAutoProgress) {
+    dom.upgradeAutoProgress.setAttribute('aria-valuenow', String(Math.floor(progress * (AUTO_UPGRADE_DELAY_MS / 1000))));
+  }
+
+  if (remaining <= 0) {
+    const choose = autoUpgradeChooser;
+    stopAutoUpgradeCountdown();
+    if (autoUpgradeState.enabled && game.upgradeModalOpen) choose(0);
+    return;
+  }
+  autoUpgradeFrame = requestAnimationFrame(updateAutoUpgradeCountdown);
+}
+
+function startAutoUpgradeCountdown(choices, onChoose) {
+  stopAutoUpgradeCountdown();
+  syncAutoUpgradeControls();
+  if (!autoUpgradeState.enabled || !game.upgradeModalOpen || !choices.length) return;
+  autoUpgradeChooser = onChoose;
+  beginAutoUpgradeCountdown();
+}
+
+function beginAutoUpgradeCountdown() {
+  if (!autoUpgradeChooser || !autoUpgradeState.enabled || !game.upgradeModalOpen) return;
+  autoUpgradeDeadline = performance.now() + AUTO_UPGRADE_DELAY_MS;
+  autoUpgradeRemaining = null;
+  lastAnnouncedCountdown = null;
+  if (dom.upgradeAutoProgressFill) dom.upgradeAutoProgressFill.style.transform = 'scaleX(0)';
+  autoUpgradeFrame = requestAnimationFrame(updateAutoUpgradeCountdown);
+}
+
+export function syncAutoUpgradePreference() {
+  syncAutoUpgradeControls();
+  if (!game.upgradeModalOpen || !autoUpgradeChooser) return;
+  if (autoUpgradeState.enabled) {
+    if (!autoUpgradeDeadline && autoUpgradeRemaining === null) beginAutoUpgradeCountdown();
+  } else {
+    if (autoUpgradeFrame) cancelAnimationFrame(autoUpgradeFrame);
+    autoUpgradeFrame = 0;
+    autoUpgradeDeadline = 0;
+    autoUpgradeRemaining = null;
+    lastAnnouncedCountdown = null;
+    hideAutoUpgradeProgress();
+  }
+}
+
+dom.upgradeAutoToggle?.addEventListener('change', () => {
+  setAutoUpgradeEnabled(dom.upgradeAutoToggle.checked);
+  syncAutoUpgradePreference();
+});
+
+document.addEventListener('visibilitychange', () => {
+  if (!autoUpgradeChooser) return;
+  if (document.hidden) {
+    if (autoUpgradeDeadline) {
+      autoUpgradeRemaining = Math.max(0, autoUpgradeDeadline - performance.now());
+      autoUpgradeDeadline = 0;
+    }
+    if (autoUpgradeFrame) cancelAnimationFrame(autoUpgradeFrame);
+    autoUpgradeFrame = 0;
+    return;
+  }
+  if (autoUpgradeState.enabled && autoUpgradeRemaining !== null) {
+    autoUpgradeDeadline = performance.now() + autoUpgradeRemaining;
+    autoUpgradeRemaining = null;
+    autoUpgradeFrame = requestAnimationFrame(updateAutoUpgradeCountdown);
+  }
+});
 
 let releasePauseFocusTrap = null;
 let releaseUpgradeFocusTrap = null;
@@ -86,6 +212,8 @@ export function updateUpgradeDialog(choices, player, onChoose) {
     dom.upgradeCards.appendChild(button);
   });
 
+  startAutoUpgradeCountdown(choices, onChoose);
+
   if (!dom.upgradeModal?.hidden) {
     dom.upgradeCards.querySelector('button')?.focus({ preventScroll: true });
   }
@@ -106,6 +234,7 @@ export function showUpgradeDialog(choices, player, onChoose) {
 }
 
 export function hideUpgradeDialog(paused, running) {
+  stopAutoUpgradeCountdown();
   if (releaseUpgradeFocusTrap) {
     releaseUpgradeFocusTrap();
     releaseUpgradeFocusTrap = null;

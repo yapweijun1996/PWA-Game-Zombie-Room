@@ -3,7 +3,7 @@ import { clamp, dist2, rand, shuffle } from './utils.js';
 import { beginPlaytestRun, finishPlaytestRun, gameRandom, gameRand, getPlaytestSeed, isPlaytestReplaying, playtestConfig, recordPlaytestAbility, recordPlaytestCheckpoint, recordPlaytestDamage, recordPlaytestInput, recordPlaytestPause, recordPlaytestUpgrade, recordPlaytestWaveModifier, recordPlaytestDirectorEvent } from './playtest.js';
 import { burst, sprayBlood, makeDecal, particleBudget, spawnDamageText, spawnGore } from './effects.js';
 import { flashMessage, updateUI } from './ui.js';
-import { renderPausePresentation, showUpgradeDialog, updateUpgradeDialog, hideUpgradeDialog, showGameOver, hideGameOver, hideBossBar } from './game-ui.js';
+import { renderPausePresentation, showUpgradeDialog, updateUpgradeDialog, hideUpgradeDialog, stopAutoUpgradeCountdown, showGameOver, hideGameOver, hideBossBar } from './game-ui.js';
 import { t } from './i18n.js';
 import { createTelegraphedCharge, updateTelegraphedCharge } from './telegraphed-charge.js';
 import { DIRECTOR_CONFIG, createDirectorState, getWavePlan, advanceDirector, recordDirectorDamage, startDirectorRecovery, selectEliteAffix, selectEnemyType, getSpawnInterval, capEnemySpeed } from './wave-director.js';
@@ -659,6 +659,7 @@ export function openUpgradeModal() {
 export function chooseUpgrade(index, replayEvent = false) {
   if (isPlaytestReplaying() && !replayEvent) return;
   if (!game.upgradeModalOpen || !currentUpgradeChoices[index]) return;
+  stopAutoUpgradeCountdown();
   const chosen = currentUpgradeChoices[index];
   const p = game.player;
   if (chosen.isBuild && !getBuildChoices(p).some(choice => choice.id === chosen.id)) return;
