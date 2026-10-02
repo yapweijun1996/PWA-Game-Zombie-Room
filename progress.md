@@ -67,3 +67,4 @@ Original prompt: Implement the approved endless difficulty director plan: 25-sec
 - Remaining: physical-device use, native-speaker review of new translations, and human fun/pressure acceptance. Automated policies still survived all nine five-minute runs; do not claim the 3–5-minute pressure target is met.
 
 - Reworked audio (v3.8.1): shared compressor master bus, noise-textured SFX with voice caps, and a fuller 8-bar E-minor BGM with bass, arpeggio and soft drums. Full test suite passes.
+- v3.8.2: service worker navigation no longer rewrites the cached shell, so error pages are not cached and a new index.html is never paired with an older module set.

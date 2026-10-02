@@ -1,6 +1,6 @@
 'use strict';
 
-const APP_VERSION = '3.8.1';
+const APP_VERSION = '3.8.2';
 const CACHE_NAME = 'zombie-room-v' + APP_VERSION;
 const APP_SHELL = [
   './',
@@ -65,12 +65,10 @@ self.addEventListener('fetch', event => {
 
   if (request.mode === 'navigate') {
     event.respondWith(
+      // The shell is cached at install time together with its modules, so a
+      // navigation never rewrites it: that avoids storing error pages and
+      // pairing a newer index.html with an older cached module set.
       fetch(request)
-        .then(response => {
-          const copy = response.clone();
-          caches.open(CACHE_NAME).then(cache => cache.put('./index.html', copy)).catch(() => {});
-          return response;
-        })
         .catch(() => caches.match('./index.html').then(cached => cached || caches.match('./')))
     );
     return;
