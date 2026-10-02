@@ -11,6 +11,7 @@ test('service worker and app share one APP_VERSION', () => {
   assert.equal(versionOf(read('../service-worker.js')), appVersion);
 });
 
-test('index.html does not hardcode the app version', () => {
-  assert.doesNotMatch(read('../index.html'), /\bv\d+\.\d+\.\d+\b/);
+test('index.html pre-render label matches APP_VERSION', () => {
+  const appVersion = versionOf(read('../src/state.js'));
+  assert.match(read('../index.html'), new RegExp(`<span id="updateLabel">Update v${appVersion.replaceAll('.', '\\.')}</span>`));
 });

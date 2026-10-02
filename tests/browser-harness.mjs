@@ -250,7 +250,8 @@ async function stopBrowser(browser) {
     try {
       process.kill(-browser.pid, signal);
     } catch (error) {
-      if (error.code !== 'ESRCH') throw error;
+      // macOS reports EPERM instead of ESRCH once the group leader has exited.
+      if (error.code !== 'ESRCH' && error.code !== 'EPERM') throw error;
     }
   };
   signalGroup('SIGTERM');
