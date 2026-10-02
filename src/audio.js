@@ -4,6 +4,9 @@ let audioCtx = null;
 let resumeContext = null;
 let resumePromise = null;
 let lastResumeAttempt = 0;
+let masterBus = null;
+let masterContext = null;
+let noiseBuffer = null;
 
 function audioIsEnabled() {
   return audioState.enabled || musicState.enabled;
@@ -88,550 +91,257 @@ export function initAudio() {
   document.addEventListener('visibilitychange', restore);
 }
 
-// 1. Shoot Sound: Tiered laser/cannon pitch drop adapting to upgrades
+// Shared master chain (soft compressor) so stacked SFX + music never clip.
+export function getMasterBus(ac) {
+  if (masterContext !== ac || !masterBus) {
+    masterContext = ac;
+    noiseBuffer = null;
+    const comp = ac.createDynamicsCompressor();
+    comp.threshold.value = -14;
+    comp.knee.value = 18;
+    comp.ratio.value = 5;
+    comp.attack.value = 0.004;
+    comp.release.value = 0.18;
+    comp.connect(ac.destination);
+    masterBus = comp;
+  }
+  return masterBus;
+}
+
+function getNoise(ac) {
+  if (!noiseBuffer) {
+    noiseBuffer = ac.createBuffer(1, Math.floor(ac.sampleRate * 0.6), ac.sampleRate);
+    const data = noiseBuffer.getChannelData(0);
+    for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+  }
+  return noiseBuffer;
+}
+
+// Oscillator voice: optional pitch slide, optional detuned twin for thickness, optional lowpass.
+function tone(ac, { type = 'sine', from, to = from, at = 0, dur, vol, lp = 0, detune = 0 }) {
+  const t = ac.currentTime + at;
+  const out = getMasterBus(ac);
+  const env = ac.createGain();
+  env.gain.setValueAtTime(vol, t);
+  env.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  let sink = env;
+  if (lp) {
+    const f = ac.createBiquadFilter();
+    f.type = 'lowpass';
+    f.frequency.setValueAtTime(lp, t);
+    f.frequency.exponentialRampToValueAtTime(Math.max(120, lp * 0.15), t + dur);
+    f.connect(env);
+    sink = f;
+  }
+  env.connect(out);
+  for (const d of detune ? [-detune, detune] : [0]) {
+    const o = ac.createOscillator();
+    o.type = type;
+    o.detune.value = d;
+    o.frequency.setValueAtTime(from, t);
+    if (to !== from) o.frequency.exponentialRampToValueAtTime(to, t + dur);
+    o.connect(sink);
+    o.start(t);
+    o.stop(t + dur + 0.02);
+  }
+}
+
+// Filtered noise burst: gives hits, blasts and zaps real texture.
+function noise(ac, { at = 0, dur, vol, type = 'lowpass', from, to = from, q = 0.7 }) {
+  const t = ac.currentTime + at;
+  const src = ac.createBufferSource();
+  src.buffer = getNoise(ac);
+  const f = ac.createBiquadFilter();
+  f.type = type;
+  f.Q.value = q;
+  f.frequency.setValueAtTime(from, t);
+  if (to !== from) f.frequency.exponentialRampToValueAtTime(to, t + dur);
+  const env = ac.createGain();
+  env.gain.setValueAtTime(vol, t);
+  env.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  src.connect(f);
+  f.connect(env);
+  env.connect(getMasterBus(ac));
+  src.start(t, Math.random() * 0.2);
+  src.stop(t + dur + 0.02);
+}
+
+function ready() {
+  const ac = getContext();
+  return ac && ac.state === 'running' ? ac : null;
+}
+
+// Cap overlapping voices for high-frequency sounds (nukes can kill dozens per frame).
+function makeLimiter(max, window) {
+  let start = 0;
+  let count = 0;
+  return now => {
+    if (now - start > window) { start = now; count = 0; }
+    return ++count <= max;
+  };
+}
+const allowKillVoice = makeLimiter(6, 0.05);
+const allowShootVoice = makeLimiter(4, 0.05);
+const allowZapVoice = makeLimiter(2, 0.08);
+
 export function playShoot(volleys = 1, isHeavy = false) {
-  const ac = getContext();
-  if (!ac || ac.state !== 'running') return;
-  const now = ac.currentTime;
-
-  const osc = ac.createOscillator();
-  const gain = ac.createGain();
-
-  osc.type = isHeavy ? 'sawtooth' : 'triangle';
-  const startFreq = isHeavy ? 520 : 640;
-  osc.frequency.setValueAtTime(startFreq, now);
-  osc.frequency.exponentialRampToValueAtTime(isHeavy ? 80 : 110, now + 0.075);
-
-  gain.gain.setValueAtTime(isHeavy ? 0.11 : 0.09, now);
-  gain.gain.exponentialRampToValueAtTime(0.001, now + 0.075);
-
-  osc.connect(gain);
-  gain.connect(ac.destination);
-  osc.start(now);
-  osc.stop(now + 0.075);
-
-  // Multi-shot harmonic resonance
-  if (volleys > 1) {
-    const osc2 = ac.createOscillator();
-    const gain2 = ac.createGain();
-    osc2.type = 'sawtooth';
-    osc2.frequency.setValueAtTime(780, now + 0.01);
-    osc2.frequency.exponentialRampToValueAtTime(140, now + 0.08);
-    gain2.gain.setValueAtTime(0.06, now + 0.01);
-    gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
-    osc2.connect(gain2);
-    gain2.connect(ac.destination);
-    osc2.start(now + 0.01);
-    osc2.stop(now + 0.08);
-  }
-
-  // Heavy sub-bass punch
-  if (isHeavy) {
-    const sub = ac.createOscillator();
-    const subGain = ac.createGain();
-    sub.type = 'sine';
-    sub.frequency.setValueAtTime(95, now);
-    sub.frequency.exponentialRampToValueAtTime(35, now + 0.09);
-    subGain.gain.setValueAtTime(0.12, now);
-    subGain.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
-    sub.connect(subGain);
-    subGain.connect(ac.destination);
-    sub.start(now);
-    sub.stop(now + 0.09);
-  }
+  const ac = ready();
+  if (!ac || !allowShootVoice(ac.currentTime)) return;
+  const j = 1 + (Math.random() - 0.5) * 0.08;
+  tone(ac, { type: isHeavy ? 'sawtooth' : 'triangle', from: (isHeavy ? 520 : 680) * j, to: isHeavy ? 80 : 120, dur: 0.08, vol: isHeavy ? 0.1 : 0.08, lp: 3500 });
+  noise(ac, { dur: 0.03, vol: isHeavy ? 0.07 : 0.04, type: 'highpass', from: 3000 });
+  if (volleys > 1) tone(ac, { type: 'sawtooth', from: 780 * j, to: 140, at: 0.01, dur: 0.08, vol: 0.05, lp: 3000 });
+  if (isHeavy) tone(ac, { from: 95, to: 35, dur: 0.12, vol: 0.14 });
 }
 
-// 2. Critical Hit Sound: Bright dual chime
 export function playCrit() {
-  const ac = getContext();
-  if (!ac || ac.state !== 'running') return;
-  const now = ac.currentTime;
-
-  [1200, 1800].forEach((freq, i) => {
-    const osc = ac.createOscillator();
-    const gain = ac.createGain();
-    osc.type = 'triangle';
-    osc.frequency.setValueAtTime(freq, now + i * 0.015);
-    gain.gain.setValueAtTime(0.12, now + i * 0.015);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
-    osc.connect(gain);
-    gain.connect(ac.destination);
-    osc.start(now + i * 0.015);
-    osc.stop(now + 0.14);
-  });
-}
-
-// 3. Zombie Kill: Low crunch/thud with dynamic combo pitch scaling
-// Throttled: mass-kill events (e.g. the tactical nuke) can trigger dozens of
-// kills in a single frame, and creating that many oscillator/gain nodes at
-// once causes audible crackle and a frame hitch. Cap real voices per short
-// window; excess kills in the same burst simply stay silent (inaudible
-// difference at that density anyway).
-const KILL_VOICE_MAX = 6;
-const KILL_VOICE_WINDOW = 0.05;
-let killVoiceWindowStart = 0;
-let killVoiceWindowCount = 0;
-
-function allowKillVoice(now) {
-  if (now - killVoiceWindowStart > KILL_VOICE_WINDOW) {
-    killVoiceWindowStart = now;
-    killVoiceWindowCount = 0;
-  }
-  killVoiceWindowCount++;
-  return killVoiceWindowCount <= KILL_VOICE_MAX;
+  const ac = ready();
+  if (!ac) return;
+  [1200, 1800, 2400].forEach((freq, i) => tone(ac, { type: 'triangle', from: freq, at: i * 0.015, dur: 0.16, vol: 0.09 - i * 0.02 }));
+  noise(ac, { dur: 0.05, vol: 0.05, type: 'highpass', from: 5000 });
 }
 
 export function playKill(combo = 0) {
-  const ac = getContext();
-  if (!ac || ac.state !== 'running') return;
-  const now = ac.currentTime;
-  if (!allowKillVoice(now)) return;
-
-  const osc = ac.createOscillator();
-  const gain = ac.createGain();
-
-  osc.type = 'square';
-  const pitchBump = Math.min(110, combo * 2.5);
-  osc.frequency.setValueAtTime(160 + pitchBump, now);
-  osc.frequency.exponentialRampToValueAtTime(45 + pitchBump * 0.2, now + 0.08);
-
-  gain.gain.setValueAtTime(0.08, now);
-  gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
-
-  osc.connect(gain);
-  gain.connect(ac.destination);
-
-  osc.start(now);
-  osc.stop(now + 0.08);
+  const ac = ready();
+  if (!ac || !allowKillVoice(ac.currentTime)) return;
+  const bump = Math.min(110, combo * 2.5);
+  tone(ac, { type: 'square', from: 170 + bump, to: 45 + bump * 0.2, dur: 0.09, vol: 0.07, lp: 1800 });
+  noise(ac, { dur: 0.08, vol: 0.09, from: 1800, to: 300 });
 }
 
-// 4. XP Pickup: Pentatonic rising crystalline tone
 const XP_NOTES = [784, 880, 988, 1175, 1319, 1568];
 let xpNoteIdx = 0;
 let lastXpTime = 0;
 
 export function playXp() {
-  const ac = getContext();
-  if (!ac || ac.state !== 'running') return;
+  const ac = ready();
+  if (!ac) return;
   const now = ac.currentTime;
-
-  if (now - lastXpTime < 0.4) {
-    xpNoteIdx = (xpNoteIdx + 1) % XP_NOTES.length;
-  } else {
-    xpNoteIdx = 0;
-  }
+  xpNoteIdx = now - lastXpTime < 0.4 ? (xpNoteIdx + 1) % XP_NOTES.length : 0;
   lastXpTime = now;
-
   const freq = XP_NOTES[xpNoteIdx];
-  const osc = ac.createOscillator();
-  const gain = ac.createGain();
-
-  osc.type = 'sine';
-  osc.frequency.setValueAtTime(freq, now);
-  osc.frequency.exponentialRampToValueAtTime(freq * 1.08, now + 0.07);
-
-  gain.gain.setValueAtTime(0.06, now);
-  gain.gain.exponentialRampToValueAtTime(0.001, now + 0.07);
-
-  osc.connect(gain);
-  gain.connect(ac.destination);
-
-  osc.start(now);
-  osc.stop(now + 0.07);
+  tone(ac, { from: freq, to: freq * 1.05, dur: 0.1, vol: 0.06 });
+  tone(ac, { from: freq * 2, dur: 0.06, vol: 0.015 });
 }
 
-// 5. Level Up: Triumphant 4-note ascending major arpeggio
 export function playLevelUp() {
-  const ac = getContext();
-  if (!ac || ac.state !== 'running') return;
-  const now = ac.currentTime;
-
-  const chord = [523.25, 659.25, 783.99, 1046.50];
-  chord.forEach((freq, idx) => {
-    const t = now + idx * 0.07;
-    const osc = ac.createOscillator();
-    const gain = ac.createGain();
-    osc.type = idx === chord.length - 1 ? 'triangle' : 'sine';
-    osc.frequency.setValueAtTime(freq, t);
-    gain.gain.setValueAtTime(0.12, t);
-    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.28);
-    osc.connect(gain);
-    gain.connect(ac.destination);
-    osc.start(t);
-    osc.stop(t + 0.28);
+  const ac = ready();
+  if (!ac) return;
+  [523.25, 659.25, 783.99, 1046.5, 1318.5].forEach((freq, idx, a) => {
+    const last = idx === a.length - 1;
+    tone(ac, { type: last ? 'triangle' : 'sine', from: freq, at: idx * 0.07, dur: last ? 0.5 : 0.3, vol: 0.1, detune: 4 });
   });
 }
 
-// 6. Upgrade Select: Power-up ascending sweep
 export function playUpgradeSelect() {
-  const ac = getContext();
-  if (!ac || ac.state !== 'running') return;
-  const now = ac.currentTime;
-
-  const osc = ac.createOscillator();
-  const gain = ac.createGain();
-
-  osc.type = 'triangle';
-  osc.frequency.setValueAtTime(440, now);
-  osc.frequency.exponentialRampToValueAtTime(920, now + 0.12);
-
-  gain.gain.setValueAtTime(0.12, now);
-  gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
-
-  osc.connect(gain);
-  gain.connect(ac.destination);
-
-  osc.start(now);
-  osc.stop(now + 0.12);
+  const ac = ready();
+  if (!ac) return;
+  tone(ac, { type: 'triangle', from: 440, to: 920, dur: 0.14, vol: 0.1 });
+  tone(ac, { from: 1320, at: 0.12, dur: 0.18, vol: 0.06 });
 }
 
-// 7. Player Hurt: Low dull thud
 export function playPlayerHit() {
-  const ac = getContext();
-  if (!ac || ac.state !== 'running') return;
-  const now = ac.currentTime;
-
-  const osc = ac.createOscillator();
-  const gain = ac.createGain();
-
-  osc.type = 'sawtooth';
-  osc.frequency.setValueAtTime(110, now);
-  osc.frequency.exponentialRampToValueAtTime(32, now + 0.14);
-
-  gain.gain.setValueAtTime(0.14, now);
-  gain.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
-
-  osc.connect(gain);
-  gain.connect(ac.destination);
-
-  osc.start(now);
-  osc.stop(now + 0.14);
+  const ac = ready();
+  if (!ac) return;
+  tone(ac, { type: 'sawtooth', from: 120, to: 30, dur: 0.18, vol: 0.14, lp: 900 });
+  noise(ac, { dur: 0.12, vol: 0.12, from: 1200, to: 200 });
 }
 
-// 8. Game Over: Grim descending progression
 export function playGameOver() {
-  const ac = getContext();
-  if (!ac || ac.state !== 'running') return;
-  const now = ac.currentTime;
-
-  const notes = [330, 293.66, 246.94, 196];
-  notes.forEach((freq, idx) => {
-    const t = now + idx * 0.14;
-    const osc = ac.createOscillator();
-    const gain = ac.createGain();
-    osc.type = 'sawtooth';
-    osc.frequency.setValueAtTime(freq, t);
-    gain.gain.setValueAtTime(0.10, t);
-    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
-    osc.connect(gain);
-    gain.connect(ac.destination);
-    osc.start(t);
-    osc.stop(t + 0.35);
+  const ac = ready();
+  if (!ac) return;
+  [330, 293.66, 246.94, 196, 164.81].forEach((freq, idx) => {
+    tone(ac, { type: 'sawtooth', from: freq, to: freq * 0.97, at: idx * 0.16, dur: idx === 4 ? 0.9 : 0.4, vol: 0.09, lp: 1400, detune: 6 });
   });
 }
 
-// 9. UI Click / Button Tap
 export function playUiClick() {
-  const ac = getContext();
-  if (!ac || ac.state !== 'running') return;
-  const now = ac.currentTime;
-
-  const osc = ac.createOscillator();
-  const gain = ac.createGain();
-
-  osc.type = 'sine';
-  osc.frequency.setValueAtTime(1400, now);
-  gain.gain.setValueAtTime(0.04, now);
-  gain.gain.exponentialRampToValueAtTime(0.001, now + 0.025);
-
-  osc.connect(gain);
-  gain.connect(ac.destination);
-
-  osc.start(now);
-  osc.stop(now + 0.025);
+  const ac = ready();
+  if (!ac) return;
+  tone(ac, { from: 1400, to: 1100, dur: 0.035, vol: 0.04 });
 }
 
-// 10. Tactical Nuke: Thunderous low explosion roar
 export function playNuke() {
-  const ac = getContext();
-  if (!ac || ac.state !== 'running') return;
-  const now = ac.currentTime;
-
-  // Sub-bass blast
-  const sub = ac.createOscillator();
-  const subGain = ac.createGain();
-  sub.type = 'sawtooth';
-  sub.frequency.setValueAtTime(80, now);
-  sub.frequency.exponentialRampToValueAtTime(20, now + 0.45);
-  subGain.gain.setValueAtTime(0.24, now);
-  subGain.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
-  sub.connect(subGain);
-  subGain.connect(ac.destination);
-  sub.start(now);
-  sub.stop(now + 0.45);
-
-  // High-frequency shockwave rumble
-  const roar = ac.createOscillator();
-  const roarGain = ac.createGain();
-  roar.type = 'square';
-  roar.frequency.setValueAtTime(120, now);
-  roar.frequency.exponentialRampToValueAtTime(30, now + 0.35);
-  roarGain.gain.setValueAtTime(0.14, now);
-  roarGain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
-  roar.connect(roarGain);
-  roarGain.connect(ac.destination);
-  roar.start(now);
-  roar.stop(now + 0.35);
+  const ac = ready();
+  if (!ac) return;
+  tone(ac, { type: 'sawtooth', from: 80, to: 18, dur: 0.8, vol: 0.22, lp: 600 });
+  tone(ac, { type: 'square', from: 120, to: 30, dur: 0.4, vol: 0.1, lp: 900 });
+  noise(ac, { dur: 1.0, vol: 0.3, from: 3000, to: 120 });
 }
 
-// 11. Overdrive: Electric charging power surge
 export function playOverdrive() {
-  const ac = getContext();
-  if (!ac || ac.state !== 'running') return;
-  const now = ac.currentTime;
-
-  const osc = ac.createOscillator();
-  const gain = ac.createGain();
-  osc.type = 'sawtooth';
-  osc.frequency.setValueAtTime(220, now);
-  osc.frequency.exponentialRampToValueAtTime(1200, now + 0.22);
-  gain.gain.setValueAtTime(0.12, now);
-  gain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
-  osc.connect(gain);
-  gain.connect(ac.destination);
-  osc.start(now);
-  osc.stop(now + 0.22);
+  const ac = ready();
+  if (!ac) return;
+  tone(ac, { type: 'sawtooth', from: 220, to: 1200, dur: 0.26, vol: 0.1, lp: 5000, detune: 8 });
+  noise(ac, { dur: 0.26, vol: 0.05, type: 'bandpass', from: 400, to: 4000, q: 2 });
 }
 
-// 12. Medkit: Pleasant restorative chime
 export function playHeal() {
-  const ac = getContext();
-  if (!ac || ac.state !== 'running') return;
-  const now = ac.currentTime;
-
-  [587.33, 739.99, 880].forEach((freq, idx) => {
-    const t = now + idx * 0.04;
-    const osc = ac.createOscillator();
-    const gain = ac.createGain();
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(freq, t);
-    gain.gain.setValueAtTime(0.08, t);
-    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.24);
-    osc.connect(gain);
-    gain.connect(ac.destination);
-    osc.start(t);
-    osc.stop(t + 0.24);
-  });
+  const ac = ready();
+  if (!ac) return;
+  [587.33, 739.99, 880, 1174.66].forEach((freq, idx) => tone(ac, { from: freq, at: idx * 0.05, dur: 0.3, vol: 0.07 }));
 }
 
-// 13. Super Magnet: Suction whoosh sweep
 export function playMagnet() {
-  const ac = getContext();
-  if (!ac || ac.state !== 'running') return;
-  const now = ac.currentTime;
-
-  const osc = ac.createOscillator();
-  const gain = ac.createGain();
-  osc.type = 'triangle';
-  osc.frequency.setValueAtTime(260, now);
-  osc.frequency.exponentialRampToValueAtTime(880, now + 0.18);
-  gain.gain.setValueAtTime(0.09, now);
-  gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
-  osc.connect(gain);
-  gain.connect(ac.destination);
-  osc.start(now);
-  osc.stop(now + 0.18);
+  const ac = ready();
+  if (!ac) return;
+  tone(ac, { type: 'triangle', from: 260, to: 880, dur: 0.22, vol: 0.08 });
+  noise(ac, { dur: 0.22, vol: 0.04, type: 'bandpass', from: 500, to: 3000, q: 3 });
 }
 
-// 14. Shield Deflection: High plasma bounce
 export function playShieldHit() {
-  const ac = getContext();
-  if (!ac || ac.state !== 'running') return;
-  const now = ac.currentTime;
-
-  const osc = ac.createOscillator();
-  const gain = ac.createGain();
-  osc.type = 'triangle';
-  osc.frequency.setValueAtTime(1100, now);
-  osc.frequency.exponentialRampToValueAtTime(540, now + 0.08);
-  gain.gain.setValueAtTime(0.12, now);
-  gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
-  osc.connect(gain);
-  gain.connect(ac.destination);
-  osc.start(now);
-  osc.stop(now + 0.08);
+  const ac = ready();
+  if (!ac) return;
+  tone(ac, { type: 'triangle', from: 1100, to: 540, dur: 0.1, vol: 0.1 });
+  noise(ac, { dur: 0.05, vol: 0.05, type: 'highpass', from: 4000 });
 }
 
-// 15. Shield Overload Break: Resonant shatter
 export function playShieldBreak() {
-  const ac = getContext();
-  if (!ac || ac.state !== 'running') return;
-  const now = ac.currentTime;
-
-  const osc = ac.createOscillator();
-  const gain = ac.createGain();
-  osc.type = 'sawtooth';
-  osc.frequency.setValueAtTime(320, now);
-  osc.frequency.exponentialRampToValueAtTime(55, now + 0.18);
-  gain.gain.setValueAtTime(0.16, now);
-  gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
-  osc.connect(gain);
-  gain.connect(ac.destination);
-  osc.start(now);
-  osc.stop(now + 0.18);
+  const ac = ready();
+  if (!ac) return;
+  tone(ac, { type: 'sawtooth', from: 320, to: 55, dur: 0.24, vol: 0.14, lp: 2000 });
+  noise(ac, { dur: 0.3, vol: 0.14, type: 'highpass', from: 6000, to: 1500 });
 }
 
-// 16. Shield Recharged: Gentle rising harmonic chime
 export function playShieldRecharge() {
-  const ac = getContext();
-  if (!ac || ac.state !== 'running') return;
-  const now = ac.currentTime;
-
-  [440, 880].forEach((freq, idx) => {
-    const t = now + idx * 0.06;
-    const osc = ac.createOscillator();
-    const gain = ac.createGain();
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(freq, t);
-    gain.gain.setValueAtTime(0.07, t);
-    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
-    osc.connect(gain);
-    gain.connect(ac.destination);
-    osc.start(t);
-    osc.stop(t + 0.22);
-  });
+  const ac = ready();
+  if (!ac) return;
+  [440, 660, 880].forEach((freq, idx) => tone(ac, { from: freq, at: idx * 0.06, dur: 0.26, vol: 0.06 }));
 }
 
-// 17. Boss Enraged Roar: Terrifying low-frequency beast roar
 export function playBossRoar() {
-  const ac = getContext();
-  if (!ac || ac.state !== 'running') return;
-  const now = ac.currentTime;
-
-  const roar1 = ac.createOscillator();
-  const gain1 = ac.createGain();
-  roar1.type = 'sawtooth';
-  roar1.frequency.setValueAtTime(160, now);
-  roar1.frequency.exponentialRampToValueAtTime(38, now + 0.55);
-  gain1.gain.setValueAtTime(0.24, now);
-  gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.55);
-  roar1.connect(gain1);
-  gain1.connect(ac.destination);
-  roar1.start(now);
-  roar1.stop(now + 0.55);
-
-  const roar2 = ac.createOscillator();
-  const gain2 = ac.createGain();
-  roar2.type = 'square';
-  roar2.frequency.setValueAtTime(120, now + 0.04);
-  roar2.frequency.exponentialRampToValueAtTime(44, now + 0.45);
-  gain2.gain.setValueAtTime(0.16, now + 0.04);
-  gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
-  roar2.connect(gain2);
-  gain2.connect(ac.destination);
-  roar2.start(now + 0.04);
-  roar2.stop(now + 0.45);
+  const ac = ready();
+  if (!ac) return;
+  tone(ac, { type: 'sawtooth', from: 160, to: 38, dur: 0.8, vol: 0.2, lp: 1200, detune: 12 });
+  tone(ac, { type: 'square', from: 120, to: 44, at: 0.04, dur: 0.55, vol: 0.12, lp: 800 });
+  noise(ac, { dur: 0.7, vol: 0.12, from: 900, to: 150 });
 }
 
-// 18. Electric Hazard Arc / Zap: High-voltage crackle
 export function playElectricZap() {
-  const ac = getContext();
-  if (!ac || ac.state !== 'running') return;
-  const now = ac.currentTime;
-
-  const osc = ac.createOscillator();
-  const gain = ac.createGain();
-  osc.type = 'sawtooth';
-  osc.frequency.setValueAtTime(360, now);
-  osc.frequency.exponentialRampToValueAtTime(70, now + 0.16);
-  gain.gain.setValueAtTime(0.12, now);
-  gain.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
-  osc.connect(gain);
-  gain.connect(ac.destination);
-  osc.start(now);
-  osc.stop(now + 0.16);
+  const ac = ready();
+  if (!ac || !allowZapVoice(ac.currentTime)) return;
+  tone(ac, { type: 'sawtooth', from: 360, to: 70, dur: 0.18, vol: 0.09, lp: 4000 });
+  noise(ac, { dur: 0.18, vol: 0.1, type: 'bandpass', from: 3500, to: 900, q: 4 });
 }
 
-// 19. Combo Milestone: Triumphant ascending fanfare
 export function playComboMilestone(tier = 1) {
-  const ac = getContext();
-  if (!ac || ac.state !== 'running') return;
-  const now = ac.currentTime;
-
+  const ac = ready();
+  if (!ac) return;
   const notes = tier === 3 ? [587, 740, 880, 1175] : (tier === 2 ? [523, 659, 784] : [587, 880]);
-  notes.forEach((freq, idx) => {
-    const t = now + idx * 0.05;
-    const osc = ac.createOscillator();
-    const gain = ac.createGain();
-    osc.type = tier >= 2 ? 'triangle' : 'sine';
-    osc.frequency.setValueAtTime(freq, t);
-    gain.gain.setValueAtTime(0.12, t);
-    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
-    osc.connect(gain);
-    gain.connect(ac.destination);
-    osc.start(t);
-    osc.stop(t + 0.22);
-  });
+  notes.forEach((freq, idx) => tone(ac, { type: tier >= 2 ? 'triangle' : 'sine', from: freq, at: idx * 0.05, dur: 0.24, vol: 0.1 }));
 }
 
-// 20. Blackout Alarm: Generator power-down spool and warning sirens
 export function playBlackoutAlarm() {
-  const ac = getContext();
-  if (!ac || ac.state !== 'running') return;
-  const now = ac.currentTime;
-
-  const osc = ac.createOscillator();
-  const gain = ac.createGain();
-  osc.type = 'sawtooth';
-  osc.frequency.setValueAtTime(180, now);
-  osc.frequency.exponentialRampToValueAtTime(32, now + 0.65);
-  gain.gain.setValueAtTime(0.22, now);
-  gain.gain.exponentialRampToValueAtTime(0.001, now + 0.65);
-  osc.connect(gain);
-  gain.connect(ac.destination);
-  osc.start(now);
-  osc.stop(now + 0.65);
-
-  [0.15, 0.42].forEach(delay => {
-    const beep = ac.createOscillator();
-    const beepGain = ac.createGain();
-    beep.type = 'square';
-    beep.frequency.setValueAtTime(880, now + delay);
-    beepGain.gain.setValueAtTime(0.12, now + delay);
-    beepGain.gain.exponentialRampToValueAtTime(0.001, now + delay + 0.12);
-    beep.connect(beepGain);
-    beepGain.connect(ac.destination);
-    beep.start(now + delay);
-    beep.stop(now + delay + 0.12);
-  });
+  const ac = ready();
+  if (!ac) return;
+  tone(ac, { type: 'sawtooth', from: 180, to: 32, dur: 0.8, vol: 0.2, lp: 800 });
+  [0.15, 0.42].forEach(at => tone(ac, { type: 'square', from: 880, at, dur: 0.12, vol: 0.1, lp: 3000 }));
 }
 
-// 21. Power Restored: Generator spin-up and breaker switch clack
 export function playPowerRestored() {
-  const ac = getContext();
-  if (!ac || ac.state !== 'running') return;
-  const now = ac.currentTime;
-
-  const osc = ac.createOscillator();
-  const gain = ac.createGain();
-  osc.type = 'triangle';
-  osc.frequency.setValueAtTime(45, now);
-  osc.frequency.exponentialRampToValueAtTime(360, now + 0.45);
-  gain.gain.setValueAtTime(0.20, now);
-  gain.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
-  osc.connect(gain);
-  gain.connect(ac.destination);
-  osc.start(now);
-  osc.stop(now + 0.45);
-
-  const click = ac.createOscillator();
-  const clickGain = ac.createGain();
-  click.type = 'sawtooth';
-  click.frequency.setValueAtTime(1200, now + 0.45);
-  clickGain.gain.setValueAtTime(0.16, now + 0.45);
-  clickGain.gain.exponentialRampToValueAtTime(0.001, now + 0.52);
-  click.connect(clickGain);
-  clickGain.connect(ac.destination);
-  click.start(now + 0.45);
-  click.stop(now + 0.52);
+  const ac = ready();
+  if (!ac) return;
+  tone(ac, { type: 'triangle', from: 45, to: 360, dur: 0.45, vol: 0.18 });
+  tone(ac, { type: 'sawtooth', from: 1200, at: 0.45, dur: 0.07, vol: 0.12, lp: 4000 });
+  noise(ac, { at: 0.45, dur: 0.08, vol: 0.12, type: 'bandpass', from: 2500, q: 2 });
 }

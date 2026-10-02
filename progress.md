@@ -65,3 +65,5 @@ Original prompt: Implement the approved endless difficulty director plan: 25-sec
 - Verification: `PLAYTEST_BROWSER='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' PLAYTEST_REQUIRE_BROWSER=1 node --test tests/*.test.mjs` passed all 38 tests with no skips on the final source. `git diff --check` passed.
 - Inspected all three combat styles and portrait/short-landscape/desktop selection screenshots. The supplied Playwright client finished with no page errors.
 - Remaining: physical-device use, native-speaker review of new translations, and human fun/pressure acceptance. Automated policies still survived all nine five-minute runs; do not claim the 3–5-minute pressure target is met.
+
+- Reworked audio (v3.8.1): shared compressor master bus, noise-textured SFX with voice caps, and a fuller 8-bar E-minor BGM with bass, arpeggio and soft drums. Full test suite passes.
