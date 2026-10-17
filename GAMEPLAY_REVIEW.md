@@ -2,31 +2,31 @@
 
 Review request: “Review the game level, end user complaint too easy, review codebase, output all bugs and update the .md”.
 
-Reviewed baseline: commit `ce22076`, app **3.8.3**. This is a review and documentation update; game code, tuning, tests, releases, and stored scores were not changed. Source locations below refer to this baseline.
+Reviewed baseline: commit `ce22076`, app **3.8.3**. The findings below refer to that reviewed baseline; their fixes and follow-up evidence are recorded against app **3.8.4**.
 
 ## Result
 
-The complaint is supported by repeatable low-pressure runs, but difficulty is inconsistent across seeds and room geometry. All nine existing world-aware synthetic runs reached five minutes at full HP/shield again. A simpler controller, with no Dash or enemy awareness, also finished three of six trials at full HP/shield; the other three died before 132 seconds. Increasing every enemy's health or count would risk making the difficult openings worse while preserving the easy late-game loop.
+The complaint was supported by repeatable low-pressure runs, with outcomes varying by seed and room geometry. After the fixes and tuning, the world-aware synthetic controller survived eight of nine five-minute runs; the first-card/no-Dash square-movement controller survived one of six, while five died between 44 and 178 seconds. These controlled results show more damage exposure and greater risk, but they do not establish the intended 3–5-minute pressure for familiar players.
 
-This review found **11 confirmed defects**, **six balance/UX concerns**, and gaps in difficulty acceptance. These are all confirmed findings from the reviewed code and scenarios, not a guarantee that no other defects exist. Functional regression checks pass despite these uncovered cases.
+The review found **11 confirmed defects** and **six balance/UX concerns**. All 11 defects now have fixes and targeted regression coverage. The balance changes address the six concerns, while human acceptance, physical-device play, and a real two-release PWA update cycle remain unverified.
 
 ## Confirmed defect register
 
-P1 means high-impact gameplay or release correctness; P2 means a functional defect; P3 means a lower-impact presentation or feedback defect. Every item below remains **open**.
+P1 means high-impact gameplay or release correctness; P2 means a functional defect; P3 means a lower-impact presentation or feedback defect. All listed findings are **fixed in app 3.8.4**.
 
-| ID | Priority | Finding | Source |
-| --- | --- | --- | --- |
-| F01 | P1 | Enemies can remain permanently pinned behind cover | `src/entities.js:449–479,1200–1271` |
-| F02 | P1 | Service-worker updates can mix HTML and modules from different versions | `service-worker.js:67–92` |
-| F03 | P2 | Player bullets can cross cover or damage a target before cover intercepts them | `src/entities.js:1093–1176` |
-| F04 | P2 | Queued level-up rewards are lost when upgrade choices run out | `src/entities.js:640–648,697–706` |
-| F05 | P2 | Simulation continues mutating results after lethal hazard damage | `src/entities.js:1332–1377` |
-| F06 | P2 | Guaranteed blackout supplies disappear at the pickup cap | `src/entities.js:378–397,999–1008` |
-| F07 | P2 | Short desktop viewports permit offscreen player movement | `src/main.js:19–20,33–37` |
-| F08 | P2 | Enabling automatic selection inside an already-open upgrade dialog does nothing | `src/game-ui.js:78–99` |
-| F09 | P2 | Movement shortcuts consume keyboard input intended for Settings controls | `src/input.js:53–64` |
-| F10 | P3 | Share Run claims a successful copy when the Clipboard API is unavailable | `src/main.js:231–240` |
-| F11 | P3 | Maximum-level build chips expose an untranslated internal key | `src/game-ui.js:300`, `src/i18n.js:1305–1315` |
+| ID | Priority | Finding | Source | Status |
+| --- | --- | --- | --- | --- |
+| F01 | P1 | Enemies can remain permanently pinned behind cover | `src/entities.js:449–479,1200–1271` | Fixed; routing tests pass |
+| F02 | P1 | Service-worker updates can mix HTML and modules from different versions | `service-worker.js:67–92` | Fixed; cache and offline tests pass |
+| F03 | P2 | Player bullets can cross cover or damage a target before cover intercepts them | `src/entities.js:1093–1176` | Fixed; swept-impact tests pass |
+| F04 | P2 | Queued level-up rewards are lost when upgrade choices run out | `src/entities.js:640–648,697–706` | Fixed; queued/exhausted cases pass |
+| F05 | P2 | Simulation continues mutating results after lethal hazard damage | `src/entities.js:1332–1377` | Fixed; lethal-step browser test passes |
+| F06 | P2 | Guaranteed blackout supplies disappear at the pickup cap | `src/entities.js:378–397,999–1008` | Fixed; 0/7/8 pickup cases pass |
+| F07 | P2 | Short desktop viewports permit offscreen player movement | `src/main.js:19–20,33–37` | Fixed; 1280×320 browser test passes |
+| F08 | P2 | Enabling automatic selection inside an already-open upgrade dialog does nothing | `src/game-ui.js:78–99` | Fixed; off→on timer test passes |
+| F09 | P2 | Movement shortcuts consume keyboard input intended for Settings controls | `src/input.js:53–64` | Fixed; focused-control test passes |
+| F10 | P3 | Share Run claims a successful copy when the Clipboard API is unavailable | `src/main.js:231–240` | Fixed; unavailable/rejected cases pass |
+| F11 | P3 | Maximum-level build chips expose an untranslated internal key | `src/game-ui.js:300`, `src/i18n.js:1305–1315` | Fixed; all seven locales pass |
 
 ### F01 — Enemy pursuit deadlocks against pillars
 
@@ -35,7 +35,7 @@ Enemies always move directly toward the player, then obstacle resolution pushes 
 - **Reproduce:** place a pillar at `(200,200,46,40)`, a stationary player at `(300,220)`, and a walker at `(180,220)` with radius 13 and speed 50. Disable firing, hazards, and new spawns. Advance 600 steps of `1/60` second. The walker remains at **`(187,220)`**, with the player at full HP/shield. A corresponding Boss fixture also remained blocked for ten seconds.
 - **Expected:** an enemy blocked by cover should eventually navigate around it or use an explicitly designed alternate attack.
 - **Suggested fix:** add bounded obstacle-aware steering or routing, with a stuck-state escape. Keep pillars solid and preserve charge telegraphs.
-- **Acceptance:** repeat on all four pillar faces, at corners, and with walkers, runners, tanks, and Bosses. Verify that movement resolves the obstruction without teleporting, crossing solid cover, or creating an unavoidable attack.
+- **Resolution (3.8.4):** added visibility-graph waypoints around radius-expanded obstacles for pursuit; active Boss/swift charge telegraphs keep their locked direction. Regression coverage exercises direct pursuit, a centerline pillar deadlock, multiple obstacles, and a live walker route. All four faces and every enemy type still need broader movement coverage.
 
 ### F02 — PWA cache versions are not coherent
 
@@ -44,7 +44,7 @@ Navigation returns network HTML immediately while scripts are served from cache.
 - **Reproduce:** execute the unchanged service worker with an old active cache and a newly deployed server. Navigation returns **new HTML**, while the first `main.js` fetch returns **old main**. After revalidation, the old cache can contain **old index / new main / old entities**. This was confirmed using an isolated Node VM with controlled fetch/cache responses; a real two-release browser deployment was not performed.
 - **Impact:** an incompatible update can break the current game or a later offline startup before the player accepts Update.
 - **Suggested fix:** keep shell assets immutable within a release cache and make navigation, dependency loading, and waiting-worker activation use a coherent release. Preserve the explicit update flow.
-- **Acceptance:** install release A, publish incompatible release B in an isolated fixture, decline Update, reload online and offline, then accept Update. Each session must use a complete A or complete B asset set, including subsequent requests from already-open tabs.
+- **Resolution (3.8.4):** controlled navigation and module requests now use the installed release cache first; uncached requests are fetched without mutating that release. Bumped the worker/app shell to 3.8.4 and precached the navigation module. The Node VM regression simulates stale release A against release B responses, and the browser offline-start test passes. A deployed two-release accept/decline cycle remains untested.
 
 ### F03 — Player bullet collision is neither swept nor ordered by impact
 
@@ -53,7 +53,7 @@ Unlike enemy projectile collision in `ranged-combat.js`, player bullets only tes
 - **Corner crossing:** pillar `(180,210,46,40)`; bullet starts `(176,211)`, velocity `(460,-100)`, radius 3.5, `dt=0.034`. The segment crosses the corner but the bullet survives at **`(191.64,207.6)`**.
 - **Wrong impact order:** same pillar; static enemy at `(239,220)`, radius 13, HP 100; bullet starts `(224,205)`, velocity `(0,460)`, radius 3.5, `dt=0.034`. The pillar is encountered first, but enemy HP becomes **99** before the bullet is removed.
 - **Suggested fix:** use radius-aware swept intersections for both cover and enemies, resolving the earliest contact. Continue piercing only through permitted enemy hits.
-- **Acceptance:** cover before enemy, enemy before cover, grazing corners, narrow target crossings, piercing, and multiple frame intervals must produce consistent results. Keep enemy-projectile regressions passing.
+- **Resolution (3.8.4):** added radius-aware swept traces, sorted target impacts by travel time, made cover win when encountered first, and made auto-aim prefer targets with clear line of sight. Piercing continues through ordered visible hits; chain arcs also respect cover. Unit and browser regressions cover targets before/behind cover and piercing order; existing enemy-shot tests pass.
 
 ### F04 — Exhausted upgrade queues underpay earned rewards
 
@@ -61,7 +61,7 @@ When the last available choice is consumed, the code awards one `+50 HP` fallbac
 
 - **Reproduce:** complete Arc/Fork/Tesla and all ordinary upgrades except Magnet at level 2. Set HP to `1/225` and queue three earned upgrades. Select the final Magnet card. Result: **51 HP, zero pending upgrades**. The two remaining fallback rewards should give **101 HP**.
 - **Suggested fix:** consume each earned upgrade exactly once, including consecutive fallback rewards, with the normal maximum-HP clamp.
-- **Acceptance:** test zero, one, and multiple remaining choices; several queued levels from Super Magnet; and a queue that starts with every choice already exhausted. No reward may disappear or repeat.
+- **Resolution (3.8.4):** each unavailable queued level now restores 25 HP, clamps at max HP, and drains the entire queue. Browser regressions cover a final available choice followed by two fallback levels and a queue that starts exhausted.
 
 ### F05 — Lethal hazards do not stop the current simulation step
 
@@ -69,7 +69,7 @@ Enemy and projectile damage paths return when the player dies. The hazard path d
 
 - **Reproduce:** player HP 1/shield 0; one active hazard overlaps the player; a second active hazard overlaps a static enemy at HP 1. Both have `tickTimer=0`. After one `1/60` step, defeat shows **score 0 / kills 0**, but game state contains **score 10.0187 / kills 1** and the enemy has disappeared.
 - **Suggested fix:** end simulation processing immediately after lethal hazard damage, using the same finalization boundary as other death sources.
-- **Acceptance:** visible results, shared summary, best score, and final telemetry must agree and remain frozen after lethal damage, including multiple hazards in the same frame.
+- **Resolution (3.8.4):** the update returns as soon as hazard damage ends the run, before later hazards or score/checkpoint mutation. Browser regression confirms the next hazard and score remain untouched after death.
 
 ### F06 — Guaranteed blackout rewards are silently dropped
 
@@ -77,7 +77,7 @@ The two blackout reward calls use the ordinary eight-pickup cap. This contradict
 
 - **Reproduce:** end a blackout with zero, seven, and eight active pickups positioned away from the player. Observed new cache rewards: **2, 1, and 0**, respectively.
 - **Suggested fix:** reserve or replace pickup slots for guaranteed rewards under an explicit bounded policy. Apply a consistent policy to Boss rewards as well.
-- **Acceptance:** ending a blackout with pools of 0, 7, or 8 must create two identifiable cache rewards without unbounded pool growth.
+- **Resolution (3.8.4):** blackout bundles reserve two slots by evicting pickups nearest expiry; single Boss supplies also displace one expiring pickup at capacity. The pool stays capped at eight and browser regressions confirm two new cache rewards with initial pools of 0, 7, and 8.
 
 ### F07 — A minimum simulated height creates invisible play space
 
@@ -85,7 +85,7 @@ The two blackout reward calls use the ordinary eight-pickup cap. This contradict
 
 - **Reproduce:** Chrome, fine pointer, `1280×320`. Simulation/canvas height is **420**, room bottom **402**. Hold Down for two simulation seconds: player center is **y=389**, radius 13, entirely below the visible 320-pixel window.
 - **Suggested fix:** derive the playable bounds from the visible viewport and available HUD/control area, with a deliberate compact layout for short windows.
-- **Acceptance:** the full player circle and necessary controls remain visible at `1280×320`, `844×390`, and the supported mobile portrait/landscape sizes after movement, resize, and Dash.
+- **Resolution (3.8.4):** canvas height now follows the actual viewport, and room bounds use a compact minimum that fits short windows. Browser regression resizes to `1280×320` and checks the room and full player circle remain on-screen. Physical devices and every short mobile layout remain to be checked.
 
 ### F08 — Off-to-on automatic selection loses its chooser
 
@@ -93,7 +93,7 @@ The two blackout reward calls use the ordinary eight-pickup cap. This contradict
 
 - **Reproduce:** disable automatic selection; open an earned upgrade; enable its checkbox; wait 3.5 visible seconds. The dialog remains open, the progress indicator stays hidden, and no choice is applied.
 - **Suggested fix:** retain the current dialog's chooser independently of whether its timer is enabled.
-- **Acceptance:** off→on, on→off→on, queued dialogs, background/foreground, and manual selection all apply at most one choice at the correct time.
+- **Resolution (3.8.4):** the dialog now retains its chooser even while auto-pick is off, allowing the existing setting-change handler to start the timer when enabled. Browser regression opens with the option off, enables it in-place, and observes exactly one recorded choice.
 
 ### F09 — Settings does not own its movement-key input
 
@@ -101,7 +101,7 @@ The global key handler prevents default behavior for WASD/arrow keys without che
 
 - **Reproduce:** open Settings, focus `#languageSelect`, and press ArrowDown. The event is **default-prevented** and `input.down` becomes **true** while focus remains on the select. Native keyboard language selection is blocked.
 - **Suggested fix:** respect interactive controls and modal ownership; still clear gameplay key state when keys are released or focus changes.
-- **Acceptance:** all seven languages can be selected by keyboard. Navigating Settings must not move the character or leave a movement key active after closing it.
+- **Resolution (3.8.4):** movement keydown now yields to focused text/select controls and open Settings; keyup still clears a movement key that was pressed before focus changed. Browser regression checks a focused language selector does not prevent ArrowDown or set movement input.
 
 ### F10 — Share Run has false-success and silent-failure branches
 
@@ -109,7 +109,7 @@ The missing-API branch displays “RUN SUMMARY COPIED!” without copying. A rej
 
 - **Reproduce:** make `navigator.clipboard` unavailable in an isolated browser fixture and click Share Run. A success message appears with no clipboard operation. Inspecting the rejection branch also confirms that it has no error feedback.
 - **Suggested fix:** announce success only after a successful copy; offer a selectable summary or clear failure feedback when copying is unavailable or denied.
-- **Acceptance:** available/success, unavailable, and rejected clipboard cases each give truthful feedback and a usable next action.
+- **Resolution (3.8.4):** success appears only after `writeText()` resolves; missing or rejected clipboard access shows a translated failure message in each supported locale. Browser regression exercises both failure paths. A selectable manual-copy fallback is not included.
 
 ### F11 — Defeat build summary leaks a missing translation key
 
@@ -117,7 +117,7 @@ Maximum ordinary upgrade chips request `t('upgradeMaxLevel')`, but this key is a
 
 - **Reproduce:** die with any maximum-level ordinary upgrade. The chip displays **`UPGRADEMAXLEVEL`**. Calling `t('upgradeMaxLevel')` returns the raw key in **en, zh, ms, ja, ko, vi, and th**. Confirmed in the mobile defeat screenshot and dictionary checks.
 - **Suggested fix:** use the existing appropriate maximum-level label or add the required label to all seven dictionaries.
-- **Acceptance:** maximum-level chips show a translated label in every locale; no rendered summary contains an internal key.
+- **Resolution (3.8.4):** added a localized maximum-level label to all seven dictionaries. Browser regression checks the rendered English chip and verifies both new labels resolve in every locale.
 
 ## Balance and UX concerns — separate from defects
 
@@ -127,44 +127,44 @@ These behaviors follow current constants or policies. They explain the complaint
 
 `src/entities.js:519–608` permits ordinary damage **3.71293**, firing interval **0.140881 seconds**, three projectiles, three direct-hit targets per piercing bullet, and 60% critical chance, before exclusive builds, combo bonuses, or Overdrive. The starting damage/interval are 1/0.38 seconds.
 
-By comparison, `wave-director.js:72–74` and `entities.js:290–293,490–495` give the following unarmored HP:
+In 3.8.4, enemy progression is stronger while the player upgrade multipliers stay unchanged. `wave-director.js` and `entities.js` now produce:
 
 | Wave / scheduled time | Walker | Boss |
 | --- | --- | --- |
-| 8 / 175 seconds | 3.801 | 44.6 |
-| 12 / 275 seconds | 4.998 | 60.8 |
+| 8 / 175 seconds | 4.347 | 52.6 |
+| 12 / 275 seconds | 5.901 | 73.8 |
 
-Arc chains, Scatter displacement, critical hits, and pickups amplify an already strong ordinary progression. Actual DPS depends on aim, cover, and hit geometry; these figures are capability comparisons, not measured hit rates. Measure time-to-kill, Boss lifetime, upgrade timing, and live enemy count before changing health multipliers.
+Arc chains, Scatter displacement, critical hits, and pickups still amplify progression. Actual DPS depends on aim, cover, and hit geometry; these figures are capability comparisons, not measured hit rates. The 3.8.4 five-minute trials recorded more damage events and spitter shots, while real-player time-to-kill and Boss lifetime remain unknown.
 
 ### B02 — Boss charges are slower than normal player movement
 
-Player speed starts at **180 px/s**, reaches **300** through Agility, and can receive a ×1.25 combo bonus (`entities.js:31,583,1040`). Boss frenzy dash speed is only **111.72** at wave 8 and **127.68** at wave 12 (`:496,1225`). Ordinary enemy movement is capped at 160 (`wave-director.js:7`).
+Player speed starts at **180 px/s**, reaches **300** through Agility, and can receive a ×1.25 combo bonus. Boss speed is now `40 + 2.2 × wave`; its normal/frenzy charge factors are 2.45/2.9, with a ×1.42 frenzy movement scale. At waves 8 and 12, the frenzy dash speeds are about **237** and **273 px/s**, respectively. Ordinary enemy movement is capped at 180.
 
-At these stages, the telegraphed Boss charge cannot close distance against straight-line base movement in open space. Room edges, interception, Frost, and other enemies can still cause damage. Evaluate closing speed and attack coverage while retaining readable warnings and mobile counterplay.
+The faster telegraphed charge can now catch a base-speed player during frenzy while preserving the warning window and escape counterplay. Physical-device readability and experienced-player reaction time remain untested.
 
 ### B03 — Base spawn escalation saturates before three minutes
 
-`getSpawnInterval()` reaches its **0.22-second floor at approximately 129.48 seconds**, in wave 6. Time and wave increases no longer raise base spawn frequency after that point. Phase multipliers still lower the effective rate during blackout and Boss waves; recovery and relief reduce it further.
+`getSpawnInterval()` now has a **0.18-second floor**, reached at about **138 seconds** in wave 6. The safety floor still caps late base frequency, but allows 22% more spawns at the floor than the former 0.22-second value. The per-wave health curve continues to rise after the floor; recovery and relief remain bounded.
 
 The floor is a deliberate safety bound, not a defect. Assess composition, coordinated attack opportunities, and meaningful stage changes within the existing entity/performance caps instead of relying entirely on a faster spawn timer.
 
 ### B04 — Keeping a Boss alive suppresses other threats
 
-`wave-director.js:159–173` limits ordinary spawn rate to at most 0.42 during an active Boss, prevents new spitters, and discards later Boss/blackout events. Together with slow charges and F01, kiting or trapping a Boss can turn later pressure waves into reduced-rate melee encounters.
+The director still discards later Boss/blackout events while a Boss is alive, but the 3.8.4 carryover cap is 0.68 instead of 0.42 and buildup/pressure waves can add spitters within their quota. This increases support spawn frequency while a Boss remains alive; late Boss health and support exposure increased in the fixed-seed runs.
 
-Simply increasing Boss HP could prolong this condition. Measure pressure during living-Boss carryover separately from Boss-death recovery before changing either durability or spawn policy. Existing spitters can still attack; the policy suppresses new ones.
+Boss-death recovery is four seconds, while the reduced support spawn interval and restored spitter eligibility apply only during a living-Boss carryover on buildup/pressure waves. The Boss and blackout phase rules remain distinct.
 
 ### B05 — Growth and recovery erase attrition
 
-The current complete build requires 32 earned selections: 29 ordinary purchases plus path, specialization, and evolution. Reaching level 33 costs **1,414 cumulative XP** under `entities.js:720–728`, although choices and collection timing determine when it happens. After choices are exhausted, level-ups heal 50; Vitality also increases maximum HP and heals during growth.
+The current complete build requires 32 earned selections: 29 ordinary purchases plus path, specialization, and evolution. Reaching level 33 costs **1,414 cumulative XP**, although choices and collection timing determine when it happens. Exhausted queued levels now heal 25 HP each instead of collapsing to one 50-HP reward; Vitality restores 25 HP per selection instead of 40.
 
-Maximum HP is 225; the 40-point shield regenerates at 16 points per second after four seconds without damage (`:988–992`). Contact damage remains 8/11/17/24 for runner/walker/tank/Boss (`:291–293,497`). Environmental damage, medkits, nukes, and combo bonuses add more safety or free kills. Compare net HP loss, healing received, shield downtime, and pickup use across builds rather than balancing from final HP alone.
+Maximum HP remains 225. The 40-point shield regenerates at 12 points per second after four seconds without damage, and the director's recovery/relief periods are shorter and less frequent. Contact damage remains 8/11/17/24 for runner/walker/tank/Boss. Environmental damage, medkits, nukes, and combo bonuses still add safety or free kills. The new six-run simple-controller sample has one 300-second survivor and five deaths at 44–178 seconds; a human survival curve is still needed.
 
 ### B06 — Automatic aim repeatedly selects an obstructed target
 
-`entities.js:319–328` selects the nearest enemy without testing whether it is attackable. With player `(150,230)`, pillar `(180,210,46,40)`, a covered enemy `(239,230)`, and a clear enemy `(150,350)`, ten seconds of ordinary auto-fire damages neither enemy. Both enemies were static in this fixture.
+In the reviewed baseline, `entities.js:319–328` selected the nearest enemy without testing whether it was attackable. In 3.8.4 auto-aim skips targets whose direct shot intersects cover, then chooses the nearest visible target. Enemies still route around obstacles, and Tesla arcs now obey line of sight.
 
-Nearest-target selection may be an intentional movement puzzle, so this is a confirmed UX limitation rather than a contract violation. If automatic targeting is meant to choose a useful target, prefer a visible enemy and provide a deliberate fallback when all targets are covered. Recheck all build paths, whose attacks have different ranges and effects.
+When all enemies are hidden behind cover, the player waits for a visible route rather than firing through a pillar; no manual aim mode was added. The path-specific attack styles share the same cover ordering, though a broader human check of each build remains useful.
 
 ## Verification performed
 
@@ -175,13 +175,13 @@ PLAYTEST_BROWSER='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' 
 PLAYTEST_REQUIRE_BROWSER=1 node --test tests/*.test.mjs
 ```
 
-Result on the reviewed source: **41 passed, 0 failed, 0 skipped**, approximately 56.5 seconds, Node 23.10.0 / local Chrome 155. This covers the existing pure rules, browser integrations, replay, build choices, mobile interactions, and offline startup. No production code or tests were changed to obtain this result.
+At the 3.8.3 review baseline, **41 passed, 0 failed, 0 skipped** in about 56.5 seconds on Node 23.10.0 / local Chrome 155. Those checks did not cover F01–F11.
 
-Controlled defect probes deliberately produced the failures described in F01–F11. Passing the existing suite therefore does not clear these findings. Browser fixture runs reported no uncaught runtime exceptions; the inspected local page's document/modules returned HTTP 200 with no console warnings/errors at inspection.
+On the fixed 3.8.4 source, the same Chrome-required command passes **53 tests, 0 failed, 0 skipped**. New unit/browser coverage exercises all 11 findings, director tuning, and cache coherence. Browser regressions reported no uncaught runtime exceptions.
 
-### Existing world-aware synthetic controller
+### Baseline world-aware synthetic controller (3.8.3)
 
-Re-ran `tests/director.browser.test.mjs` across seeds 42, 160501, and 202602 and its three policies:
+The v3.8.3 baseline results from `tests/director.browser.test.mjs` across seeds 42, 160501, and 202602 were:
 
 | Policy / resulting path | Survived to 300s | Final HP / shield | Damage events | Spitter shots |
 | --- | --- | --- | --- | --- |
@@ -191,7 +191,30 @@ Re-ran `tests/director.browser.test.mjs` across seeds 42, 160501, and 202602 and
 
 Kills ranged from 726 to 747. This controller reads enemy/hazard/orb positions, selects safe movement directions, collects XP, and uses Dash. It demonstrates a survivable strategy, not representative human difficulty.
 
-### Simpler controller, without enemy awareness or Dash
+### Post-fix synthetic comparisons (3.8.4)
+
+The same world-aware controller and seeds were run after the 3.8.4 changes. Eight of nine runs reached 300 seconds at 225 HP/40 shield; the first-card Arc run on seed 160501 died at 129.38 seconds. Surviving runs recorded 1–20 damage events and 8–23 spitter shots, compared with the lower exposure in the baseline samples above.
+
+| Policy / resulting path | Survived to 300s | Damage events | Spitter shots |
+| --- | --- | --- | --- |
+| Offense / Scatter | 3 / 3 | 1–3 | 8–16 |
+| First card / Arc | 2 / 3 | 2–19 | 9–22 |
+| Mobility / Mobile Striker | 3 / 3 | 10–20 | 18–23 |
+
+The simple first-card/no-Dash loop was repeated with six fixed seed/viewport cases in `tests/gameplay-review-regressions.browser.test.mjs`:
+
+| Viewport | Seed | Outcome / seconds | Final HP / shield |
+| --- | --- | --- | --- |
+| 1200×685 | 42 | Death at 43.95 | 0 / 0 |
+| 1200×685 | 160501 | Alive at 300 | 225 / 40 |
+| 1200×685 | 202602 | Death at 123.10 | 0 / 0 |
+| 390×844 | 42 | Death at 46.05 | 0 / 0 |
+| 390×844 | 160501 | Death at 178.02 | 0 / 0 |
+| 390×844 | 202602 | Death at 129.43 | 0 / 0 |
+
+The no-Dash controller is deliberately simple and does not stand in for a human. Together these samples show that skilled movement remains survivable while a controller that never avoids threats or uses Dash is at much greater risk.
+
+### Baseline simple controller, without enemy awareness or Dash (3.8.3)
 
 Used the existing isolated browser harness with a fresh page for each seed, a fixed 1/60-second simulation step, and first-card selection immediately on every upgrade. Move **Right, Down, Left, Up**, changing direction every one simulation second; evaluate movement in 100ms batches. No enemy positions are read to decide movement; no Dash, stat injection, or enemy removal is used. Touch emulation is enabled for the phone viewport; movement is synthetic keyboard state in both viewports, not physical touch.
 
@@ -208,7 +231,7 @@ An independent repeat in the same harness reproduced all six rows. Recording sto
 
 **Geometry limitation:** a separate headed Chrome DevTools run at nominally 390×844 with seed 202602 died at 112.23 seconds. Its measured room started at y=82.5 with height 627.5; the headless harness room started at y=74.25 with height 635.75. The room is derived from rendered HUD geometry, so seed and nominal viewport alone do not specify identical physics across browser/layout environments. Preserve the browser mode, room dimensions, settings, and action policy when comparing tuning experiments. This difference remains a validation limit, not proof of a new root-cause defect.
 
-### Difficulty acceptance gaps
+### Remaining difficulty acceptance gaps
 
 - `tests/director.browser.test.mjs:169–174` accepts both death and time-cap outcomes. It verifies safe execution/replay, not whether familiar players feel pressure after 3–5 minutes. Do not turn a synthetic full-health run into a passing difficulty claim.
 - The current policies omit representative physical touch behavior, mistakes, reaction delays, and upgrade decision time. Instant card selection also omits real-time automatic-selection waiting, although simulation is paused during the dialog.
@@ -216,10 +239,9 @@ An independent repeat in the same harness reproduced all six rows. Recording sto
 - Real iOS/Android devices, a real incompatible-release update cycle, translation fluency, and human enjoyment were not validated by this review.
 - Retain the existing human gate: at least five familiar players, with at least three reporting a clear pressure increase around minutes 3–5, understanding the main damage/counterplay, and wanting another run. Define the desired survival curve with those results before choosing numerical difficulty targets.
 
-## Recommended implementation order
+## Remaining validation
 
-1. Fix F01/F03 so cover and enemy movement behave predictably, and F02 so update behavior is coherent. Re-run their exact failure cases before tuning difficulty.
-2. Fix F04–F11 with focused regression cases. Keep existing input, pause, replay, offline, and build tests passing.
-3. Establish a balance baseline across identical room geometry, seeds, all three paths, first-card selection, and simple/human movement. Track Boss lifetime, first HP damage, time-to-kill, upgrade timing, healing, shield downtime, and ranged-attack exposure.
-4. Tune B01–B05 together against the agreed pressure/survival targets; preserve caps, readable telegraphs, and mobile escape opportunities. Decide B06's intended targeting policy explicitly.
-5. Run familiar-player sessions and physical-device checks, then record whether the original complaint is resolved. No difficulty fix or release is claimed by this documentation review.
+- Recruit at least five familiar players. At least three should report a clear pressure increase around minutes 3–5, understand the main damage/counterplay, and want another run. The synthetic trials cannot establish this acceptance gate.
+- Exercise a deployed v3.8.3→3.8.4 service-worker update with players who decline and accept the update, both online and offline.
+- Check controls, room geometry, and charge readability on real iOS/Android devices.
+- Expand enemy-routing coverage across all enemy types and obstacle approaches, and inspect each build's cover/chain behavior in a headed browser.

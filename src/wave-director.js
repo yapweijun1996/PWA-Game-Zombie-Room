@@ -1,12 +1,12 @@
 // All pacing and difficulty rules live here; the director never mutates combat entities.
 export const DIRECTOR_CONFIG = Object.freeze({
   waveSeconds: 25, wavesPerStage: 4, warningSeconds: 3,
-  blackoutOffset: 8, blackoutSeconds: 12, recoverySeconds: 6,
-  reliefSeconds: 3, reliefCooldown: 25, damageWindow: 5, damageThreshold: 0.2,
-  nearbyRadius: 90, nearbyThreshold: 8,
-  maxEnemies: 90, maxMoveSpeed: 160, maxChargeSpeed: 360,
-  phaseRates: Object.freeze([0.75, 1, 0.65, 0.42]), recoveryRate: 0.25,
-  healthPerWave: 0.08, bossHealthPerWave: 0.14, healthPerStage: 0.25,
+  blackoutOffset: 8, blackoutSeconds: 12, recoverySeconds: 4,
+  reliefSeconds: 2.25, reliefCooldown: 30, damageWindow: 5, damageThreshold: 0.25,
+  nearbyRadius: 90, nearbyThreshold: 9,
+  maxEnemies: 90, maxMoveSpeed: 180, maxChargeSpeed: 360,
+  phaseRates: Object.freeze([0.82, 1.12, 0.72, 0.55]), recoveryRate: 0.25,
+  healthPerWave: 0.11, bossHealthPerWave: 0.19, healthPerStage: 0.3,
   eliteBase: 0.12, elitePerWave: 0.025, eliteCap: 0.4
 });
 
@@ -72,7 +72,7 @@ export function getWavePlan(seed, wave) {
     healthScale: 1 + DIRECTOR_CONFIG.healthPerWave * (wave - 1) + DIRECTOR_CONFIG.healthPerStage * cycle,
     bossHealthScale: 1 + DIRECTOR_CONFIG.bossHealthPerWave * (wave - 1) + DIRECTOR_CONFIG.healthPerStage * cycle,
     eliteChance: Math.min(DIRECTOR_CONFIG.eliteCap, DIRECTOR_CONFIG.eliteBase + wave * DIRECTOR_CONFIG.elitePerWave),
-    spitterLimit: wave < 5 ? 0 : Math.min(4, cycle + 1)
+    spitterLimit: wave < 5 ? 0 : Math.min(6, cycle + 2)
   };
 }
 
@@ -102,7 +102,7 @@ export function selectEnemyType(plan, roll, { walkersOnly = false, allowSpitter 
 }
 
 export function getSpawnInterval(elapsed, wave, rate) {
-  return Math.max(0.22, 0.82 - elapsed * 0.0038 - wave * 0.018) / rate;
+  return Math.max(0.18, 0.82 - elapsed * 0.0038 - wave * 0.018) / rate;
 }
 
 export function capEnemySpeed(speed, charging = false) {
@@ -166,10 +166,10 @@ export function advanceDirector(state, context) {
     }
   }
   const bossPressure = hasBoss || event === 'boss';
-  const spawnRate = recovering ? DIRECTOR_CONFIG.recoveryRate : Math.min(plan.spawnRate, bossPressure ? DIRECTOR_CONFIG.phaseRates[3] : 1);
+  const spawnRate = recovering ? DIRECTOR_CONFIG.recoveryRate : Math.min(plan.spawnRate, bossPressure ? 0.68 : 1);
   return {
     plan, enteredWave, warning, event, events, spawnRate,
     pausedSpawns: relieved, walkersOnly: recovering,
-    allowSpitter: plan.phase < 2 && !bossPressure && !blackoutActive && !recovering && !relieved
+    allowSpitter: plan.phase < 2 && !blackoutActive && !recovering && !relieved
   };
 }

@@ -1,6 +1,6 @@
 'use strict';
 
-const APP_VERSION = '3.8.3';
+const APP_VERSION = '3.8.4';
 const CACHE_NAME = 'zombie-room-v' + APP_VERSION;
 const APP_SHELL = [
   './',
@@ -20,6 +20,7 @@ const APP_SHELL = [
   './src/telegraphed-charge.js',
   './src/wave-director.js',
   './src/ranged-combat.js',
+  './src/enemy-navigation.js',
   './src/builds.js',
   './src/focus-trap.js',
   './src/game-ui.js',
@@ -68,29 +69,14 @@ self.addEventListener('fetch', event => {
 
   if (request.mode === 'navigate') {
     event.respondWith(
-      // The shell is cached at install time together with its modules, so a
-      // navigation never rewrites it: that avoids storing error pages and
-      // pairing a newer index.html with an older cached module set.
-      fetch(request)
-        .catch(() => caches.match('./index.html').then(cached => cached || caches.match('./')))
+      // The shell and its modules are installed as one release; use that
+      // complete release for each controlled navigation.
+      caches.match('./index.html').then(cached => cached || fetch(request))
     );
     return;
   }
 
   event.respondWith(
-    caches.match(request).then(cached => {
-      const revalidate = fetch(request).then(response => {
-        if (!response || response.status !== 200 || response.type === 'opaque') return response;
-        const copy = response.clone();
-        caches.open(CACHE_NAME).then(cache => cache.put(request, copy)).catch(() => {});
-        return response;
-      }).catch(() => null);
-
-      if (cached) {
-        event.waitUntil(revalidate);
-        return cached;
-      }
-      return revalidate.then(response => response || caches.match(request));
-    })
+    caches.match(request).then(cached => cached || fetch(request))
   );
 });

@@ -78,8 +78,8 @@ function updateAutoUpgradeCountdown(now) {
 function startAutoUpgradeCountdown(choices, onChoose) {
   stopAutoUpgradeCountdown();
   syncAutoUpgradeControls();
-  if (!autoUpgradeState.enabled || !game.upgradeModalOpen || !choices.length) return;
   autoUpgradeChooser = onChoose;
+  if (!autoUpgradeState.enabled || !game.upgradeModalOpen || !choices.length) return;
   beginAutoUpgradeCountdown();
 }
 

@@ -39,6 +39,38 @@ function segmentCircleTime(x, y, dx, dy, circle, radius) {
   return time >= 0 && time <= 1 ? time : Infinity;
 }
 
+export function tracePlayerBulletStep(bullet, dt, targets, room) {
+  const dx = bullet.vx * dt;
+  const dy = bullet.vy * dt;
+  const hitTargets = bullet.hitTargets || new Set();
+  let blockedAt = Infinity;
+  for (const obstacle of room.obstacles || []) {
+    blockedAt = Math.min(blockedAt, segmentBoxTime(bullet.x, bullet.y, dx, dy, obstacle, bullet.r));
+  }
+
+  const hits = targets
+    .filter(target => !hitTargets.has(target))
+    .map((target, order) => ({
+      target,
+      order,
+      time: segmentCircleTime(bullet.x, bullet.y, dx, dy, target, bullet.r)
+    }))
+    .filter(hit => Number.isFinite(hit.time) && hit.time < blockedAt)
+    .sort((a, b) => a.time - b.time || a.order - b.order);
+
+  return {
+    x: bullet.x + dx,
+    y: bullet.y + dy,
+    dx,
+    dy,
+    blockedAt,
+    blocked: Number.isFinite(blockedAt),
+    blockedX: Number.isFinite(blockedAt) ? bullet.x + dx * blockedAt : null,
+    blockedY: Number.isFinite(blockedAt) ? bullet.y + dy * blockedAt : null,
+    hits
+  };
+}
+
 export function isInsideRoom(entity, room) {
   return entity.x - entity.r >= room.x && entity.x + entity.r <= room.x + room.w &&
     entity.y - entity.r >= room.y && entity.y + entity.r <= room.y + room.h;

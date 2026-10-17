@@ -17,7 +17,7 @@ import { updateUpgradeDialog } from './game-ui.js';
 
 function resize() {
   viewport.W = Math.max(320, innerWidth);
-  viewport.H = Math.max(420, innerHeight);
+  viewport.H = Math.max(1, innerHeight);
   viewport.dpr = Math.min(2, devicePixelRatio || 1);
   dom.canvas.width = Math.floor(viewport.W * viewport.dpr);
   dom.canvas.height = Math.floor(viewport.H * viewport.dpr);
@@ -26,7 +26,7 @@ function resize() {
 
   const hudRect = dom.hud ? dom.hud.getBoundingClientRect() : { bottom: 60 };
   const appbarBottom = dom.appbar ? dom.appbar.getBoundingClientRect().bottom : 0;
-  const roomTop = Math.max(hudRect.bottom + 8, appbarBottom + 8);
+  const roomTop = Math.min(Math.max(hudRect.bottom + 8, appbarBottom + 8), Math.max(0, viewport.H - 108));
   const controlsRect = dom.controlsWrap ? dom.controlsWrap.getBoundingClientRect() : { height: 0 };
   const mobileBottom = controlsRect.height > 0 ? Math.max(controlsRect.height + 8, 134) : 18;
   const bottomReserve = isDesktopControls() ? 18 : mobileBottom;
@@ -34,7 +34,7 @@ function resize() {
   room.x = 10;
   room.y = roomTop;
   room.w = viewport.W - 20;
-  room.h = Math.max(150, viewport.H - roomTop - bottomReserve);
+  room.h = Math.max(90, viewport.H - roomTop - bottomReserve);
 
   updateObstacles();
   updateHazards();
@@ -232,12 +232,16 @@ dom.shareButton?.addEventListener('click', () => {
   const rank = ui.gameoverRankText ? ui.gameoverRankText.textContent : 'RANK S';
   const text = `🧟 Zombie Room | ${rank} | Score: ${Math.floor(game.score)} | Wave ${game.wave} | Kills: ${game.kills} | Max Combo: ×${game.maxCombo || 0}\nhttps://yapweijun1996.github.io/PWA-Game-Zombie-Room/`;
   if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(text).then(() => {
-      flashMessage(t('shareCopied'));
-      playUiClick();
-    }).catch(() => {});
+    try {
+      navigator.clipboard.writeText(text).then(() => {
+        flashMessage(t('shareCopied'));
+        playUiClick();
+      }).catch(() => flashMessage(t('shareFailed')));
+    } catch (_) {
+      flashMessage(t('shareFailed'));
+    }
   } else {
-    flashMessage(t('shareCopied'));
+    flashMessage(t('shareFailed'));
   }
 });
 

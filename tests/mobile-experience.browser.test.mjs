@@ -117,12 +117,20 @@ test('touch anywhere steers, settings stay on toggles, and timed upgrade choice 
 
     const enabledAuto = await cdp.evaluate(`(async () => {
       const { game } = await import('./src/state.js');
+      const { setAutoUpgradeEnabled } = await import('./src/state.js');
       const { openUpgradeModal } = await import('./src/entities.js');
+      setAutoUpgradeEnabled(false);
       game.pendingUpgrades = 1;
       openUpgradeModal();
       return { checked: document.querySelector('#upgradeAutoToggle').checked, progressHidden: document.querySelector('#upgradeAutoProgress').hidden, countdown: document.querySelector('#upgradeAutoCountdown').textContent };
     })()`);
-    assert.equal(enabledAuto.checked, true);
+    assert.equal(enabledAuto.checked, false);
+    assert.equal(enabledAuto.progressHidden, true);
+    await cdp.evaluate(`(() => {
+      const toggle = document.querySelector('#upgradeAutoToggle');
+      toggle.checked = true;
+      toggle.dispatchEvent(new Event('change', { bubbles: true }));
+    })()`);
     const countdown = await waitFor(
       cdp.evaluate.bind(cdp),
       `(() => ({ hidden: document.querySelector('#upgradeAutoProgress').hidden, text: document.querySelector('#upgradeAutoCountdown').textContent }))()`,

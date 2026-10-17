@@ -13,6 +13,10 @@ function recordInputState() {
 }
 
 export function initInput(onRestart) {
+  function hasTextInputFocus(target) {
+    return target instanceof Element && Boolean(target.closest('input, select, textarea, [contenteditable="true"]'));
+  }
+
   function setKeyboardInput(dir, pressed) {
     if (!Object.prototype.hasOwnProperty.call(input, dir)) return;
     if (pressed && !game.running) onRestart();
@@ -52,6 +56,8 @@ export function initInput(onRestart) {
     }
     const dir = keyMap[e.key.toLowerCase()];
     if (!dir) return;
+    const panel = document.getElementById('settingsPanel');
+    if (hasTextInputFocus(e.target) || (panel && !panel.hidden)) return;
     e.preventDefault();
     setKeyboardInput(dir, true);
   }, { passive: false });
@@ -60,6 +66,7 @@ export function initInput(onRestart) {
     if (isPlaytestReplaying()) return;
     const dir = keyMap[e.key.toLowerCase()];
     if (!dir) return;
+    if (!input[dir]) return;
     e.preventDefault();
     setKeyboardInput(dir, false);
   }, { passive: false });

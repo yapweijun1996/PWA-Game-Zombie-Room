@@ -7,7 +7,8 @@ import { renderPausePresentation, showUpgradeDialog, updateUpgradeDialog, hideUp
 import { t } from './i18n.js';
 import { createTelegraphedCharge, updateTelegraphedCharge } from './telegraphed-charge.js';
 import { DIRECTOR_CONFIG, createDirectorState, getWavePlan, advanceDirector, recordDirectorDamage, startDirectorRecovery, selectEliteAffix, selectEnemyType, getSpawnInterval, capEnemySpeed } from './wave-director.js';
-import { SPITTER_CONFIG, createSpitAttack, advanceSpitter, createEnemyProjectile, advanceEnemyProjectile } from './ranged-combat.js';
+import { SPITTER_CONFIG, createSpitAttack, advanceSpitter, createEnemyProjectile, advanceEnemyProjectile, tracePlayerBulletStep, hasClearShot } from './ranged-combat.js';
+import { getEnemySteering } from './enemy-navigation.js';
 import { createBuildState, getBuildChoices, getBuildProfile, BUILD_EVOLUTIONS, canUnlockEvolution, applyEvolution } from './builds.js';
 
 import { playShoot, playCrit, playKill, playXp, playLevelUp, playUpgradeSelect, playPlayerHit, playGameOver, playUiClick, playNuke, playOverdrive, playHeal, playMagnet, playShieldHit, playShieldBreak, playShieldRecharge, playBossRoar, playElectricZap, playComboMilestone, playBlackoutAlarm, playPowerRestored } from './audio.js';
@@ -322,6 +323,7 @@ function shootNearest() {
   let target = null;
   let bestD = Infinity;
   for (const z of game.zombies) {
+    if (!hasClearShot(p, z, room)) continue;
     const d = dist2(p, z);
     if (d < bestD) { bestD = d; target = z; }
   }
@@ -376,7 +378,10 @@ function deathBurst(z) {
 }
 
 export function spawnPickup(x, y, source = 'normal') {
-  if (game.pickups.length >= 8) return;
+  if (game.pickups.length >= 8) {
+    if (source !== 'boss') return;
+    discardExpiringPickup();
+  }
   let type = 'medkit';
   if (source === 'boss') {
     const bossTypes = ['nuke', 'overdrive', 'medkit'];
@@ -395,6 +400,21 @@ export function spawnPickup(x, y, source = 'normal') {
     life: 16,
     pulse: Math.random() * Math.PI * 2
   });
+}
+
+function discardExpiringPickup() {
+  if (!game.pickups.length) return;
+  let soonestIndex = 0;
+  for (let i = 1; i < game.pickups.length; i++) {
+    if ((game.pickups[i].life ?? Infinity) < (game.pickups[soonestIndex].life ?? Infinity)) soonestIndex = i;
+  }
+  game.pickups.splice(soonestIndex, 1);
+}
+
+function spawnPickupBundle(x, y, source, count) {
+  const guaranteedCount = Math.min(8, Math.max(0, Math.floor(count)));
+  while (game.pickups.length > 8 - guaranteedCount) discardExpiringPickup();
+  for (let i = 0; i < guaranteedCount; i++) spawnPickup(x, y, source);
 }
 
 function collectPickup(item, index) {
@@ -493,7 +513,7 @@ function spawnBoss() {
     r: 26,
     hp: 20 * scale,
     maxHp: 20 * scale,
-    speed: 28 + game.wave * 1.4,
+    speed: 40 + game.wave * 2.2,
     damage: 24,
     color: '#c75b68',
     score: 140,
@@ -568,7 +588,7 @@ export const UPGRADES = [
     level: p => p.upgrades.vitality,
     apply: p => {
       p.maxHp += 25;
-      p.hp = Math.min(p.maxHp, p.hp + 40);
+      p.hp = Math.min(p.maxHp, p.hp + 25);
       p.upgrades.vitality = (p.upgrades.vitality || 0) + 1;
     }
   },
@@ -642,9 +662,7 @@ export function openUpgradeModal() {
   if (!p || !game.running) return;
   currentUpgradeChoices = getAvailableUpgrades();
   if (!currentUpgradeChoices.length) {
-    p.hp = Math.min(p.maxHp, p.hp + 50);
-    game.pendingUpgrades = Math.max(0, (game.pendingUpgrades || 1) - 1);
-    flashMessage(t('msgLevelUp'));
+    awardUnavailableUpgrades(p);
     return;
   }
 
@@ -654,6 +672,13 @@ export function openUpgradeModal() {
   if (dom.canvas) dom.canvas.classList.add('game-dimmed');
 
   showUpgradeDialog(currentUpgradeChoices, p, chooseUpgrade);
+}
+
+function awardUnavailableUpgrades(player) {
+  const count = Math.max(1, Math.floor(game.pendingUpgrades || 1));
+  player.hp = Math.min(player.maxHp, player.hp + count * 25);
+  game.pendingUpgrades = 0;
+  flashMessage(t('msgLevelUp'));
 }
 
 export function chooseUpgrade(index, replayEvent = false) {
@@ -702,9 +727,7 @@ export function chooseUpgrade(index, replayEvent = false) {
       updateUpgradeDialog(currentUpgradeChoices, p, chooseUpgrade);
       return;
     }
-    p.hp = Math.min(p.maxHp, p.hp + 50);
-    game.pendingUpgrades = 0;
-    flashMessage(t('msgLevelUp'));
+    awardUnavailableUpgrades(p);
   }
 
   closeUpgradeModal();
@@ -989,7 +1012,7 @@ export function update(dt) {
     p.shieldCooldown = Math.max(0, p.shieldCooldown - dt);
   } else if (p.shield < p.maxShield) {
     const wasFull = p.shield >= p.maxShield;
-    p.shield = Math.min(p.maxShield, p.shield + 16 * dt);
+    p.shield = Math.min(p.maxShield, p.shield + 12 * dt);
     if (!wasFull && p.shield >= p.maxShield) {
       playShieldRecharge();
       burst(p.x, p.y, '#8ae0ff', 8, 70);
@@ -1004,8 +1027,7 @@ export function update(dt) {
       playPowerRestored();
       vibrateUi();
       game.cameraShake = Math.max(game.cameraShake, .25);
-      spawnPickup(room.x + room.w * 0.45, room.y + room.h * 0.5, 'boss');
-      spawnPickup(room.x + room.w * 0.55, room.y + room.h * 0.5, 'boss');
+      spawnPickupBundle(room.x + room.w * 0.45, room.y + room.h * 0.5, 'boss', 2);
       burst(room.x + room.w * 0.5, room.y + room.h * 0.5, '#ffd700', 28, 140);
     }
   }
@@ -1092,90 +1114,88 @@ export function update(dt) {
 
   for (let i = game.bullets.length - 1; i >= 0; i--) {
     const b = game.bullets[i];
-    b.x += b.vx * dt;
-    b.y += b.vy * dt;
+    const startX = b.x;
+    const startY = b.y;
+    const trace = tracePlayerBulletStep(b, dt, game.zombies, room);
+    b.x = trace.x;
+    b.y = trace.y;
     b.life -= dt;
-    let hit = false;
-    for (let j = game.zombies.length - 1; j >= 0; j--) {
-      const z = game.zombies[j];
-      if (b.hitTargets?.has(z)) continue;
-      const rr = b.r + z.r;
-      if ((b.x - z.x) ** 2 + (b.y - z.y) ** 2 <= rr * rr) {
-        // Piercing is a target budget, not permission to hit the same enemy each frame.
-        (b.hitTargets ||= new Set()).add(z);
-        let dealt = b.damage;
-        if (z.type === 'boss') dealt *= (z.armor || .86);
-        else if (z.affix === 'armored') dealt *= (z.armor || .60);
-        z.hp -= dealt;
-        z.hitFlash = .08;
-        if (b.isCrit) {
-          playCrit();
-          vibrateCrit();
-        }
-        spawnDamageText(z.x + rand(-6, 6), z.y - z.r - 4, dealt, b.isCrit, false);
-        burst(b.x, b.y, b.isCrit ? '#ffd27a' : (z.affix === 'armored' ? '#69b6ff' : '#eaf7ed'), b.isCrit ? 6 : 3, b.isCrit ? 75 : 45);
-        sprayBlood(b.x, b.y, z.type === 'boss' ? 1.1 : .45, z.type === 'boss' ? '#e06c78' : '#ba4956');
-
-        if (b.knockback > 0) {
-          const knockDist = b.knockback * (z.type === 'boss' ? 1 / 3 : 1);
-          const bulletSpeed = p.bulletSpeed || 460;
-          z.x += (b.vx / bulletSpeed) * knockDist;
-          z.y += (b.vy / bulletSpeed) * knockDist;
-          resolveObstacleCollision(z);
-        }
-
-        if (b.chainTargets > 0 && !b.hasChained) {
-          b.hasChained = true;
-          let chainCount = 0;
-          for (let k = game.zombies.length - 1; k >= 0; k--) {
-            if (k === j) continue;
-            const cz = game.zombies[k];
-            const cdx = cz.x - z.x;
-            const cdy = cz.y - z.y;
-            if (cdx * cdx + cdy * cdy < b.chainRange * b.chainRange) {
-              const chainDmg = b.damage * b.chainDamage * (cz.type === 'boss' ? (cz.armor || .86) : cz.affix === 'armored' ? (cz.armor || .60) : 1);
-              cz.hp -= chainDmg;
-              cz.hitFlash = 0.08;
-              spawnDamageText(cz.x, cz.y - cz.r, chainDmg, false, false);
-              game.particles.push({
-                shape: 'arc',
-                vx: 0,
-                vy: 0,
-                x: z.x,
-                y: z.y,
-                tx: cz.x,
-                ty: cz.y,
-                life: 0.14,
-                maxLife: 0.14
-              });
-              playElectricZap();
-              if (cz.hp <= 0) {
-                killZombie(k, b.isCrit);
-                if (k < j) j--;
-              }
-              chainCount++;
-              if (chainCount >= b.chainTargets) break;
-            }
-          }
-        }
-
-        b.pierce = (b.pierce || 1) - 1;
-        if (b.pierce <= 0) hit = true;
-        if (z.type === 'boss') game.cameraShake = Math.max(game.cameraShake, .08);
-        if (z.hp <= 0) killZombie(j, b.isCrit);
-        if (hit) break;
+    let consumed = false;
+    for (const { target: z, time } of trace.hits) {
+      const zombieIndex = game.zombies.indexOf(z);
+      if (zombieIndex < 0) continue;
+      b.x = startX + trace.dx * time;
+      b.y = startY + trace.dy * time;
+      (b.hitTargets ||= new Set()).add(z);
+      let dealt = b.damage;
+      if (z.type === 'boss') dealt *= (z.armor || .86);
+      else if (z.affix === 'armored') dealt *= (z.armor || .60);
+      z.hp -= dealt;
+      z.hitFlash = .08;
+      if (b.isCrit) {
+        playCrit();
+        vibrateCrit();
       }
-    }
-    if (!hit && room.obstacles) {
-      for (const obs of room.obstacles) {
-        if (b.x >= obs.x && b.x <= obs.x + obs.w && b.y >= obs.y && b.y <= obs.y + obs.h) {
-          hit = true;
-          burst(b.x, b.y, '#ffd27a', 3, 50);
-          break;
+      spawnDamageText(z.x + rand(-6, 6), z.y - z.r - 4, dealt, b.isCrit, false);
+      burst(b.x, b.y, b.isCrit ? '#ffd27a' : (z.affix === 'armored' ? '#69b6ff' : '#eaf7ed'), b.isCrit ? 6 : 3, b.isCrit ? 75 : 45);
+      sprayBlood(b.x, b.y, z.type === 'boss' ? 1.1 : .45, z.type === 'boss' ? '#e06c78' : '#ba4956');
+
+      if (b.knockback > 0) {
+        const knockDist = b.knockback * (z.type === 'boss' ? 1 / 3 : 1);
+        const bulletSpeed = p.bulletSpeed || 460;
+        z.x += (b.vx / bulletSpeed) * knockDist;
+        z.y += (b.vy / bulletSpeed) * knockDist;
+        resolveObstacleCollision(z);
+      }
+
+      if (b.chainTargets > 0 && !b.hasChained) {
+        b.hasChained = true;
+        let chainCount = 0;
+        const nearbyTargets = game.zombies
+          .filter(candidate => candidate !== z && hasClearShot(z, candidate, room))
+          .sort((a, other) => dist2(z, a) - dist2(z, other));
+        for (const cz of nearbyTargets) {
+          if (!game.zombies.includes(cz)) continue;
+          const cdx = cz.x - z.x;
+          const cdy = cz.y - z.y;
+          if (cdx * cdx + cdy * cdy >= b.chainRange * b.chainRange) continue;
+          const chainDmg = b.damage * b.chainDamage * (cz.type === 'boss' ? (cz.armor || .86) : cz.affix === 'armored' ? (cz.armor || .60) : 1);
+          cz.hp -= chainDmg;
+          cz.hitFlash = 0.08;
+          spawnDamageText(cz.x, cz.y - cz.r, chainDmg, false, false);
+          game.particles.push({
+            shape: 'arc',
+            vx: 0,
+            vy: 0,
+            x: z.x,
+            y: z.y,
+            tx: cz.x,
+            ty: cz.y,
+            life: 0.14,
+            maxLife: 0.14
+          });
+          playElectricZap();
+          if (cz.hp <= 0) killZombie(game.zombies.indexOf(cz), b.isCrit);
+          if (++chainCount >= b.chainTargets) break;
         }
       }
+
+      b.pierce = (b.pierce || 1) - 1;
+      if (z.type === 'boss') game.cameraShake = Math.max(game.cameraShake, .08);
+      if (z.hp <= 0) killZombie(game.zombies.indexOf(z), b.isCrit);
+      if (b.pierce <= 0) {
+        consumed = true;
+        break;
+      }
     }
-    if (hit || b.life <= 0 || b.x < room.x - 35 || b.x > room.x + room.w + 35 || b.y < room.y - 35 || b.y > room.y + room.h + 35) {
+
+    if (!consumed && trace.blocked) {
+      b.x = trace.blockedX;
+      b.y = trace.blockedY;
+      burst(b.x, b.y, '#ffd27a', 3, 50);
+      consumed = true;
+    }
+    if (consumed || b.life <= 0 || b.x < room.x - 35 || b.x > room.x + room.w + 35 || b.y < room.y - 35 || b.y > room.y + room.h + 35) {
       game.bullets.splice(i, 1);
     }
   }
@@ -1204,11 +1224,17 @@ export function update(dt) {
     let moveY = dy / distance;
     let moveScale = 1;
     let chargingThisStep = false;
+    let preservingTelegraphedDirection = false;
 
     if (z.type === 'spitter') {
       const spit = advanceSpitter(z, dt, p, room, game.spitCooldown <= 0 && game.enemyProjectiles.length < SPITTER_CONFIG.maxProjectiles);
       moveX = spit.moveX;
       moveY = spit.moveY;
+      if (spit.moveX * dx + spit.moveY * dy > 0 && !hasClearShot(z, p, room)) {
+        const route = getEnemySteering(z, p, room.obstacles);
+        moveX = route.x;
+        moveY = route.y;
+      }
       if (spit.started) game.spitCooldown = SPITTER_CONFIG.globalCooldown;
       if (spit.fire && game.enemyProjectiles.length < SPITTER_CONFIG.maxProjectiles) {
         game.enemyProjectiles.push(createEnemyProjectile(z));
@@ -1222,7 +1248,7 @@ export function update(dt) {
         windupSeconds: z.frenzy ? .42 : .62,
         dashSeconds: z.frenzy ? .32 : .24,
         windupMultiplier: .12,
-        dashMultiplier: z.frenzy ? 2.85 : 2.15
+        dashMultiplier: z.frenzy ? 2.9 : 2.45
       });
       chargingThisStep = charge.mode === 'dash';
       if (wasWinding && charge.state === 'dash') z.attackFlash = z.frenzy ? .42 : .32;
@@ -1233,6 +1259,7 @@ export function update(dt) {
         if (z.frenzy) burst(z.x, z.y, '#ff4359', 8, 80);
       }
       if (charge.mode !== 'idle') {
+        preservingTelegraphedDirection = true;
         moveX = charge.directionX;
         moveY = charge.directionY;
         moveScale = charge.mode === 'windup'
@@ -1258,10 +1285,17 @@ export function update(dt) {
         game.swiftChargeCooldown = 1.1;
       }
       if (charge.mode !== 'idle') {
+        preservingTelegraphedDirection = true;
         moveX = charge.directionX;
         moveY = charge.directionY;
         moveScale = charge.movementMultiplier;
       }
+    }
+
+    if (z.type !== 'spitter' && !preservingTelegraphedDirection) {
+      const route = getEnemySteering(z, p, room.obstacles);
+      moveX = route.x;
+      moveY = route.y;
     }
 
     z.facing = Math.atan2(moveY, moveX);
@@ -1367,6 +1401,7 @@ export function update(dt) {
           const pdy = p.y - h.y;
           if (pdx * pdx + pdy * pdy < (p.r + h.r) ** 2) {
             damagePlayer(7, h);
+            if (!game.running) return;
             burst(p.x, p.y, '#69b6ff', 4, 60);
           }
         }

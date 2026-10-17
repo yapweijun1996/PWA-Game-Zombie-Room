@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createSpitAttack, advanceSpitter, createEnemyProjectile, advanceEnemyProjectile, SPITTER_CONFIG } from '../src/ranged-combat.js';
+import { createSpitAttack, advanceSpitter, createEnemyProjectile, advanceEnemyProjectile, tracePlayerBulletStep, SPITTER_CONFIG } from '../src/ranged-combat.js';
 
 const room = { x: 0, y: 0, w: 600, h: 500, obstacles: [] };
 const player = { x: 300, y: 250, r: 13 };
@@ -74,4 +74,35 @@ test('telegraph endpoint agrees with the actual projectile cover and boundary co
   assert.deepEqual(end, { x: shot.x, y: shot.y });
   assert.equal(end.x, 235);
   assert.equal(getSpitEndpoint(z, { ...room, w: 300 }).x, 295);
+});
+
+test('player bullets hit targets in travel order and cover blocks targets behind it', () => {
+  const blockedRoom = { ...room, obstacles: [{ x: 40, y: 30, w: 20, h: 40 }] };
+  const bullet = { x: 0, y: 50, vx: 100, vy: 0, r: 2, hitTargets: new Set() };
+  const near = { x: 20, y: 50, r: 4 };
+  const behindCover = { x: 80, y: 50, r: 4 };
+
+  const traced = tracePlayerBulletStep(bullet, 1, [behindCover, near], blockedRoom);
+  assert.equal(traced.hits.length, 1);
+  assert.equal(traced.hits[0].target, near);
+  assert.ok(traced.hits[0].time < traced.blockedAt);
+  assert.equal(traced.blocked, true);
+});
+
+test('piercing player bullet trace returns multiple visible targets in distance order', () => {
+  const bullet = { x: 0, y: 50, vx: 100, vy: 0, r: 2, hitTargets: new Set() };
+  const first = { x: 20, y: 50, r: 4 };
+  const second = { x: 70, y: 50, r: 4 };
+  const traced = tracePlayerBulletStep(bullet, 1, [second, first], room);
+  assert.deepEqual(traced.hits.map(hit => hit.target), [first, second]);
+});
+
+test('player bullet radius catches a swept cover corner before a target', () => {
+  const blockedRoom = { ...room, obstacles: [{ x: 180, y: 210, w: 46, h: 40 }] };
+  const bullet = { x: 176, y: 211, vx: 460, vy: -100, r: 3.5, hitTargets: new Set() };
+  const behindCorner = { x: 205, y: 205, r: 13 };
+  const traced = tracePlayerBulletStep(bullet, 0.034, [behindCorner], blockedRoom);
+  assert.equal(traced.blocked, true);
+  assert.equal(traced.hits.length, 0);
+  assert.ok(traced.blockedX < blockedRoom.obstacles[0].x + blockedRoom.obstacles[0].w);
 });

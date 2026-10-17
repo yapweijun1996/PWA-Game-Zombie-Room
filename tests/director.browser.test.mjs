@@ -243,7 +243,7 @@ test('three seeds compare builds, reproduce director/ranged events and exercise 
       return { peakEnemies, peakSpitters, peakProjectiles, cpuMs: performance.now() - start };
     })()`);
     assert.ok(stress.peakEnemies >= 80 && stress.peakEnemies <= 90);
-    assert.ok(stress.peakSpitters > 0 && stress.peakSpitters <= 4);
+    assert.ok(stress.peakSpitters > 0 && stress.peakSpitters <= 6);
     assert.ok(stress.peakProjectiles <= 12);
     console.log('Controlled saturation fixture: ' + JSON.stringify(stress));
     assert.deepEqual(cdp.runtimeExceptions, []);
@@ -256,10 +256,11 @@ test('PWA precaches combat/build modules and starts offline', browserOptions, as
     await waitFor(cdp.evaluate.bind(cdp), 'Boolean(navigator.serviceWorker.controller)', Boolean);
     const cached = await cdp.evaluate(`(async () => {
       await navigator.serviceWorker.ready;
-      return { caches: await caches.keys(), ranged: Boolean(await caches.match('./src/ranged-combat.js')), builds: Boolean(await caches.match('./src/builds.js')), music: Boolean(await caches.match('./src/music.js')) };
+      return { caches: await caches.keys(), ranged: Boolean(await caches.match('./src/ranged-combat.js')), navigation: Boolean(await caches.match('./src/enemy-navigation.js')), builds: Boolean(await caches.match('./src/builds.js')), music: Boolean(await caches.match('./src/music.js')) };
     })()`);
     assert.ok(cached.caches.includes(`zombie-room-v${APP_VERSION}`));
     assert.equal(cached.ranged, true);
+    assert.equal(cached.navigation, true);
     assert.equal(cached.builds, true);
     assert.equal(cached.music, true);
     await cdp.send('Network.enable');

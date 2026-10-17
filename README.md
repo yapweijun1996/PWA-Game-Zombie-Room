@@ -2,7 +2,7 @@
 
 Zombie Room is an offline-first, canvas-based survival game for desktop and mobile browsers. The player moves in four directions, can trigger a timed evasive dash, and fires automatically. The project is implemented as a dependency-free static web app and installable Progressive Web App (PWA).
 
-Latest review: [Gameplay and Codebase Review — 2026-10-17](GAMEPLAY_REVIEW.md) documents 11 confirmed defects, six balance/UX concerns, current test evidence, and the reported “too easy” feedback. Findings remain open; the review changes documentation only.
+Latest review: [Gameplay and Codebase Review — 2026-10-17](GAMEPLAY_REVIEW.md) tracks 11 confirmed defects, six balance concerns, the fixes, and updated test evidence for the “too easy” feedback.
 
 ## Current Features
 
@@ -140,11 +140,11 @@ Real-device testing remains necessary for Safari, Chrome Android, iOS standalone
 
 ### Gameplay
 
-Version 3.6.0 introduces the endless director. The product target is for familiar players to feel substantial pressure after 3–5 minutes, with no final wave. This is a tuning target, not a verified human-playtest result. Version 3.7.0 adds exclusive build paths. Nine synthetic runs across all three paths still reached five minutes at full health/shield; the pressure target remains unverified. See the versioned verification evidence below.
+Version 3.6.0 introduced the endless director, with a target of substantial pressure for familiar players after 3–5 minutes and no final wave. Version 3.7.0 added exclusive build paths. Early synthetic runs reached five minutes at full health/shield; the target remains unverified by human playtests. Version 3.8.4 adjusts the challenge and documents the before/after seed evidence below.
 
-The [2026-10-17 review](GAMEPLAY_REVIEW.md) reproduced those nine full-health outcomes and found pillar pursuit deadlocks, weak Boss closing speed, early spawn-rate saturation, and growth/recovery advantages. A simpler no-Dash controller survived three of six seed/viewport trials at full health, while three died before 132 seconds. These results support investigating inconsistent pressure across seeds, builds, and actual room geometry before increasing global difficulty. The review also identifies an unresolved PWA version-mixing defect; ordinary offline startup tests do not establish update coherence.
+Version 3.8.4 fixes the review's 11 defects and raises pressure through stronger later-wave growth, more frequent phases, faster Boss charges, continued support spawns while a Boss carries over, less shield regeneration, and shorter relief/recovery windows. In the fixed-seed browser comparison, a world-aware controller survived eight of nine five-minute runs and took more damage than before. A simple first-card/no-Dash movement loop survived one of six trials; five died between 44 and 178 seconds. Those synthetic controllers do not establish how familiar players feel, so the 3–5-minute pressure target still needs human playtests.
 
-The player retains automatic targeting, Dash, eight ordinary upgrades, combo bonuses, pickups, and the regenerating shield. Each run can now gain one of three path-specific weapon evolutions. All incoming damage, including enemy projectiles, uses the existing 0.58-second invulnerability window. No adaptive changes are made to enemy attributes, player upgrades, or rewards.
+The player retains automatic targeting, Dash, eight ordinary upgrades, combo bonuses, pickups, and the regenerating shield. Each run can now gain one of three path-specific weapon evolutions. All incoming damage, including enemy projectiles, uses the existing 0.58-second invulnerability window. Balance changes are deterministic and capped; the director does not adapt enemy attributes or rewards to an individual run.
 
 #### Director rules
 
@@ -152,14 +152,14 @@ A wave lasts 25 simulation seconds. Each four-wave stage lasts 100 seconds:
 
 | Wave within stage | Phase | Spawn rate multiplier |
 | --- | --- | --- |
-| 1 | Buildup | 0.75 |
-| 2 | Pressure | 1.00 |
-| 3 | Blackout | 0.65 |
-| 4 | Boss | 0.42 |
+| 1 | Buildup | 0.82 |
+| 2 | Pressure | 1.12 |
+| 3 | Blackout | 0.72 |
+| 4 | Boss | 0.55 |
 
-The first Boss is due at 75 seconds. Blackouts occur on waves 3, 7, 11, and so on, eight seconds into the wave, and last 12 seconds. The director is the only event scheduler. A living Boss prevents another Boss or blackout; blocked requests are discarded instead of accumulating. Defeating a Boss gives six seconds at a 0.25 spawn rate, with only unaffixed walkers. Recovery can delay an event within its wave; a blackout that no longer fits is skipped. A Boss continuing into another wave keeps the ordinary spawn rate at or below 0.42 while the wave and difficulty continue growing.
+The first Boss is due at 75 seconds. Blackouts occur on waves 3, 7, 11, and so on, eight seconds into the wave, and last 12 seconds. The director is the only event scheduler. A living Boss prevents another Boss or blackout; blocked requests are discarded instead of accumulating. Defeating a Boss gives four seconds at a 0.25 spawn rate, with only unaffixed walkers. Recovery can delay an event within its wave; a blackout that no longer fits is skipped. A Boss carried into later buildup/pressure waves allows new spitters and uses a 0.68 maximum spawn-rate multiplier, increasing ordinary spawns compared with the former 0.42 cap.
 
-Rate multipliers divide the base spawn interval: 0.25 means a four-times-longer interval. The base remains `max(0.22, 0.82 - elapsed * 0.0038 - wave * 0.018)`. There is no extra random double-spawn rule. With zero-based stage index `c = floor((wave - 1) / 4)`, ordinary health scales by `1 + 0.08 * (wave - 1) + 0.25 * c`; Boss health uses `0.14` per wave. Elite probability is capped at 40%. Enemy movement is capped at 160 CSS pixels/second, or 360 during a charge. Telegraph durations do not shrink with difficulty.
+Rate multipliers divide the base spawn interval: 0.25 means a four-times-longer interval. The base is `max(0.18, 0.82 - elapsed * 0.0038 - wave * 0.018)`. There is no extra random double-spawn rule. With zero-based stage index `c = floor((wave - 1) / 4)`, ordinary health scales by `1 + 0.11 * (wave - 1) + 0.30 * c`; Boss health scales by `1 + 0.19 * (wave - 1) + 0.30 * c`. Elite probability is capped at 40%. Enemy movement is capped at 180 CSS pixels/second, or 360 during a charge. Boss base speed is `40 + 2.2 * wave`, and its charge multipliers are 2.45 before frenzy and 2.9 during frenzy. Telegraph durations do not shrink with difficulty.
 
 Total enemies are capped at 90; ordinary spawns reserve a slot for the Boss. Starting at wave 5, buildup and pressure waves draw from a seed-derived shuffle bag with no adjacent repeats. The bag is independent of combat/upgrade RNG:
 
@@ -169,9 +169,9 @@ Total enemies are capped at 90; ordinary spawns reserve a slot for the Boss. Sta
 | Blockade | 40% / 15% / 35% / 10% | Armored |
 | Crossfire | 45% / 15% / 15% / 25% | Frost |
 
-Preferred affixes receive 60% of elite selections. Special phases, a living Boss, blackout, and recovery suppress new spitters. Spitter quotas are two in stage 2, three in stage 3, and four thereafter; a rejected spitter selection immediately becomes a walker.
+Preferred affixes receive 60% of elite selections. Boss-phase waves, blackout, and recovery suppress new spitters. A living Boss carried into buildup/pressure waves does not suppress them. Spitter quotas rise from three in stage 2 to four in stage 3, five in stage 4, and six from stage 5 onward; a rejected spitter selection immediately becomes a walker.
 
-Actual shield plus HP loss of at least 20% of maximum HP within five seconds, or eight enemies within 90 pixels, can pause new enemy spawns for three seconds. Relief has a global 25-second cooldown. Existing enemies/attacks remain active; the wave clock keeps advancing. The spawn countdown freezes without banking a burst, and relief cannot extend or stack with recovery.
+Actual shield plus HP loss of at least 25% of maximum HP within five seconds, or nine enemies within 90 pixels, can pause new enemy spawns for 2.25 seconds. Relief has a global 30-second cooldown. Existing enemies/attacks remain active; the wave clock keeps advancing. The spawn countdown freezes without banking a burst, and relief cannot extend or stack with recovery. Shield regeneration is 12 points/second after four seconds without damage. When every upgrade is exhausted, each queued fallback level restores 25 HP; Vitality also restores 25 HP per selection.
 
 #### Ranged combat and readability
 
@@ -204,7 +204,7 @@ Each specialization preserves a tradeoff, including after evolution:
 
 The modal explains costs before selection and shows evolution prerequisites with current progress. Only the selected path's evolution can appear. An icon beside the player level and the defeat-screen build summary retain the choice; mobility bursts also show chevrons behind the player. New interface text covers all seven locales. Short-screen dialogs scroll their card list while keeping the title visible, above the HUD and transient messages.
 
-`src/builds.js` owns build choices, gates, and derived combat profiles; the player owns selected IDs and the burst timer. Stats are derived from ordinary upgrades rather than repeatedly multiplying stored player attributes. `src/entities.js` executes those profiles and snapshots bullet properties at firing time. Piercing bullets now hit each enemy at most once instead of applying damage repeatedly during overlap. Secondary arcs respect their own target's armor. Burst timers freeze during pause/upgrade dialogs. The director rules remain unchanged.
+`src/builds.js` owns build choices, gates, and derived combat profiles; the player owns selected IDs and the burst timer. Stats are derived from ordinary upgrades rather than repeatedly multiplying stored player attributes. `src/entities.js` executes those profiles and snapshots bullet properties at firing time. Piercing bullets hit each enemy at most once instead of applying damage repeatedly during overlap. Secondary arcs respect target armor and cover. Burst timers freeze during pause/upgrade dialogs. Build ownership stays separate from director policy.
 
 Build choices use the existing ordered upgrade events; checkpoints/final snapshots and analysis signatures include path and specialization. Replay format remains 4, with exact app-version rejection preventing older recordings from being interpreted under v3.7 rules. Scores/settings are preserved; previous-version best scores remain explicitly marked. The service-worker version and precache include the new build module.
 
@@ -304,7 +304,7 @@ Before release, verify the following on HTTPS and localhost:
 
 ### P1 — Gameplay depth and balance
 
-- Address the open [review findings](GAMEPLAY_REVIEW.md#confirmed-defect-register), especially pillar deadlocks and ordered bullet/cover collision, before using the current combat behavior as a tuning baseline.
+- Review the fixed findings and remaining acceptance gaps in [GAMEPLAY_REVIEW.md](GAMEPLAY_REVIEW.md), especially the human pressure target and real release-update cycle.
 - Investigate the reported “too easy” feedback with repeated runs across early, mid, and late waves; establish a target survival curve before changing balance values.
 - Repeat balance trials with physical touch input on target devices and varied viewport sizes; the current scripted samples are too small to set a difficulty target.
 - Add distinct, telegraphed enemy attacks and tune movement, shield recharge, spawn pacing, and enemy composition from observed results; avoid increasing health or spawn counts blindly.
@@ -324,7 +324,7 @@ Before release, verify the following on HTTPS and localhost:
 
 No `package.json` or build configuration is present. Run all checks with `node --test tests/*.test.mjs`. Browser tests use Node's built-in WebSocket and an installed Edge/Chrome browser; they auto-skip locally if unavailable. Set `PLAYTEST_BROWSER` to an executable or `PLAYTEST_REQUIRE_BROWSER=1` to require browser support. GitHub Actions runs the same suite and deploys only after it passes. No packages are installed by the tests.
 
-On 2026-10-17, the current v3.8.3 source passed all **41 tests with Chrome required and no skips**. Additional review probes reproduced defects outside the existing assertions; see [the current review](GAMEPLAY_REVIEW.md#verification-performed) for failures, seed comparisons, and remaining acceptance gaps. Earlier version-specific counts below are historical.
+On 2026-10-17, the v3.8.4 source passed all **53 tests with Chrome required and no skips**. The added regressions cover the 11 fixed findings, difficulty pacing, and service-worker cache coherence. The [current review](GAMEPLAY_REVIEW.md#verification-performed) records seeded comparisons and remaining acceptance gaps. Earlier version-specific counts below are historical.
 
 Unit checks cover 1,000-wave growth, shuffled encounter bags, pacing boundaries, ranged state transitions, shared collision geometry, and descriptive analysis. Browser checks retain controls/focus/replay regressions, add ranged combat, caps, pause/reset, seeded balance comparisons, controlled late/saturated scenarios, and real service-worker offline startup. Browser harness utilities are shared without adding runtime dependencies.
 
@@ -360,7 +360,7 @@ The mobile synthetic controller compared seeds 42, 160501, and 202602 with offen
 
 Invulnerable, fully upgraded fixtures at 10 and 20 minutes exercised another 30 seconds each; a separate stationary/no-fire saturation fixture reached 89 ordinary enemies and four spitters without exceeding the caps. CPU timings from accelerated browser fixtures are diagnostics, not physical-device FPS measurements or survival evidence.
 
-Human acceptance remains outstanding: recruit at least five familiar players; at least three should report a clear pressure increase around minutes 3–5, identify the main damage source/counterplay, and want another run. Physical iOS/Android behavior and human enjoyment are not verified by the automated suite. Initial tuning constants are intentionally retained pending representative evidence.
+Human acceptance remains outstanding: recruit at least five familiar players; at least three should report a clear pressure increase around minutes 3–5, identify the main damage source/counterplay, and want another run. Physical iOS/Android behavior and human enjoyment are not verified by the automated suite.
 
 ### Historical trials before version 3.6
 

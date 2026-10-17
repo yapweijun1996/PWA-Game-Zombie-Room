@@ -381,7 +381,7 @@ test('replay, dash controls, telegraphs, wave modifiers, and modal focus work to
         const { viewport } = await import('./src/state.js');
         const rect = document.querySelector('#dashButton').getBoundingClientRect();
         return { width: innerWidth, height: innerHeight, coarsePointer: matchMedia('(pointer: coarse)').matches,
-          resized: viewport.W === innerWidth && viewport.H === Math.max(420, innerHeight),
+          resized: viewport.W === innerWidth && viewport.H === innerHeight,
           visible: rect.width >= 48 && rect.height >= 48, left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom };
       })()`,
       value => value.width === 844 && value.height === 390 && value.coarsePointer && value.resized,

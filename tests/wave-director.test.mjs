@@ -48,7 +48,7 @@ test('1000 waves keep growing, use complete shuffled bags, and never repeat adja
       assert.ok(plan.healthScale > lastHealth);
       assert.ok(plan.bossHealthScale > lastBossHealth);
       assert.ok(plan.eliteChance <= 0.4);
-      assert.ok(plan.spitterLimit <= 4);
+      assert.ok(plan.spitterLimit <= 6);
       assert.equal(plan.stage, Math.ceil(wave / 4));
       if (plan.encounterId) {
         assert.notEqual(plan.encounterId, lastEncounter);
@@ -65,10 +65,23 @@ test('1000 waves keep growing, use complete shuffled bags, and never repeat adja
 
 test('reduced rates lengthen intervals and both enemy speed modes remain bounded', () => {
   assert.equal(getSpawnInterval(0, 1, 0.25), getSpawnInterval(0, 1, 1) * 4);
-  assert.equal(capEnemySpeed(9999), 160);
+  assert.equal(capEnemySpeed(9999), 180);
   assert.equal(capEnemySpeed(9999, true), 360);
   assert.equal(capEnemySpeed(65), 65);
   assert.equal(DIRECTOR_CONFIG.maxEnemies, 90);
+});
+
+test('difficulty continues scaling and keeps meaningful threats during a living boss', () => {
+  const waveEight = getWavePlan(42, 8);
+  assert.ok(Math.abs(waveEight.healthScale - 2.07) < 1e-9);
+  assert.ok(Math.abs(waveEight.bossHealthScale - 2.63) < 1e-9);
+  assert.equal(getSpawnInterval(1000, 41, 1), 0.18);
+  assert.equal(getWavePlan(42, 17).spitterLimit, 6);
+
+  const director = createDirectorState(42);
+  const carryover = advanceDirector(director, context(200, { hasBoss: true }));
+  assert.equal(carryover.spawnRate, 0.68);
+  assert.equal(carryover.allowSpitter, true);
 });
 
 test('boss and blackout schedules have one owner with no delayed catch-up', () => {
@@ -105,16 +118,17 @@ test('recovery delays events within the wave, skips an unfittable blackout and o
 
 test('shield plus HP loss and crowding trigger bounded relief across wave boundaries', () => {
   const director = createDirectorState(1);
-  recordDirectorDamage(director, 22, 11);
-  recordDirectorDamage(director, 24, 9);
+  recordDirectorDamage(director, 22, 13);
+  recordDirectorDamage(director, 24, 12);
   assert.equal(advanceDirector(director, context(24)).pausedSpawns, true);
   const next = advanceDirector(director, context(25));
   assert.equal(next.plan.wave, 2);
   assert.equal(next.pausedSpawns, true);
   assert.equal(advanceDirector(director, context(27, { nearbyEnemies: 20 })).pausedSpawns, false);
   assert.equal(advanceDirector(director, context(48.9, { nearbyEnemies: 20 })).pausedSpawns, false);
-  assert.equal(advanceDirector(director, context(49, { nearbyEnemies: 8 })).pausedSpawns, true);
-  assert.equal(advanceDirector(director, context(52)).pausedSpawns, false);
+  assert.equal(advanceDirector(director, context(53.9, { nearbyEnemies: 9 })).pausedSpawns, false);
+  assert.equal(advanceDirector(director, context(54, { nearbyEnemies: 9 })).pausedSpawns, true);
+  assert.equal(advanceDirector(director, context(56.25)).pausedSpawns, false);
   assert.equal(director.recentDamage.length, 0);
 });
 
@@ -122,13 +136,13 @@ test('damage older than five seconds cannot trigger relief and recovery does not
   const director = createDirectorState(1);
   recordDirectorDamage(director, 0, 100);
   assert.equal(advanceDirector(director, context(5.01)).pausedSpawns, false);
-  advanceDirector(director, context(10, { nearbyEnemies: 8 }));
+  advanceDirector(director, context(10, { nearbyEnemies: 9 }));
   startDirectorRecovery(director, 11);
   const recovery = advanceDirector(director, context(12, { nearbyEnemies: 8 }));
   assert.equal(recovery.pausedSpawns, false);
   assert.equal(director.reliefUntil, 0);
-  assert.equal(director.recoveryUntil, 17);
-  assert.equal(advanceDirector(director, context(17, { nearbyEnemies: 8 })).pausedSpawns, false);
+  assert.equal(director.recoveryUntil, 15);
+  assert.equal(advanceDirector(director, context(15, { nearbyEnemies: 8 })).pausedSpawns, false);
 });
 
 test('spitter quotas fall back immediately and special phases cannot add spitters', () => {
@@ -136,10 +150,10 @@ test('spitter quotas fall back immediately and special phases cannot add spitter
   const normal = advanceDirector(director, context(100));
   assert.equal(normal.allowSpitter, true);
   assert.equal(selectEnemyType(normal.plan, 0.99, { allowSpitter: true }), 'spitter');
-  assert.equal(selectEnemyType(normal.plan, 0.99, { allowSpitter: true, spitterCount: 2 }), 'walker');
+  assert.equal(selectEnemyType(normal.plan, 0.99, { allowSpitter: true, spitterCount: 3 }), 'walker');
   assert.equal(selectEnemyType(normal.plan, 0.99), 'walker');
   assert.equal(selectEnemyType(normal.plan, 0.5, { walkersOnly: true }), 'walker');
   assert.equal(advanceDirector(director, context(150)).allowSpitter, false);
   assert.equal(advanceDirector(director, context(175)).allowSpitter, false);
-  assert.equal(advanceDirector(director, context(200, { hasBoss: true })).allowSpitter, false);
+  assert.equal(advanceDirector(director, context(200, { hasBoss: true })).allowSpitter, true);
 });
