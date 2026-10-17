@@ -2,6 +2,8 @@
 
 Zombie Room is an offline-first, canvas-based survival game for desktop and mobile browsers. The player moves in four directions, can trigger a timed evasive dash, and fires automatically. The project is implemented as a dependency-free static web app and installable Progressive Web App (PWA).
 
+Latest review: [Gameplay and Codebase Review — 2026-10-17](GAMEPLAY_REVIEW.md) documents 11 confirmed defects, six balance/UX concerns, current test evidence, and the reported “too easy” feedback. Findings remain open; the review changes documentation only.
+
 ## Current Features
 
 - Canvas game loop with automatic targeting and shooting.
@@ -139,6 +141,8 @@ Real-device testing remains necessary for Safari, Chrome Android, iOS standalone
 ### Gameplay
 
 Version 3.6.0 introduces the endless director. The product target is for familiar players to feel substantial pressure after 3–5 minutes, with no final wave. This is a tuning target, not a verified human-playtest result. Version 3.7.0 adds exclusive build paths. Nine synthetic runs across all three paths still reached five minutes at full health/shield; the pressure target remains unverified. See the versioned verification evidence below.
+
+The [2026-10-17 review](GAMEPLAY_REVIEW.md) reproduced those nine full-health outcomes and found pillar pursuit deadlocks, weak Boss closing speed, early spawn-rate saturation, and growth/recovery advantages. A simpler no-Dash controller survived three of six seed/viewport trials at full health, while three died before 132 seconds. These results support investigating inconsistent pressure across seeds, builds, and actual room geometry before increasing global difficulty. The review also identifies an unresolved PWA version-mixing defect; ordinary offline startup tests do not establish update coherence.
 
 The player retains automatic targeting, Dash, eight ordinary upgrades, combo bonuses, pickups, and the regenerating shield. Each run can now gain one of three path-specific weapon evolutions. All incoming damage, including enemy projectiles, uses the existing 0.58-second invulnerability window. No adaptive changes are made to enemy attributes, player upgrades, or rewards.
 
@@ -300,6 +304,7 @@ Before release, verify the following on HTTPS and localhost:
 
 ### P1 — Gameplay depth and balance
 
+- Address the open [review findings](GAMEPLAY_REVIEW.md#confirmed-defect-register), especially pillar deadlocks and ordered bullet/cover collision, before using the current combat behavior as a tuning baseline.
 - Investigate the reported “too easy” feedback with repeated runs across early, mid, and late waves; establish a target survival curve before changing balance values.
 - Repeat balance trials with physical touch input on target devices and varied viewport sizes; the current scripted samples are too small to set a difficulty target.
 - Add distinct, telegraphed enemy attacks and tune movement, shield recharge, spawn pacing, and enemy composition from observed results; avoid increasing health or spawn counts blindly.
@@ -318,6 +323,8 @@ Before release, verify the following on HTTPS and localhost:
 ## Verification Status
 
 No `package.json` or build configuration is present. Run all checks with `node --test tests/*.test.mjs`. Browser tests use Node's built-in WebSocket and an installed Edge/Chrome browser; they auto-skip locally if unavailable. Set `PLAYTEST_BROWSER` to an executable or `PLAYTEST_REQUIRE_BROWSER=1` to require browser support. GitHub Actions runs the same suite and deploys only after it passes. No packages are installed by the tests.
+
+On 2026-10-17, the current v3.8.3 source passed all **41 tests with Chrome required and no skips**. Additional review probes reproduced defects outside the existing assertions; see [the current review](GAMEPLAY_REVIEW.md#verification-performed) for failures, seed comparisons, and remaining acceptance gaps. Earlier version-specific counts below are historical.
 
 Unit checks cover 1,000-wave growth, shuffled encounter bags, pacing boundaries, ranged state transitions, shared collision geometry, and descriptive analysis. Browser checks retain controls/focus/replay regressions, add ranged combat, caps, pause/reset, seeded balance comparisons, controlled late/saturated scenarios, and real service-worker offline startup. Browser harness utilities are shared without adding runtime dependencies.
 
