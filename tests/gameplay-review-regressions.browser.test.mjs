@@ -173,7 +173,7 @@ test('short viewports, Settings keyboard focus, clipboard feedback, and translat
   });
 });
 
-test('first-card no-Dash movement runs create pressure without making the opening harsher', { ...browserOptions, timeout: 90000 }, async () => {
+test('first-card no-Dash movement runs create pressure without ending inside the first wave', { ...browserOptions, timeout: 90000 }, async () => {
   await withBrowser(async (cdp, url) => {
     const scenarios = [
       { width: 1200, height: 685, mobile: false, seed: 42 },
@@ -216,12 +216,13 @@ test('first-card no-Dash movement runs create pressure without making the openin
       assert.ok(outcome.elapsed >= 10, `run ended implausibly early: ${JSON.stringify(outcome)}`);
       assert.deepEqual(cdp.runtimeExceptions, []);
     }
-    // 3.8.5 compounds durability after wave 2, so this careless policy no longer reaches 300s.
-    // Guard the opening instead: 3.8.4 and 3.8.5 both outlast 90 seconds on four of six cases.
-    const outlastOpening = outcomes.filter(run => run.elapsed >= 90).length;
+    // 3.8.6 is deliberately hard from wave 2, so this careless policy no longer reaches 300s.
+    // Guard the onboarding instead: every case clears the 25-second first wave and most reach 45 seconds.
+    const outlastOpening = outcomes.filter(run => run.elapsed >= 45).length;
     const pressured = outcomes.filter(run => run.elapsed < 300).length;
     console.log('First-card no-Dash balance samples (not human playtests): ' + JSON.stringify(outcomes));
-    assert.ok(outlastOpening >= 4, 'most seeds should outlast the opening 90 seconds');
+    assert.ok(outcomes.every(run => run.elapsed >= 25), 'no seed should end inside the first wave');
+    assert.ok(outlastOpening >= 3, 'most seeds should reach 45 seconds');
     assert.ok(pressured > 0, 'the no-Dash policy should experience lethal pressure on some seeds');
   });
 });

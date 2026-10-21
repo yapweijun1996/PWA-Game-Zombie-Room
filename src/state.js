@@ -1,4 +1,4 @@
-export const APP_VERSION = '3.8.5';
+export const APP_VERSION = '3.8.6';
 
 export const dom = {
   canvas: document.getElementById('game'),

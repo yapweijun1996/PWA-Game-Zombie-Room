@@ -283,6 +283,26 @@ The same play also exposed a defect, now fixed: a held or freshly pressed direct
 
 The survival rank also double-counted kills, so a two-minute death ranked S. Rank now follows the wave reached: B from wave 4, A from wave 8, S from wave 13.
 
+## Difficulty tuning — 3.8.6
+
+The owner played 3.8.5 and still found it too easy.
+
+Two changes:
+- **Enemy damage now scales with the wave.** Contact, Boss and spitter-projectile damage rise by 9% per wave (wave 8: ×1.63, wave 12: ×1.99). Until now a walker hit for 11 at every wave, against up to 225 HP plus a shield that regenerates.
+- **Health compounds faster and sooner:** ×1.20 per wave after wave 1, instead of ×1.16 after wave 2.
+
+| 360s probe, six seeds | World-aware Offense | World-aware auto-pick (default) |
+| --- | --- | --- |
+| ×1.16 after wave 2 + 7%/wave | 0/6 deaths | 1/6 — 147 s |
+| **×1.20 after wave 1 + 9%/wave (3.8.6)** | 3/6 — 348–356 s | 6/6 — 133, 142, 150, 155, 184, 343 s |
+| ×1.24 after wave 1 + 11%/wave | 6/6 — 243–349 s | 6/6 — 127–159 s |
+
+Human-like real-time play on 3.8.6 died at 143, 159 and 144 seconds. In every run the crowd rose from about 20 to 70–80 enemies after 110 seconds.
+
+A no-Dash controller still clears the first wave in every case; observed deaths ranged from 42 to 126 seconds.
+
+These results are still synthetic, and real-player feedback remains the deciding signal.
+
 ## Remaining validation
 
 - Recruit at least five familiar players. At least three should report a clear pressure increase around minutes 3–5, understand the main damage/counterplay, and want another run. The synthetic trials cannot establish this acceptance gate.

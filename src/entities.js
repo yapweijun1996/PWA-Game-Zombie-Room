@@ -293,6 +293,9 @@ function spawnZombie(directive) {
   else if (type === 'tank') Object.assign(z, { r: 18, hp: 5.5 * scale, maxHp: 5.5 * scale, speed: 32 + wave * 1.2, damage: 17, color: '#7d9c75', score: 35, xp: 3 });
   else Object.assign(z, { r: 13, hp: 2.1 * scale, maxHp: 2.1 * scale, speed: 48 + wave * 1.7, damage: 11, color: '#79b86a', score: 10, xp: 1 });
 
+  z.damageScale = directive.plan.damageScale;
+  z.damage *= z.damageScale;
+
   if (type !== 'spitter' && !directive.walkersOnly && wave >= 2 && gameRandom() < directive.plan.eliteChance) {
     z.affix = selectEliteAffix(game.waveModifierId, gameRandom());
     if (z.affix === 'frost') {
@@ -507,14 +510,15 @@ function spawnBoss() {
   if (side === 1) { x = room.x + room.w + 44; y = gameRand(room.y + 40, room.y + room.h - 40); }
   if (side === 2) { x = gameRand(room.x + 40, room.x + room.w - 40); y = room.y + room.h + 44; }
   if (side === 3) { x = room.x - 44; y = gameRand(room.y + 40, room.y + room.h - 40); }
-  const scale = getWavePlan(game.scenarioSeed, game.wave).bossHealthScale;
+  const plan = getWavePlan(game.scenarioSeed, game.wave);
+  const scale = plan.bossHealthScale;
   const z = {
     x, y, type: 'boss', hitFlash: 0, attackFlash: 0, walkTime: 0, facing: 0, pulse: 0, entrance: 1.2,
     r: 26,
     hp: 20 * scale,
     maxHp: 20 * scale,
     speed: 40 + game.wave * 2.2,
-    damage: 24,
+    damage: 24 * plan.damageScale,
     color: '#c75b68',
     score: 140,
     xp: 8,

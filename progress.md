@@ -106,3 +106,15 @@ Original prompt: Implement the approved endless difficulty director plan: 25-sec
 - The director browser test advances synthetic runs and replays in slices; crowded late waves had exceeded the 15-second DevTools command timeout.
 
 - Required-Chrome suite on the final 3.8.5 source: 54 passed, 0 failed, 0 skipped (`PLAYTEST_REQUIRE_BROWSER=1 node --test tests/*.test.mjs`).
+
+## Harder from wave 2 — v3.8.6
+
+- Owner feedback after playing 3.8.5: still too easy, make it harder.
+- Enemy contact, Boss and spitter-projectile damage now scale by +9% per wave (`DIRECTOR_CONFIG.damagePerWave`, exposed as `plan.damageScale`). Before this, a walker hit for 11 at every wave against up to 225 HP plus a regenerating shield. Health compounding is raised to ×1.20 per wave after wave 1 (wave 8 health ≈ 7.4×, wave 12 ≈ 20.9×).
+- 360-second probe with six seeds compared three candidates. World-aware controller, Offense / default auto-pick deaths:
+  - ×1.16 after wave 2 + 7%/wave: 0/6 / 1/6.
+  - ×1.20 after wave 1 + 9%/wave (chosen): 3/6 at 348–356 s / 6/6 at 133–343 s, five of them within 133–184 s.
+  - ×1.24 after wave 1 + 11%/wave: 6/6 at 243–349 s / 6/6 at 127–159 s, rejected as leaving no room for strong players.
+- Human-like real-time play on 3.8.6 died at 143, 159 and 144 seconds; enemy counts rose from about 20 to 70–80 after 110 seconds.
+- The no-Dash regression now guards onboarding: every case clears the 25-second first wave and at least three of six reach 45 seconds (observed 42–126 seconds).
+- Required-Chrome suite: 54 passed, 0 failed, 0 skipped.

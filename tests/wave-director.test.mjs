@@ -73,10 +73,13 @@ test('reduced rates lengthen intervals and both enemy speed modes remain bounded
 
 test('difficulty continues scaling and keeps meaningful threats during a living boss', () => {
   const waveEight = getWavePlan(42, 8);
-  // Linear growth (2.07 / 2.63 at wave 8) compounds by 1.16 per wave after wave 2.
-  assert.ok(Math.abs(waveEight.healthScale - 2.07 * 1.16 ** 6) < 1e-9);
-  assert.ok(Math.abs(waveEight.bossHealthScale - 2.63 * 1.16 ** 6) < 1e-9);
-  assert.equal(getWavePlan(42, 2).healthScale, 1.11, 'the opening waves keep linear growth');
+  // Linear growth (2.07 / 2.63 at wave 8) compounds by 1.20 per wave after wave 1.
+  assert.ok(Math.abs(waveEight.healthScale - 2.07 * 1.2 ** 7) < 1e-9);
+  assert.ok(Math.abs(waveEight.bossHealthScale - 2.63 * 1.2 ** 7) < 1e-9);
+  assert.equal(getWavePlan(42, 1).healthScale, 1, 'the first wave keeps base durability');
+  // Contact, Boss and spitter-projectile damage rise 9% per wave so hits matter as maximum HP grows.
+  assert.equal(getWavePlan(42, 1).damageScale, 1);
+  assert.ok(Math.abs(waveEight.damageScale - 1.63) < 1e-9);
   assert.equal(getSpawnInterval(1000, 41, 1), 0.18);
   assert.equal(getWavePlan(42, 17).spitterLimit, 6);
 

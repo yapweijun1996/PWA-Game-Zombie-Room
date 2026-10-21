@@ -119,7 +119,7 @@ export function createEnemyProjectile(zombie) {
   return {
     x: zombie.x + attack.directionX * muzzle, y: zombie.y + attack.directionY * muzzle,
     vx: attack.directionX * SPITTER_CONFIG.projectileSpeed, vy: attack.directionY * SPITTER_CONFIG.projectileSpeed,
-    r: SPITTER_CONFIG.projectileRadius, damage: SPITTER_CONFIG.projectileDamage,
+    r: SPITTER_CONFIG.projectileRadius, damage: SPITTER_CONFIG.projectileDamage * (zombie.damageScale || 1),
     life: SPITTER_CONFIG.projectileLife, type: 'spitter-projectile'
   };
 }

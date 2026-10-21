@@ -8,7 +8,9 @@ export const DIRECTOR_CONFIG = Object.freeze({
   phaseRates: Object.freeze([0.82, 1.12, 0.72, 0.55]), recoveryRate: 0.25,
   healthPerWave: 0.11, bossHealthPerWave: 0.19, healthPerStage: 0.3,
   // Upgrades multiply player damage, so durability also compounds after the opening waves.
-  lateHealthGrowth: 1.16, lateGrowthAfterWave: 2,
+  lateHealthGrowth: 1.20, lateGrowthAfterWave: 1,
+  // Hits must keep mattering as maximum HP grows.
+  damagePerWave: 0.09,
   eliteBase: 0.12, elitePerWave: 0.025, eliteCap: 0.4
 });
 
@@ -74,6 +76,7 @@ export function getWavePlan(seed, wave) {
     spawnRate: DIRECTOR_CONFIG.phaseRates[phase],
     healthScale: (1 + DIRECTOR_CONFIG.healthPerWave * (wave - 1) + DIRECTOR_CONFIG.healthPerStage * cycle) * late,
     bossHealthScale: (1 + DIRECTOR_CONFIG.bossHealthPerWave * (wave - 1) + DIRECTOR_CONFIG.healthPerStage * cycle) * late,
+    damageScale: 1 + DIRECTOR_CONFIG.damagePerWave * (wave - 1),
     eliteChance: Math.min(DIRECTOR_CONFIG.eliteCap, DIRECTOR_CONFIG.eliteBase + wave * DIRECTOR_CONFIG.elitePerWave),
     spitterLimit: wave < 5 ? 0 : Math.min(6, cycle + 2)
   };
