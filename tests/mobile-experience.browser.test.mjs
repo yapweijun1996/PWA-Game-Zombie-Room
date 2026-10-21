@@ -149,3 +149,48 @@ test('touch anywhere steers, settings stay on toggles, and timed upgrade choice 
     assert.deepEqual(cdp.runtimeExceptions, []);
   });
 });
+
+test('upgrade choices are skipped by default and the dialog can opt in to skipping all', browserOptions, async () => {
+  await withBrowser(async (cdp, url) => {
+    await cdp.send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+    // An ordinary session: seeded playtests keep the dialog for synthetic controllers.
+    await cdp.send('Page.navigate', { url: `${url}/` });
+    await waitFor(cdp.evaluate.bind(cdp), "document.readyState === 'complete' && Boolean(document.querySelector('#upgradeSkipToggle'))", Boolean);
+    const skipped = await cdp.evaluate(`(async () => {
+      const { game } = await import('./src/state.js');
+      const { resetGame, openUpgradeModal } = await import('./src/entities.js');
+      resetGame();
+      const before = Object.values(game.player.upgrades).reduce((sum, level) => sum + (level || 0), 0);
+      game.pendingUpgrades = 2;
+      openUpgradeModal();
+      const after = Object.values(game.player.upgrades).reduce((sum, level) => sum + (level || 0), 0);
+      return { toggle: document.querySelector('#upgradeSkipToggle').getAttribute('aria-checked'), open: game.upgradeModalOpen,
+        hidden: document.querySelector('#upgradeModal').hidden, pending: game.pendingUpgrades, gained: after > before, paused: game.paused };
+    })()`);
+    assert.deepEqual(skipped, { toggle: 'true', open: false, hidden: true, pending: 0, gained: true, paused: false });
+
+    const dialog = await cdp.evaluate(`(async () => {
+      const { game, setUpgradeSkipEnabled } = await import('./src/state.js');
+      const { openUpgradeModal } = await import('./src/entities.js');
+      setUpgradeSkipEnabled(false);
+      game.pendingUpgrades = 2;
+      openUpgradeModal();
+      return { open: game.upgradeModalOpen, buttonVisible: Boolean(document.querySelector('#upgradeSkipButton')?.offsetParent) };
+    })()`);
+    assert.deepEqual(dialog, { open: true, buttonVisible: true });
+    await cdp.evaluate("document.querySelector('#upgradeSkipButton').click()");
+    const afterSkipAll = await cdp.evaluate(`import('./src/state.js').then(({ game, upgradeSkipState }) => ({
+      open: game.upgradeModalOpen, hidden: document.querySelector('#upgradeModal').hidden, pending: game.pendingUpgrades,
+      enabled: upgradeSkipState.enabled, stored: localStorage.getItem('zombie-room-upgrade-skip') }))`);
+    assert.deepEqual(afterSkipAll, { open: false, hidden: true, pending: 0, enabled: true, stored: 'true' });
+
+    await cdp.evaluate("document.querySelector('#settingsTrigger').click()");
+    await waitFor(cdp.evaluate.bind(cdp), "!document.querySelector('#settingsPanel').hidden", Boolean);
+    const toggled = await cdp.evaluate(`(() => {
+      document.querySelector('#upgradeSkipToggle').click();
+      return { checked: document.querySelector('#upgradeSkipToggle').getAttribute('aria-checked'), stored: localStorage.getItem('zombie-room-upgrade-skip') };
+    })()`);
+    assert.deepEqual(toggled, { checked: 'false', stored: 'false' });
+    assert.deepEqual(cdp.runtimeExceptions, []);
+  });
+});

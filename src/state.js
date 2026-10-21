@@ -1,4 +1,4 @@
-export const APP_VERSION = '3.8.4';
+export const APP_VERSION = '3.8.5';
 
 export const dom = {
   canvas: document.getElementById('game'),
@@ -22,6 +22,8 @@ export const dom = {
   hapticsStatusText: document.getElementById('hapticsStatusText'),
   hapticsAvailabilityNote: document.getElementById('hapticsAvailabilityNote'),
   autoUpgradeToggle: document.getElementById('autoUpgradeToggle'),
+  upgradeSkipToggle: document.getElementById('upgradeSkipToggle'),
+  upgradeSkipButton: document.getElementById('upgradeSkipButton'),
   upgradeAutoToggle: document.getElementById('upgradeAutoToggle'),
   upgradeAutoCountdown: document.getElementById('upgradeAutoCountdown'),
   upgradeAutoProgress: document.getElementById('upgradeAutoProgress'),
@@ -189,6 +191,16 @@ export const musicState = {
 export const autoUpgradeState = {
   enabled: readBooleanSetting('zombie-room-auto-upgrade', true)
 };
+
+// When enabled, level-ups take the first choice without opening the upgrade dialog.
+export const upgradeSkipState = {
+  enabled: readBooleanSetting('zombie-room-upgrade-skip', true)
+};
+
+export function setUpgradeSkipEnabled(enabled) {
+  upgradeSkipState.enabled = Boolean(enabled);
+  try { localStorage.setItem('zombie-room-upgrade-skip', String(upgradeSkipState.enabled)); } catch (_) {}
+}
 
 export function setMusicEnabled(enabled) {
   musicState.enabled = Boolean(enabled);

@@ -931,6 +931,24 @@
       letter-spacing: .03em;
     }
 
+    .upgrade-skip-button {
+      flex-shrink: 0;
+      width: 100%;
+      min-height: 40px;
+      margin-top: 8px;
+      border: 1px solid var(--line-strong);
+      border-radius: 10px;
+      background: rgba(228, 255, 235, .06);
+      color: #c8d8cc;
+      font: inherit;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: .02em;
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+    .upgrade-skip-button:hover,
+    .upgrade-skip-button:focus-visible { background: rgba(228, 255, 235, .12); }
     .upgrade-auto-row {
       flex-shrink: 0;
       display: flex;
@@ -1521,4 +1539,8 @@
   .upgrade-modal { padding: 12px; }
   .upgrade-header { margin-bottom: 6px; }
   .upgrade-build-summary { margin-bottom: 6px; }
+  /* Keep the choice list readable: card numbers already show the keys. */
+  .upgrade-keyboard-hint { display: none; }
+  .upgrade-auto-row { min-height: 32px; margin-top: 4px; }
+  .upgrade-skip-button { min-height: 32px; margin-top: 4px; }
 }

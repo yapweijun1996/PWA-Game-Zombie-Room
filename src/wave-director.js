@@ -7,6 +7,8 @@ export const DIRECTOR_CONFIG = Object.freeze({
   maxEnemies: 90, maxMoveSpeed: 180, maxChargeSpeed: 360,
   phaseRates: Object.freeze([0.82, 1.12, 0.72, 0.55]), recoveryRate: 0.25,
   healthPerWave: 0.11, bossHealthPerWave: 0.19, healthPerStage: 0.3,
+  // Upgrades multiply player damage, so durability also compounds after the opening waves.
+  lateHealthGrowth: 1.16, lateGrowthAfterWave: 2,
   eliteBase: 0.12, elitePerWave: 0.025, eliteCap: 0.4
 });
 
@@ -63,14 +65,15 @@ export function getWaveModifier(seed, wave) {
 export function getWavePlan(seed, wave) {
   const cycle = Math.floor((wave - 1) / DIRECTOR_CONFIG.wavesPerStage);
   const phase = (wave - 1) % DIRECTOR_CONFIG.wavesPerStage;
+  const late = DIRECTOR_CONFIG.lateHealthGrowth ** Math.max(0, wave - DIRECTOR_CONFIG.lateGrowthAfterWave);
   return {
     wave, stage: cycle + 1, phase,
     phaseId: ['buildup', 'pressure', 'blackout', 'boss'][phase],
     encounterId: encounterForWave(seed, wave),
     modifierId: getWaveModifier(seed, wave),
     spawnRate: DIRECTOR_CONFIG.phaseRates[phase],
-    healthScale: 1 + DIRECTOR_CONFIG.healthPerWave * (wave - 1) + DIRECTOR_CONFIG.healthPerStage * cycle,
-    bossHealthScale: 1 + DIRECTOR_CONFIG.bossHealthPerWave * (wave - 1) + DIRECTOR_CONFIG.healthPerStage * cycle,
+    healthScale: (1 + DIRECTOR_CONFIG.healthPerWave * (wave - 1) + DIRECTOR_CONFIG.healthPerStage * cycle) * late,
+    bossHealthScale: (1 + DIRECTOR_CONFIG.bossHealthPerWave * (wave - 1) + DIRECTOR_CONFIG.healthPerStage * cycle) * late,
     eliteChance: Math.min(DIRECTOR_CONFIG.eliteCap, DIRECTOR_CONFIG.eliteBase + wave * DIRECTOR_CONFIG.elitePerWave),
     spitterLimit: wave < 5 ? 0 : Math.min(6, cycle + 2)
   };

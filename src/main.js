@@ -6,7 +6,7 @@ import { draw } from './render.js';
 import { initPwa, refreshPwaLabels } from './pwa.js';
 import { initInput, resetInputState } from './input.js';
 import { initI18n } from './i18n-apply.js';
-import { initSettingsMenu, refreshSoundToggleUI, refreshMusicToggleUI, refreshHapticsToggleUI, refreshAutoUpgradeToggleUI } from './settings-menu.js';
+import { initSettingsMenu, refreshSoundToggleUI, refreshMusicToggleUI, refreshHapticsToggleUI, refreshAutoUpgradeToggleUI, refreshUpgradeSkipToggleUI } from './settings-menu.js';
 import { flashMessage, updateUI } from './ui.js';
 import { t } from './i18n.js';
 import { initAudio, playUiClick } from './audio.js';
@@ -206,6 +206,7 @@ initI18n(() => {
   refreshMusicToggleUI();
   refreshHapticsToggleUI();
   refreshAutoUpgradeToggleUI();
+  refreshUpgradeSkipToggleUI();
   updateUI();
   if (game.upgradeModalOpen && currentUpgradeChoices.length) {
     updateUpgradeDialog(currentUpgradeChoices, game.player, chooseUpgrade);

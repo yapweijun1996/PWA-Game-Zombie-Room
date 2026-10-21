@@ -1,4 +1,4 @@
-import { APP_VERSION, game, room, ui, dom, input, timers, perf, scoreState, viewport, getActiveBoss, hasActiveBoss } from './state.js';
+import { APP_VERSION, game, room, ui, dom, input, timers, perf, scoreState, viewport, getActiveBoss, hasActiveBoss, upgradeSkipState } from './state.js';
 import { clamp, dist2, rand, shuffle } from './utils.js';
 import { beginPlaytestRun, finishPlaytestRun, gameRandom, gameRand, getPlaytestSeed, isPlaytestReplaying, playtestConfig, recordPlaytestAbility, recordPlaytestCheckpoint, recordPlaytestDamage, recordPlaytestInput, recordPlaytestPause, recordPlaytestUpgrade, recordPlaytestWaveModifier, recordPlaytestDirectorEvent } from './playtest.js';
 import { burst, sprayBlood, makeDecal, particleBudget, spawnDamageText, spawnGore } from './effects.js';
@@ -669,9 +669,25 @@ export function openUpgradeModal() {
   game.upgradeModalOpen = true;
   playLevelUp();
   vibrateLevelUp();
+  if (shouldSkipUpgradeDialog()) {
+    resolveQueuedUpgrades();
+    return;
+  }
   if (dom.canvas) dom.canvas.classList.add('game-dimmed');
 
   showUpgradeDialog(currentUpgradeChoices, p, chooseUpgrade);
+}
+
+// Seeded playtests keep the dialog so synthetic controllers and replays choose explicitly.
+function shouldSkipUpgradeDialog() {
+  return upgradeSkipState.enabled && !playtestConfig.enabled && !isPlaytestReplaying();
+}
+
+// Takes the first choice for every queued level; chooseUpgrade closes the dialog when the queue empties.
+export function resolveQueuedUpgrades() {
+  if (isPlaytestReplaying()) return;
+  for (let guard = 0; game.upgradeModalOpen && guard < 100; guard++) chooseUpgrade(0);
+  if (game.upgradeModalOpen) closeUpgradeModal();
 }
 
 function awardUnavailableUpgrades(player) {
@@ -724,7 +740,7 @@ export function chooseUpgrade(index, replayEvent = false) {
   if (game.pendingUpgrades > 0) {
     currentUpgradeChoices = getAvailableUpgrades();
     if (currentUpgradeChoices.length) {
-      updateUpgradeDialog(currentUpgradeChoices, p, chooseUpgrade);
+      if (!shouldSkipUpgradeDialog()) updateUpgradeDialog(currentUpgradeChoices, p, chooseUpgrade);
       return;
     }
     awardUnavailableUpgrades(p);

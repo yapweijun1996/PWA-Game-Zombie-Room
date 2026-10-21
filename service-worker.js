@@ -1,6 +1,6 @@
 'use strict';
 
-const APP_VERSION = '3.8.4';
+const APP_VERSION = '3.8.5';
 const CACHE_NAME = 'zombie-room-v' + APP_VERSION;
 const APP_SHELL = [
   './',

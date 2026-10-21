@@ -1,5 +1,5 @@
-import { game, dom, audioState, hapticsState, musicState, autoUpgradeState, setMusicEnabled, setAutoUpgradeEnabled } from './state.js';
-import { setPaused } from './entities.js';
+import { game, dom, audioState, hapticsState, musicState, autoUpgradeState, upgradeSkipState, setMusicEnabled, setAutoUpgradeEnabled, setUpgradeSkipEnabled } from './state.js';
+import { setPaused, resolveQueuedUpgrades } from './entities.js';
 import { activateFocusTrap } from './focus-trap.js';
 import { t } from './i18n.js';
 import { playUiClick, resumeAudioContext } from './audio.js';
@@ -46,6 +46,14 @@ export function refreshAutoUpgradeToggleUI() {
   if (dom.upgradeAutoToggle) dom.upgradeAutoToggle.checked = autoUpgradeState.enabled;
 }
 
+export function refreshUpgradeSkipToggleUI() {
+  if (!dom.upgradeSkipToggle) return;
+  dom.upgradeSkipToggle.classList.toggle('active', upgradeSkipState.enabled);
+  dom.upgradeSkipToggle.setAttribute('aria-checked', String(upgradeSkipState.enabled));
+  const status = document.getElementById('upgradeSkipStatusText');
+  if (status) status.textContent = upgradeSkipState.enabled ? t('soundOn') : t('soundOff');
+}
+
 export function initSettingsMenu() {
   const trigger = document.getElementById('settingsTrigger');
   const panel = document.getElementById('settingsPanel');
@@ -90,6 +98,17 @@ export function initSettingsMenu() {
     if (hapticsState.enabled) vibrateUi();
   });
 
+  refreshUpgradeSkipToggleUI();
+  dom.upgradeSkipToggle?.addEventListener('click', () => {
+    setUpgradeSkipEnabled(!upgradeSkipState.enabled);
+    refreshUpgradeSkipToggleUI();
+  });
+  dom.upgradeSkipButton?.addEventListener('click', () => {
+    setUpgradeSkipEnabled(true);
+    refreshUpgradeSkipToggleUI();
+    resolveQueuedUpgrades();
+  });
+
   refreshAutoUpgradeToggleUI();
   dom.autoUpgradeToggle?.addEventListener('click', () => {
     setAutoUpgradeEnabled(!autoUpgradeState.enabled);
@@ -125,6 +144,7 @@ export function initSettingsMenu() {
     refreshMusicToggleUI();
     refreshHapticsToggleUI();
     refreshAutoUpgradeToggleUI();
+    refreshUpgradeSkipToggleUI();
 
     panel.hidden = false;
     if (backdrop) backdrop.hidden = false;

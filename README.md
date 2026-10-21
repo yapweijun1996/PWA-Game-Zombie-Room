@@ -2,7 +2,7 @@
 
 Zombie Room is an offline-first, canvas-based survival game for desktop and mobile browsers. The player moves in four directions, can trigger a timed evasive dash, and fires automatically. The project is implemented as a dependency-free static web app and installable Progressive Web App (PWA).
 
-Latest review: [Gameplay and Codebase Review — 2026-10-17](GAMEPLAY_REVIEW.md) tracks 11 confirmed defects, six balance concerns, the fixes, and updated test evidence for the “too easy” feedback.
+Latest review: [Gameplay and Codebase Review — 2026-10-17](GAMEPLAY_REVIEW.md) tracks 11 confirmed defects, six balance concerns, the fixes, and updated test evidence for the “too easy” feedback, including the 3.8.5 compounding-durability tuning.
 
 ## Current Features
 
@@ -11,7 +11,7 @@ Latest review: [Gameplay and Codebase Review — 2026-10-17](GAMEPLAY_REVIEW.md)
 - Vibration API feedback for damage, crits, level-ups, boss spawns, and death where supported. iOS Safari/PWA does not expose the iPhone Taptic Engine to web pages; Settings reports unsupported vibration instead of showing a misleading active switch.
 - Dynamic floating combat damage numbers with pop-in scaling, upward drift, alpha fade-out, and distinct gold critical strike callouts.
 - Full-screen touch movement for phones: a one-finger touch starts the analog joystick at that finger's position, with the separate Dash button preserved; desktop retains WASD / arrow keys.
-- Upgrade cards can auto-select the first option after a three-second visible countdown, controlled in the dialog or Settings.
+- Level-ups auto-select the first upgrade by default without pausing; turn off **Skip upgrade choices** in Settings to choose manually, or press **Skip all** in the dialog. With choices shown, a three-second countdown can still auto-select the first option.
 - Walker, runner, tank, telegraphed ranged spitter, and boss enemy types.
 - Cinematic Boss encounters with heavy screen rumble, warning haptics, and a dedicated glowing Boss health bar.
 - Boss Phase 2 Frenzy (< 50% HP) with terrifying beast roar audio, flaming red magma visuals, blazing golden eyes, halved dash cooldown, and rapid charges.

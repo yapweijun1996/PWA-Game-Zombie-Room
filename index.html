@@ -129,6 +129,16 @@
       </div>
       <div class="settings-row">
         <div class="settings-toggle-row">
+          <span class="settings-label" data-i18n="upgradeSkipSettingsLabel">Skip upgrade choices</span>
+          <button class="settings-toggle-btn active" id="upgradeSkipToggle" type="button" role="switch" aria-checked="true" data-i18n-aria="upgradeSkipSettingsLabel" aria-label="Skip upgrade choices">
+            <span class="toggle-track"><span class="toggle-thumb"></span></span>
+            <span class="toggle-text" id="upgradeSkipStatusText" data-i18n="soundOn">ON</span>
+          </button>
+        </div>
+        <p class="settings-note" data-i18n="upgradeSkipSettingsNote">Level-ups pick the first upgrade automatically, without stopping the game.</p>
+      </div>
+      <div class="settings-row">
+        <div class="settings-toggle-row">
           <span class="settings-label" data-i18n="autoUpgradeSettingsLabel">Auto-pick upgrades</span>
           <button class="settings-toggle-btn active" id="autoUpgradeToggle" type="button" role="switch" aria-checked="true" data-i18n-aria="autoUpgradeSettingsLabel" aria-label="Toggle automatic upgrade selection">
             <span class="toggle-track"><span class="toggle-thumb"></span></span>
@@ -144,7 +154,7 @@
       </button>
       <button class="update-button settings-action" id="updateButton" type="button" data-i18n-aria="updateAriaCheck" aria-label="Check for Zombie Room updates">
         <span class="update-dot" aria-hidden="true"></span>
-        <span id="updateLabel">Update v3.8.4</span>
+        <span id="updateLabel">Update v3.8.5</span>
       </button>
       <div class="settings-diagnostics">
         <div class="settings-label" data-i18n="hudDiagnostics">Performance</div>
@@ -181,6 +191,7 @@
           <i id="upgradeAutoProgressFill"></i>
         </div>
         <p class="upgrade-keyboard-hint" data-i18n="upgradeKeyboardHint">Press 1, 2, or 3 on keyboard</p>
+        <button class="upgrade-skip-button" id="upgradeSkipButton" type="button" data-i18n="upgradeSkipButton">Skip all — auto-select from now on</button>
       </div>
 
       <div class="card pause-card" id="pauseOverlay" role="dialog" aria-modal="true" aria-labelledby="pauseTitle" hidden tabindex="-1">

@@ -239,6 +239,34 @@ An independent repeat in the same harness reproduced all six rows. Recording sto
 - Real iOS/Android devices, a real incompatible-release update cycle, translation fluency, and human enjoyment were not validated by this review.
 - Retain the existing human gate: at least five familiar players, with at least three reporting a clear pressure increase around minutes 3–5, understanding the main damage/counterplay, and wanting another run. Define the desired survival curve with those results before choosing numerical difficulty targets.
 
+## Difficulty tuning — 3.8.5
+
+Follow-up feedback still reported the game as too easy. The 300-second fixtures hid the margin, because every survivor ended at 225 HP / 40 shield. A scratch probe therefore ran each case to **600 seconds**:
+- **Seeds:** 42, 160501, 202602, 7, 31337 and 90210.
+- **World-aware controller:** Offense and First-card upgrade policies at 390×844.
+- **No-Dash square-movement controller:** 1200×685 and 390×844.
+- **Recorded:** effective HP (HP + shield), plus the average number of live enemies in each 30-second window.
+
+**Finding (B01, quantified).** On 3.8.4 the world-aware controller stayed above 80% effective HP in 11 of 12 runs over the full 600 seconds. Average live enemies stayed at 5–12, while the cap is 90. Upgrades multiply player damage; enemy health grew only linearly, so most spawns died before reaching the player.
+
+**Change.** Normal and Boss health now compound by ×1.16 per wave after wave 2 (`DIRECTOR_CONFIG.lateHealthGrowth`, `lateGrowthAfterWave`). For example, wave 8 health is 2.07 × 1.16⁶ ≈ 5.04 and wave 12 is ≈ 12.4. Waves 1–2 are unchanged.
+
+Alternatives tried on the same batch:
+- ×1.06 after wave 4: little change.
+- ×1.12 and ×1.18 after wave 4: pressure only after about 450 seconds.
+- ×1.20 after wave 2: First-card deaths at 129–151 seconds.
+
+| Policy (600s probe) | 3.8.4 deaths / times (s) | 3.8.5 deaths / times (s) |
+| --- | --- | --- |
+| World-aware Offense | 0/6, all 600+ | 4/6 — 446, 451, 460, 483; two 600+ |
+| World-aware First-card | 1/6 — 129 | 6/6 — 141, 433, 436, 457, 480, 488 |
+| No-Dash 1200×685 | 4/6 — 44, 50, 120, 123 | 6/6 — 44, 50, 124, 139, 145, 171 |
+| No-Dash 390×844 | 5/6 — 45, 46, 119, 129, 178 | 6/6 — 45, 46, 95, 115, 136, 141 |
+
+**Upgrade flow.** Level-ups now take the first choice without opening the dialog by default, so most players will follow the First-card policy. Seeded playtests still show the dialog.
+
+**Limits.** The world-aware controller has perfect information and reacts in 100ms. Its deaths at roughly 7–8 minutes are a stress signal, not a prediction of human survival. The no-Dash controller still dies in about 45 seconds on seed 42, exactly as before; the opening was not made harder. Human enjoyment and pressure at 3–5 minutes still require the playtest gate below.
+
 ## Remaining validation
 
 - Recruit at least five familiar players. At least three should report a clear pressure increase around minutes 3–5, understand the main damage/counterplay, and want another run. The synthetic trials cannot establish this acceptance gate.
