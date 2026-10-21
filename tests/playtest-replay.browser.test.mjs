@@ -361,7 +361,8 @@ test('replay, dash controls, telegraphs, wave modifiers, and modal focus work to
     await cdp.evaluate(`(async () => {
       const { game } = await import('./src/state.js');
       const { resetGame } = await import('./src/entities.js');
-      if (!game.player) resetGame();
+      // The unattended live run can already have died on harder tuning; restart it for the dash checks.
+      if (!game.player || !game.running) resetGame();
       // Keep the live startup fixture active while later UI checks run.
       Object.assign(game.player, { dashCooldown: 0, dashTimer: 0, invuln: 180 });
     })()`);
