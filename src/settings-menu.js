@@ -1,5 +1,5 @@
 import { game, dom, audioState, hapticsState, musicState, autoUpgradeState, upgradeSkipState, setMusicEnabled, setAutoUpgradeEnabled, setUpgradeSkipEnabled } from './state.js';
-import { setPaused, resolveQueuedUpgrades } from './entities.js';
+import { setPaused, resolveQueuedUpgrades, shouldSkipUpgradeDialog } from './entities.js';
 import { activateFocusTrap } from './focus-trap.js';
 import { t } from './i18n.js';
 import { playUiClick, resumeAudioContext } from './audio.js';
@@ -52,6 +52,8 @@ export function refreshUpgradeSkipToggleUI() {
   dom.upgradeSkipToggle.setAttribute('aria-checked', String(upgradeSkipState.enabled));
   const status = document.getElementById('upgradeSkipStatusText');
   if (status) status.textContent = upgradeSkipState.enabled ? t('soundOn') : t('soundOff');
+  // The countdown only applies when choices are shown.
+  if (dom.autoUpgradeToggle) dom.autoUpgradeToggle.disabled = shouldSkipUpgradeDialog();
 }
 
 export function initSettingsMenu() {
@@ -102,6 +104,7 @@ export function initSettingsMenu() {
   dom.upgradeSkipToggle?.addEventListener('click', () => {
     setUpgradeSkipEnabled(!upgradeSkipState.enabled);
     refreshUpgradeSkipToggleUI();
+    if (upgradeSkipState.enabled && game.upgradeModalOpen) resolveQueuedUpgrades();
   });
   dom.upgradeSkipButton?.addEventListener('click', () => {
     setUpgradeSkipEnabled(true);

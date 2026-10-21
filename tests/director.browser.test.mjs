@@ -109,6 +109,8 @@ test('director combat integration, bounded threats, pause and reset', browserOpt
 });
 
 // This is a synthetic controller, not evidence of human difficulty or enjoyment.
+// Each evaluation advances at most 40 simulated seconds and returns null until the run ends,
+// keeping crowded late waves inside the DevTools command timeout.
 const simulateRun = `(async () => {
   const { game, room, input } = await import('./src/state.js');
   const entities = await import('./src/entities.js');
@@ -117,8 +119,10 @@ const simulateRun = `(async () => {
     ? ['path_mobility', 'ambush', 'phaseDrive', 'agility', 'crit', 'damage', 'rapidFire', 'multiShot', 'pierce', 'vitality', 'magnet']
     : ['path_scatter', 'choke', 'plasmaFlak', 'tesla', 'damage', 'rapidFire', 'multiShot', 'pierce', 'crit', 'agility', 'vitality', 'magnet'];
   const rank = id => preference.includes(id) ? preference.indexOf(id) : Infinity;
-  let iterations = 0;
+  let iterations = window.__simIterations || 0;
+  const sliceEnd = iterations + 400;
   while (window.__zombieRoomPlaytest.status === 'running' && iterations++ < 20000) {
+    if (iterations > sliceEnd) { window.__simIterations = iterations - 1; return null; }
     if (game.upgradeModalOpen) {
       const choices = entities.currentUpgradeChoices;
       const index = window.testProfile !== 'first-card' ? choices.reduce((best, choice, i) => rank(choice.id) < rank(choices[best].id) ? i : best, 0) : 0;
@@ -166,7 +170,8 @@ test('three seeds compare builds, reproduce director/ranged events and exercise 
       for (const profile of ['offense', 'first-card', 'mobility']) {
         await openManual(cdp, url, seed);
         await cdp.evaluate(`window.testProfile = ${JSON.stringify(profile)}`);
-        const run = await cdp.evaluate(simulateRun);
+        let run = null;
+        while (!run) run = await cdp.evaluate(simulateRun);
         assert.equal(run.status, 'finished');
         assert.ok(['player-death', 'time-cap'].includes(run.outcome));
         assert.equal(run.eventsTruncated, false);
@@ -180,10 +185,16 @@ test('three seeds compare builds, reproduce director/ranged events and exercise 
             const versionRejected = !window.__zombieRoomPlaytestTools.replay({ ...source, appVersion: '3.5.7' }).ok;
             const started = window.__zombieRoomPlaytestTools.replay(source);
             if (!started.ok) throw new Error(started.reason);
-            let attempts = 0;
-            while (window.__zombieRoomPlaytest.status === 'running' && attempts++ < 3000) window.advanceTime(1000);
-            return { oldRejected, versionRejected, comparison: window.__zombieRoomPlaytest.replayComparison };
+            return { oldRejected, versionRejected };
           })()`);
+          for (let slice = 0; slice < 100; slice++) {
+            const running = await cdp.evaluate(`(() => {
+              for (let i = 0; i < 30 && window.__zombieRoomPlaytest.status === 'running'; i++) window.advanceTime(1000);
+              return window.__zombieRoomPlaytest.status === 'running';
+            })()`);
+            if (!running) break;
+          }
+          check.comparison = await cdp.evaluate('window.__zombieRoomPlaytest.replayComparison');
           assert.equal(check.oldRejected, true);
           assert.equal(check.versionRejected, true);
           assert.ok(check.comparison, 'replay should finish');

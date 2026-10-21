@@ -314,6 +314,7 @@
       touch-action: manipulation;
     }
     .settings-toggle-btn:active { transform: translateY(1px); }
+    .settings-toggle-btn:disabled { opacity: .45; cursor: default; }
     .toggle-track {
       width: 26px;
       height: 15px;

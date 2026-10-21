@@ -169,6 +169,22 @@ test('upgrade choices are skipped by default and the dialog can opt in to skippi
     })()`);
     assert.deepEqual(skipped, { toggle: 'true', open: false, hidden: true, pending: 0, gained: true, paused: false });
 
+    const smartPicks = await cdp.evaluate(`(async () => {
+      const { game } = await import('./src/state.js');
+      const { resetGame, openUpgradeModal, pickAutomaticUpgradeIndex, UPGRADES, EVOLUTIONS } = await import('./src/entities.js');
+      resetGame();
+      game.player.level = 4; game.pendingUpgrades = 1;
+      openUpgradeModal();
+      const path = game.player.build.path;
+      const byId = id => UPGRADES.find(u => u.id === id);
+      game.player.build.path = 'scatter';
+      const towardEvolution = pickAutomaticUpgradeIndex([byId('magnet'), byId('vitality'), byId('rapidFire')], game.player);
+      const evolutionFirst = pickAutomaticUpgradeIndex([EVOLUTIONS[1], byId('rapidFire')], game.player);
+      return { path, towardEvolution, evolutionFirst, autoToggleDisabled: document.querySelector('#autoUpgradeToggle').disabled };
+    })()`);
+    assert.ok(['arc', 'scatter', 'mobility'].includes(smartPicks.path), 'skipping a path choice must still pick a path');
+    assert.deepEqual({ ...smartPicks, path: undefined }, { path: undefined, towardEvolution: 2, evolutionFirst: 0, autoToggleDisabled: true });
+
     const dialog = await cdp.evaluate(`(async () => {
       const { game, setUpgradeSkipEnabled } = await import('./src/state.js');
       const { openUpgradeModal } = await import('./src/entities.js');
@@ -191,6 +207,16 @@ test('upgrade choices are skipped by default and the dialog can opt in to skippi
       return { checked: document.querySelector('#upgradeSkipToggle').getAttribute('aria-checked'), stored: localStorage.getItem('zombie-room-upgrade-skip') };
     })()`);
     assert.deepEqual(toggled, { checked: 'false', stored: 'false' });
+    const reenabled = await cdp.evaluate(`(async () => {
+      const { game } = await import('./src/state.js');
+      const { openUpgradeModal } = await import('./src/entities.js');
+      game.pendingUpgrades = 1;
+      openUpgradeModal();
+      const openedWhileOff = game.upgradeModalOpen;
+      document.querySelector('#upgradeSkipToggle').click();
+      return { openedWhileOff, open: game.upgradeModalOpen, pending: game.pendingUpgrades };
+    })()`);
+    assert.deepEqual(reenabled, { openedWhileOff: true, open: false, pending: 0 }, 'enabling skip in Settings resolves an open dialog');
     assert.deepEqual(cdp.runtimeExceptions, []);
   });
 });

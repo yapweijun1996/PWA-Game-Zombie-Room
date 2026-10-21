@@ -657,6 +657,15 @@ export function getAvailableUpgrades() {
   return shuffled.slice(0, 3);
 }
 
+// Skipped choices vary the build path, then work toward that path's evolution.
+export function pickAutomaticUpgradeIndex(choices, player) {
+  if (choices.some(choice => choice.isBuild)) return Math.floor(gameRandom() * choices.length);
+  if (choices[0]?.isEvolution) return 0;
+  const evolution = BUILD_EVOLUTIONS.find(item => item.path === player.build?.path);
+  const needed = evolution ? choices.findIndex(choice => (player.upgrades[choice.id] || 0) < (evolution.requirements[choice.id] || 0)) : -1;
+  return Math.max(0, needed);
+}
+
 export function openUpgradeModal() {
   const p = game.player;
   if (!p || !game.running) return;
@@ -679,14 +688,16 @@ export function openUpgradeModal() {
 }
 
 // Seeded playtests keep the dialog so synthetic controllers and replays choose explicitly.
-function shouldSkipUpgradeDialog() {
+export function shouldSkipUpgradeDialog() {
   return upgradeSkipState.enabled && !playtestConfig.enabled && !isPlaytestReplaying();
 }
 
-// Takes the first choice for every queued level; chooseUpgrade closes the dialog when the queue empties.
+// Picks every queued level automatically; chooseUpgrade closes the dialog when the queue empties.
 export function resolveQueuedUpgrades() {
   if (isPlaytestReplaying()) return;
-  for (let guard = 0; game.upgradeModalOpen && guard < 100; guard++) chooseUpgrade(0);
+  for (let guard = 0; game.upgradeModalOpen && guard < 100; guard++) {
+    chooseUpgrade(pickAutomaticUpgradeIndex(currentUpgradeChoices, game.player));
+  }
   if (game.upgradeModalOpen) closeUpgradeModal();
 }
 
