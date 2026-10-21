@@ -316,6 +316,7 @@ export function showGameOver({ score, combo, wave, kills, elapsed, isNewBest, ra
     ui.gameoverRankBadge.className = 'gameover-rank-badge rank-' + rank.toLowerCase();
   }
   renderBuildSummary(player, upgrades);
+  document.getElementById('app')?.classList.add('is-over');
 
   if (dom.canvas) dom.canvas.classList.add(performanceMode ? 'game-dimmed' : 'game-blurred');
   if (!ui.gameover) return;
@@ -338,6 +339,7 @@ export function hideGameOver() {
     ui.gameover.hidden = true;
   }
   if (ui.gameoverNewBest) ui.gameoverNewBest.hidden = true;
+  document.getElementById('app')?.classList.remove('is-over');
 }
 
 export function hideBossBar() {

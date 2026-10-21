@@ -179,6 +179,13 @@ function frame(now) {
 }
 
 let resizeDebounceTimer = null;
+// Badges below the HUD follow its real height, which varies with locale and width.
+function syncHudOffset() {
+  if (!dom.hud) return;
+  document.documentElement.style.setProperty('--hud-bottom', Math.ceil(dom.hud.getBoundingClientRect().bottom) + 'px');
+}
+if (dom.hud && typeof ResizeObserver === 'function') new ResizeObserver(syncHudOffset).observe(dom.hud);
+
 addEventListener('resize', () => {
   clearTimeout(resizeDebounceTimer);
   resizeDebounceTimer = setTimeout(() => requestAnimationFrame(resize), 120);

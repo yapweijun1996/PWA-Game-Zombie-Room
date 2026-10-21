@@ -68,7 +68,7 @@
     .boss-bar-wrap {
       position: absolute;
       z-index: 18;
-      top: calc(58px + var(--safe-top));
+      top: calc(var(--hud-bottom, calc(58px + var(--safe-top))) + 6px);
       left: 50%;
       transform: translate(-50%, -10px);
       width: min(440px, calc(100% - 24px));
@@ -164,7 +164,8 @@
     .combo-badge {
       position: absolute;
       z-index: 17;
-      top: calc(56px + var(--safe-top));
+      /* --hud-bottom is measured from the live HUD so badges never sit underneath it. */
+      top: calc(var(--hud-bottom, calc(56px + var(--safe-top))) + 6px);
       left: max(12px, var(--safe-left));
       display: inline-flex;
       align-items: center;
@@ -711,6 +712,8 @@
       pointer-events: none;
       white-space: nowrap;
     }
+    .hint-pill { max-width: calc(100vw - 24px); white-space: normal; text-align: center; }
+    .hint-keys { display: none; }
 
     .message {
       top: 28%;
@@ -1160,14 +1163,21 @@
     }
     .gameover-stat {
       display: flex;
+      flex-direction: column;
       align-items: center;
-      gap: 5px;
+      gap: 2px;
       font-size: 14px;
       font-weight: 900;
       color: var(--text);
       font-variant-numeric: tabular-nums;
     }
     .gameover-stat-icon { font-size: 15px; }
+    .gameover-stat-main { display: flex; align-items: center; gap: 5px; }
+    .gameover-stat-label { color: var(--muted); font-size: 9px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+    /* Touch players use the Restart button; the key shortcut line is desktop-only. */
+    .gameover .restart { display: none; }
+    /* Gameplay controls do nothing on the defeat screen. */
+    .is-over .controls-wrap, .is-over .hint-pill { visibility: hidden; }
 
     .gameover-build-section {
       margin-top: 14px;
@@ -1458,6 +1468,9 @@
     @media (min-width: 800px) and (pointer: fine) {
       .controls-wrap { display: none; }
       .desktop-hint { display: block; }
+      .hint-touch { display: none; }
+      .hint-keys { display: inline; }
+      .gameover .restart { display: block; }
       .hint-pill { bottom: 24px; }
       .hud-bar { max-width: 680px; }
     }
@@ -1468,6 +1481,26 @@
       .score-box { min-width: 48px; }
       .score-box .score-value { font-size: 15px; }
       .meter-head .value { font-size: 9px; }
+    }
+
+    /* Narrow HUD: words stay for screen readers, numbers get the visible space. */
+    @media (max-width: 480px) {
+      .meter-hp .meter-head .label,
+      .meter-xp .label > [data-i18n] {
+        position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+        overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+      }
+      .meter-hp .meter-head .value::before { content: '\2665'; margin-right: 3px; color: #ff6b7d; }
+      .meter-xp #levelText::before { content: 'LV '; color: var(--muted); font-size: 8px; letter-spacing: .04em; }
+      /* The XP bar already shows progress; keep the level and shield readable instead. */
+      .meter-xp #xpText {
+        position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+        overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+      }
+      .hud-metrics-row { grid-template-columns: 1.35fr 1fr 1fr; }
+      /* HP carries HP and shield numbers; XP only carries the level. */
+      .meter-hp { flex: 1.7 1 0; }
+      .meter-xp { flex: 1 1 0; }
     }
 
     @media (max-width: 480px) {
@@ -1485,7 +1518,7 @@
 
     @media (max-height: 680px) {
       .appbar { padding-top: calc(4px + var(--safe-top)); }
-      .boss-bar-wrap { top: calc(50px + var(--safe-top)); width: min(400px, calc(100% - 20px)); }
+      .boss-bar-wrap { top: calc(var(--hud-bottom, calc(50px + var(--safe-top))) + 6px); width: min(400px, calc(100% - 20px)); }
       .hud-bar { padding: 4px 8px; }
       .hud-brand-col .brand-mark { width: 28px; height: 28px; font-size: 12px; }
       .hud-action-btn { width: 28px; height: 28px; min-height: 28px; }

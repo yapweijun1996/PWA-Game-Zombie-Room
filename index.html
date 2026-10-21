@@ -168,7 +168,7 @@
     <div class="install-tip" id="installTip" role="status" aria-live="polite"></div>
 
     <div class="message" id="message" data-i18n="msgLevelUp">LEVEL UP</div>
-    <div class="hint-pill" id="hintPill" data-i18n="hintPill">Move · Auto fire · Collect blue XP</div>
+    <div class="hint-pill" id="hintPill"><span class="hint-touch" data-i18n="hintTouch">Hold anywhere to move · Tap DASH to dodge · Grab XP gems</span><span class="hint-keys" data-i18n="hintPill">Auto fire · Grab XP gems · Space dashes through charges</span></div>
     <div class="damage-flash" id="damageFlash"></div>
 
     <div class="center-overlay">
@@ -212,16 +212,16 @@
         </div>
         <div class="gameover-stat-row">
           <div class="gameover-stat" data-i18n-aria="hudWave" aria-label="Wave">
-            <span class="gameover-stat-icon" aria-hidden="true">🌊</span><b id="gameoverWave">1</b>
+            <span class="gameover-stat-main"><span class="gameover-stat-icon" aria-hidden="true">🌊</span><b id="gameoverWave">1</b></span><span class="gameover-stat-label" aria-hidden="true" data-i18n="hudWave">Wave</span>
           </div>
           <div class="gameover-stat" data-i18n-aria="hudKills" aria-label="Kills">
-            <span class="gameover-stat-icon" aria-hidden="true">💀</span><b id="gameoverKills">0</b>
+            <span class="gameover-stat-main"><span class="gameover-stat-icon" aria-hidden="true">💀</span><b id="gameoverKills">0</b></span><span class="gameover-stat-label" aria-hidden="true" data-i18n="hudKills">Kills</span>
           </div>
           <div class="gameover-stat" data-i18n-aria="comboLabel" aria-label="Max Combo">
-            <span class="gameover-stat-icon" aria-hidden="true">🔥</span><b id="gameoverCombo">0</b>
+            <span class="gameover-stat-main"><span class="gameover-stat-icon" aria-hidden="true">🔥</span><b id="gameoverCombo">0</b></span><span class="gameover-stat-label" aria-hidden="true" data-i18n="comboLabel">Combo</span>
           </div>
           <div class="gameover-stat" data-i18n-aria="hudTime" aria-label="Time">
-            <span class="gameover-stat-icon" aria-hidden="true">⏱</span><b id="gameoverTime">0:00</b>
+            <span class="gameover-stat-main"><span class="gameover-stat-icon" aria-hidden="true">⏱</span><b id="gameoverTime">0:00</b></span><span class="gameover-stat-label" aria-hidden="true" data-i18n="hudTime">Time</span>
           </div>
         </div>
         <div class="gameover-build-section">

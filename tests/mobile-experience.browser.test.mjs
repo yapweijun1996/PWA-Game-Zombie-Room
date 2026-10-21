@@ -246,3 +246,51 @@ test('upgrade choices are skipped by default and the dialog can opt in to skippi
     assert.deepEqual(cdp.runtimeExceptions, []);
   });
 });
+
+test('narrow HUD keeps every visible value whole, badges clear the HUD, and the defeat screen hides controls', browserOptions, async () => {
+  await withBrowser(async (cdp, url) => {
+    for (const width of [360, 390]) {
+      await cdp.send('Emulation.setDeviceMetricsOverride', { width, height: 800, deviceScaleFactor: 1, mobile: true });
+      await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 1 });
+      await cdp.send('Page.navigate', { url: `${url}/?playtestSeed=42&playtestManual=1&playtestLimit=0` });
+      await waitFor(cdp.evaluate.bind(cdp), 'typeof window.advanceTime === "function"', Boolean);
+      const layout = await cdp.evaluate(`(async () => {
+        const { game } = await import('./src/state.js');
+        const { updateUI } = await import('./src/ui.js');
+        const problems = [];
+        for (const locale of ['en', 'zh', 'ms', 'ja', 'ko', 'vi', 'th']) {
+          const select = document.querySelector('#languageSelect'); select.value = locale; select.dispatchEvent(new Event('change'));
+          Object.assign(game.player, { hp: 225, maxHp: 225, level: 34, xp: 120, xpNeed: 135, shield: 40 });
+          Object.assign(game, { wave: 12, kills: 1234, score: 123456, elapsed: 299, combo: 30, comboTimer: 2 });
+          game.player.build.path = 'scatter';
+          updateUI();
+          await new Promise(requestAnimationFrame);
+          for (const selector of ['#hpText', '#shieldText', '#levelText', '#waveText', '#encounterText', '#killsText', '#timeText', '#scoreText']) {
+            const element = document.querySelector(selector);
+            if (element.scrollWidth > element.clientWidth + 1) problems.push(locale + ' ' + selector + ' clipped');
+          }
+          const hp = document.querySelector('.meter-hp .value').getBoundingClientRect();
+          const xp = document.querySelector('.meter-xp .label').getBoundingClientRect();
+          if (hp.right > xp.left) problems.push(locale + ' HP overlaps XP');
+          if (!document.querySelector('.meter-hp .label').textContent.trim()) problems.push(locale + ' HP label missing for screen readers');
+        }
+        const badge = document.querySelector('#comboBadge');
+        badge.hidden = false;
+        const clearsHud = badge.getBoundingClientRect().top >= document.querySelector('#hud').getBoundingClientRect().bottom;
+        badge.hidden = true;
+        return { problems, clearsHud };
+      })()`);
+      assert.deepEqual(layout, { problems: [], clearsHud: true }, `${width}px HUD layout`);
+    }
+    const defeat = await cdp.evaluate(`(async () => {
+      const { showGameOver, hideGameOver } = await import('./src/game-ui.js');
+      showGameOver({ score: 10, combo: 2, wave: 3, kills: 4, elapsed: 60, isNewBest: false, rank: 'C', player: { superWeapons: {}, build: {} }, upgrades: [], performanceMode: false });
+      const hidden = getComputedStyle(document.querySelector('#controlsWrap')).visibility === 'hidden';
+      const label = document.querySelector('.gameover-stat-label').textContent;
+      hideGameOver();
+      return { hidden, label: Boolean(label), restored: getComputedStyle(document.querySelector('#controlsWrap')).visibility === 'visible' };
+    })()`);
+    assert.deepEqual(defeat, { hidden: true, label: true, restored: true });
+    assert.deepEqual(cdp.runtimeExceptions, []);
+  });
+});

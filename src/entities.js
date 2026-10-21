@@ -15,6 +15,9 @@ import { playShoot, playCrit, playKill, playXp, playLevelUp, playUpgradeSelect, 
 import { vibrateHit, vibrateCrit, vibrateLevelUp, vibrateBoss, vibrateDeath, vibrateUi, vibrateNuke, vibrateOverdrive, vibrateCombo } from './haptics.js';
 
 const DASH_DURATION_SECONDS = 0.24;
+// Long enough to read the controls once; a quick restart restarts the timer.
+const HINT_SECONDS = 7;
+let hintTimer = 0;
 const DASH_COOLDOWN_SECONDS = 8;
 const DASH_SPEED_MULTIPLIER = 2.8;
 
@@ -262,7 +265,8 @@ export function resetGame() {
     }
   }
   dom.hintPill.classList.remove('hide');
-  setTimeout(() => dom.hintPill.classList.add('hide'), 4200);
+  clearTimeout(hintTimer);
+  hintTimer = setTimeout(() => dom.hintPill.classList.add('hide'), HINT_SECONDS * 1000);
   updateUI();
 }
 
