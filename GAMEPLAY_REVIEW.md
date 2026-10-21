@@ -303,6 +303,14 @@ A no-Dash controller still clears the first wave in every case; observed deaths 
 
 These results are still synthetic, and real-player feedback remains the deciding signal.
 
+## Difficulty tuning — 3.8.7
+
+The owner played 3.8.6, still found it too easy, and chose the harshest tested set: ×1.24 health per wave after wave 1 and +11% enemy damage per wave. These are the exact values of the ×1.24 row in the 3.8.6 table above:
+- **World-aware Offense:** 6/6 died at 243–349 seconds.
+- **Default auto-pick:** 6/6 died at 127–159 seconds.
+
+No-Dash runs in the required-Chrome suite died at 41–136 seconds; none died in the first wave.
+
 ## Remaining validation
 
 - Recruit at least five familiar players. At least three should report a clear pressure increase around minutes 3–5, understand the main damage/counterplay, and want another run. The synthetic trials cannot establish this acceptance gate.

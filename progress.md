@@ -118,3 +118,9 @@ Original prompt: Implement the approved endless difficulty director plan: 25-sec
 - Human-like real-time play on 3.8.6 died at 143, 159 and 144 seconds; enemy counts rose from about 20 to 70–80 after 110 seconds.
 - The no-Dash regression now guards onboarding: every case clears the 25-second first wave and at least three of six reach 45 seconds (observed 42–126 seconds).
 - Required-Chrome suite: 54 passed, 0 failed, 0 skipped.
+
+## Harshest tested set — v3.8.7
+
+- Owner feedback after playing 3.8.6: still too easy; use the harshest tested set.
+- `DIRECTOR_CONFIG` now uses ×1.24 health per wave after wave 1 and +11% enemy damage per wave (wave 8: health ≈ 9.5×, damage 1.77×). This is the 3.8.6 probe's candidate L. On six seeds, the world-aware Offense controller died at 243–349 seconds in 6/6 runs, and the default auto-pick controller died at 127–159 seconds in 6/6 runs. The no-Dash suite samples died at 41–136 seconds; none died inside the first wave.
+- Local suite: 51–52 of 54 passed. Every failure was a DevTools command timeout while load averaged about 175 from an unrelated ffmpeg job; there were no assertion failures. Orphaned headless test browsers from earlier interrupted probes were also killed. The CI `verify` job, on a clean runner, gates deployment.
