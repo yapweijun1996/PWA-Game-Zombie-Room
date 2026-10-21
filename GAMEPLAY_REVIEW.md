@@ -267,6 +267,22 @@ Alternatives tried on the same batch:
 
 **Limits.** The world-aware controller has perfect information and reacts in 100ms. Its deaths at roughly 7–8 minutes are a stress signal, not a prediction of human survival. The no-Dash controller still dies in about 45 seconds on seed 42, exactly as before; the opening was not made harder. Human enjoyment and pressure at 3–5 minutes still require the playtest gate below.
 
+### Human-like real-time play (3.8.5)
+
+The owner set the target that about three minutes should already feel hard. A scratch end-to-end script played ordinary unseeded sessions in real time with CDP keyboard input. Its policy reacts every 250ms, flees enemies within 170px, and dashes when two enemies are close. Upgrades were left on the default automatic selection.
+
+| Build | Runs | Outcome |
+| --- | --- | --- |
+| 3.8.4 | 3 | All alive past 230 game-seconds at 125–225 HP |
+| 3.8.5 (×1.16 per wave after wave 2) | 3 | Deaths at 113, 124 and 193 seconds |
+| Candidate ×1.22 per wave after wave 2 | 3 | Deaths at 112, 118 and 141 seconds |
+
+×1.16 was kept. The faster candidate barely moved this policy's roughly 2-minute wall, while it killed the world-aware auto-pick controller at 122–148 seconds on half the seeds.
+
+The same play also exposed a defect, now fixed: a held or freshly pressed direction key, or a tap at the moment of death, restarted instantly and skipped the defeat screen. Input restarts now wait 1.2 seconds after death and ignore key-repeat.
+
+The survival rank also double-counted kills, so a two-minute death ranked S. Rank now follows the wave reached: B from wave 4, A from wave 8, S from wave 13.
+
 ## Remaining validation
 
 - Recruit at least five familiar players. At least three should report a clear pressure increase around minutes 3–5, understand the main damage/counterplay, and want another run. The synthetic trials cannot establish this acceptance gate.

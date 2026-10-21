@@ -183,6 +183,32 @@ test('upgrade choices are skipped by default and the dialog can opt in to skippi
       return { path, towardEvolution, evolutionFirst, autoToggleDisabled: document.querySelector('#autoUpgradeToggle').disabled };
     })()`);
     assert.ok(['arc', 'scatter', 'mobility'].includes(smartPicks.path), 'skipping a path choice must still pick a path');
+    const ranks = await cdp.evaluate(`import('./src/entities.js').then(({ calculateRunRank }) => [3, 4, 7, 8, 12, 13].map(calculateRunRank).join(''))`);
+    assert.equal(ranks, 'CBBAAS', 'survival rank follows the wave reached, not inflated score');
+
+    const death = await cdp.evaluate(`(async () => {
+      const { game } = await import('./src/state.js');
+      const { resetGame, update } = await import('./src/entities.js');
+      resetGame();
+      const p = game.player;
+      Object.assign(p, { hp: 1, shield: 0, invuln: 0 });
+      game.zombies.push({ x: p.x, y: p.y, r: 13, type: 'walker', hp: 99, maxHp: 99, speed: 0, damage: 50, color: '#79b86a', xp: 1, score: 10, hitFlash: 0, attackFlash: 0, walkTime: 0, facing: 0, affix: null });
+      update(1 / 60);
+      const key = repeat => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', repeat, bubbles: true, cancelable: true }));
+      key(false); key(true);
+      return { dead: !game.running, stillOnDefeatScreen: !game.running };
+    })()`);
+    assert.deepEqual(death, { dead: true, stillOnDefeatScreen: true }, 'a key pressed at death must not skip the defeat screen');
+    await new Promise(resolve => setTimeout(resolve, 1300));
+    const restarted = await cdp.evaluate(`(async () => {
+      const { game } = await import('./src/state.js');
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', repeat: true, bubbles: true, cancelable: true }));
+      const afterRepeat = game.running;
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true, cancelable: true }));
+      window.dispatchEvent(new KeyboardEvent('keyup', { key: 'ArrowUp', bubbles: true, cancelable: true }));
+      return { afterRepeat, afterPress: game.running };
+    })()`);
+    assert.deepEqual(restarted, { afterRepeat: false, afterPress: true }, 'a fresh key press restarts after the grace period');
     assert.deepEqual({ ...smartPicks, path: undefined }, { path: undefined, towardEvolution: 2, evolutionFirst: 0, autoToggleDisabled: true });
 
     const dialog = await cdp.evaluate(`(async () => {

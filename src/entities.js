@@ -901,11 +901,11 @@ function damagePlayer(amount, from) {
   if (p.hp <= 0) endGame();
 }
 
-export function calculateRunRank(wave, score, kills, maxCombo) {
-  const scoreRating = score + wave * 140 + kills * 8 + maxCombo * 12;
-  if (scoreRating >= 2200 || wave >= 8) return 'S';
-  if (scoreRating >= 1100 || wave >= 5) return 'A';
-  if (scoreRating >= 450 || wave >= 3) return 'B';
+// Survival rank by the wave reached: B after 75s, A after 175s (the 3-minute wall), S after 300s.
+export function calculateRunRank(wave) {
+  if (wave >= 13) return 'S';
+  if (wave >= 8) return 'A';
+  if (wave >= 4) return 'B';
   return 'C';
 }
 
@@ -913,6 +913,7 @@ function endGame() {
   const p = game.player;
   p.hp = 0;
   game.running = false;
+  game.endedAt = performance.now();
   if (playtestConfig.enabled) finishPlaytestRun('player-death', playtestSnapshot());
   setPaused(false, false, true);
   closeUpgradeModal();
@@ -929,7 +930,7 @@ function endGame() {
       localStorage.setItem('zombie-room-best-version', APP_VERSION);
     }
   } catch (_) {}
-  const rank = calculateRunRank(game.wave, currentScore, game.kills, game.maxCombo || 0);
+  const rank = calculateRunRank(game.wave);
   showGameOver({
     score: currentScore,
     combo: game.maxCombo || 0,

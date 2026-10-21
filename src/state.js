@@ -214,6 +214,8 @@ export function setAutoUpgradeEnabled(enabled) {
 
 export const game = {
   running: true,
+  // performance.now() at the last death; input restarts wait out a short grace period.
+  endedAt: 0,
   paused: false,
   pendingUpgrades: 0,
   upgradeModalOpen: false,

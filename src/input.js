@@ -12,14 +12,23 @@ function recordInputState() {
   recordPlaytestInput(input);
 }
 
+// Keeps a key held or a tap made at the moment of death from skipping the defeat screen.
+const RESTART_GRACE_MS = 1200;
+
 export function initInput(onRestart) {
+  function restartAfterGrace() {
+    if (performance.now() - game.endedAt < RESTART_GRACE_MS) return false;
+    onRestart();
+    return true;
+  }
+
   function hasTextInputFocus(target) {
     return target instanceof Element && Boolean(target.closest('input, select, textarea, [contenteditable="true"]'));
   }
 
   function setKeyboardInput(dir, pressed) {
     if (!Object.prototype.hasOwnProperty.call(input, dir)) return;
-    if (pressed && !game.running) onRestart();
+    if (pressed && !game.running && !restartAfterGrace()) return;
     input[dir] = pressed;
     recordInputState();
   }
@@ -56,6 +65,7 @@ export function initInput(onRestart) {
     }
     const dir = keyMap[e.key.toLowerCase()];
     if (!dir) return;
+    if (e.repeat && !game.running) { e.preventDefault(); return; }
     const panel = document.getElementById('settingsPanel');
     if (hasTextInputFocus(e.target) || (panel && !panel.hidden)) return;
     e.preventDefault();
@@ -113,7 +123,7 @@ export function initInput(onRestart) {
       if (activePointerId !== null || game.upgradeModalOpen) return;
       if (game.paused) return;
       if (!game.running) {
-        onRestart();
+        restartAfterGrace();
         return;
       }
       e.preventDefault();
