@@ -27,8 +27,9 @@ function resize() {
   const hudRect = dom.hud ? dom.hud.getBoundingClientRect() : { bottom: 60 };
   const appbarBottom = dom.appbar ? dom.appbar.getBoundingClientRect().bottom : 0;
   const roomTop = Math.min(Math.max(hudRect.bottom + 8, appbarBottom + 8), Math.max(0, viewport.H - 108));
-  const controlsRect = dom.controlsWrap ? dom.controlsWrap.getBoundingClientRect() : { height: 0 };
-  const mobileBottom = controlsRect.height > 0 ? Math.max(controlsRect.height + 8, 134) : 18;
+  // Touch controls float over the room; only keep the safe-area gap under them.
+  const controlsRect = dom.controlsWrap ? dom.controlsWrap.getBoundingClientRect() : { height: 0, bottom: viewport.H };
+  const mobileBottom = controlsRect.height > 0 ? Math.max(18, viewport.H - controlsRect.bottom + 8) : 18;
   const bottomReserve = isDesktopControls() ? 18 : mobileBottom;
 
   room.x = 10;

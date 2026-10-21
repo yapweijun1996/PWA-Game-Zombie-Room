@@ -1342,6 +1342,9 @@
       touch-action: manipulation;
       user-select: none;
       -webkit-user-select: none;
+      /* Floats over the room's bottom-right corner, within the right thumb's reach. */
+      margin-left: auto;
+      opacity: .9;
       transition: opacity .12s ease, border-color .12s ease, transform .12s ease;
     }
     .dash-action[aria-disabled="true"] { opacity: .72; border-color: rgba(228, 255, 235, .35); }
