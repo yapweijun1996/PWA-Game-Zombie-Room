@@ -1,4 +1,4 @@
-import { getWaveModifier } from './wave-director.js';
+import { getWaveModifier, resolveDifficulty } from './wave-director.js';
 
 const UINT32_MAX = 0xffffffff;
 const DEFAULT_LIMIT_SECONDS = 180;
@@ -34,6 +34,8 @@ export const playtestConfig = Object.freeze({
   seed: configuredSeed,
   limitSeconds: parseLimit(search.get('playtestLimit')),
   profile: (search.get('playtestProfile') || '').slice(0, 80) || null,
+  // Seeded sessions default to Hard so recordings and fixtures do not depend on a stored setting.
+  difficulty: resolveDifficulty(search.get('playtestDifficulty')),
   inputProfile: (search.get('playtestInput') || '').slice(0, 80) || null
 });
 
@@ -93,6 +95,11 @@ export function gameRand(min, max) {
   return gameRandom() * (max - min) + min;
 }
 
+// A replay keeps the difficulty it was recorded with; records before 3.9.0 were Hard.
+export function getPlaytestDifficulty() {
+  return replaySource ? resolveDifficulty(replaySource.difficulty) : playtestConfig.difficulty;
+}
+
 export function beginPlaytestRun(metadata, previousSnapshot) {
   if (!playtestConfig.enabled || typeof window === 'undefined') return;
   if (activeRun && activeRun.status === 'running') {
@@ -116,6 +123,7 @@ export function beginPlaytestRun(metadata, previousSnapshot) {
     limitSeconds: activeLimitSeconds,
     mode: replaySource ? 'replay' : 'record',
     profile: replaySource ? replaySource.profile : playtestConfig.profile,
+    difficulty: getPlaytestDifficulty(),
     inputProfile: replaySource ? replaySource.inputProfile : playtestConfig.inputProfile,
     replayOf: replaySource ? {
       seed: replaySource.seed,

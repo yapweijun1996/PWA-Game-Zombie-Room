@@ -1,4 +1,6 @@
-export const APP_VERSION = '3.8.9';
+import { DEFAULT_DIFFICULTY, resolveDifficulty } from './wave-director.js';
+
+export const APP_VERSION = '3.9.0';
 
 export const dom = {
   canvas: document.getElementById('game'),
@@ -24,6 +26,7 @@ export const dom = {
   autoUpgradeToggle: document.getElementById('autoUpgradeToggle'),
   upgradeSkipToggle: document.getElementById('upgradeSkipToggle'),
   upgradeSkipButton: document.getElementById('upgradeSkipButton'),
+  saveImageButton: document.getElementById('saveImageButton'),
   upgradeAutoToggle: document.getElementById('upgradeAutoToggle'),
   upgradeAutoCountdown: document.getElementById('upgradeAutoCountdown'),
   upgradeAutoProgress: document.getElementById('upgradeAutoProgress'),
@@ -39,6 +42,7 @@ export const dom = {
   dashButtonStatus: document.getElementById('dashButtonStatus'),
   dashCooldownFill: document.getElementById('dashCooldownFill'),
   hintPill: document.getElementById('hintPill'),
+  hintCoach: document.getElementById('hintCoach'),
   languageSelect: document.getElementById('languageSelect'),
   restartButton: document.getElementById('restartButton'),
   shareButton: document.getElementById('shareButton')
@@ -138,13 +142,25 @@ export const pwaState = {
   deferredInstallPrompt: null
 };
 
-function readBestScore() {
+// Hard keeps the original keys so best scores from before difficulty modes stay with it.
+function bestScoreKeys(mode) {
+  return mode === DEFAULT_DIFFICULTY
+    ? { best: 'zombie-room-best', version: 'zombie-room-best-version' }
+    : { best: `zombie-room-best-${mode}`, version: `zombie-room-best-version-${mode}` };
+}
+
+function readBestScore(mode) {
   try {
-    const n = Number(localStorage.getItem('zombie-room-best') || 0);
+    const n = Number(localStorage.getItem(bestScoreKeys(mode).best) || 0);
     return Number.isFinite(n) ? n : 0;
   } catch (_) {
     return 0;
   }
+}
+
+function readBestVersion(mode) {
+  try { return localStorage.getItem(bestScoreKeys(mode).version) || 'pre-3.6'; }
+  catch (_) { return 'pre-3.6'; }
 }
 
 function readSoundSetting() {
@@ -174,13 +190,42 @@ function readBooleanSetting(key, fallback) {
   }
 }
 
-export const scoreState = {
-  best: readBestScore(),
-  bestVersion: (() => {
-    try { return localStorage.getItem('zombie-room-best-version') || 'pre-3.6'; }
-    catch (_) { return 'pre-3.6'; }
+// The selected mode applies from the next run; the running run keeps the mode it started with.
+export const difficultyState = {
+  mode: (() => {
+    try { return resolveDifficulty(localStorage.getItem('zombie-room-difficulty')); }
+    catch (_) { return DEFAULT_DIFFICULTY; }
   })()
 };
+
+export function setDifficulty(mode) {
+  difficultyState.mode = resolveDifficulty(mode);
+  try { localStorage.setItem('zombie-room-difficulty', difficultyState.mode); } catch (_) {}
+}
+
+export const scoreState = {
+  mode: DEFAULT_DIFFICULTY,
+  best: readBestScore(DEFAULT_DIFFICULTY),
+  bestVersion: readBestVersion(DEFAULT_DIFFICULTY)
+};
+
+export function loadBestScore(mode) {
+  scoreState.mode = resolveDifficulty(mode);
+  scoreState.best = readBestScore(scoreState.mode);
+  scoreState.bestVersion = readBestVersion(scoreState.mode);
+}
+
+export function saveBestScore(score, version) {
+  const isNewBest = score > scoreState.best;
+  scoreState.best = Math.max(scoreState.best, score);
+  if (isNewBest) scoreState.bestVersion = version;
+  try {
+    const keys = bestScoreKeys(scoreState.mode);
+    localStorage.setItem(keys.best, String(scoreState.best));
+    if (isNewBest) localStorage.setItem(keys.version, version);
+  } catch (_) {}
+  return isNewBest;
+}
 
 export const audioState = {
   enabled: readSoundSetting()
@@ -199,6 +244,16 @@ export const autoUpgradeState = {
 };
 
 // When enabled, level-ups take the first choice without opening the upgrade dialog.
+// First-run coaching is shown once, in an ordinary (unseeded) session.
+export const coachState = {
+  done: readBooleanSetting('zombie-room-coached', false)
+};
+
+export function markCoached() {
+  coachState.done = true;
+  try { localStorage.setItem('zombie-room-coached', 'true'); } catch (_) {}
+}
+
 export const upgradeSkipState = {
   enabled: readBooleanSetting('zombie-room-upgrade-skip', true)
 };
@@ -222,6 +277,8 @@ export const game = {
   running: true,
   // performance.now() at the last death; input restarts wait out a short grace period.
   endedAt: 0,
+  difficulty: DEFAULT_DIFFICULTY,
+  coachStep: -1,
   damageTaken: {},
   killedBy: null,
   paused: false,

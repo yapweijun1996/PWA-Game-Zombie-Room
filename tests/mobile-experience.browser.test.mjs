@@ -325,3 +325,60 @@ test('pressure waves get a red edge warning and build picks get a centred banner
     assert.deepEqual(cdp.runtimeExceptions, []);
   });
 });
+
+test('difficulty modes, first-run coaching and the share image card', browserOptions, async () => {
+  await withBrowser(async (cdp, url) => {
+    await cdp.send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+    await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 1 });
+    await cdp.send('Page.navigate', { url: `${url}/` });
+    await waitFor(cdp.evaluate.bind(cdp), "document.readyState === 'complete' && Boolean(document.querySelector('[data-difficulty-picker] button'))", Boolean);
+    const coach = await cdp.evaluate(`(async () => {
+      const { game } = await import('./src/state.js');
+      const { update, setPaused } = await import('./src/entities.js');
+      setPaused(false, true);
+      const first = document.querySelector('#hintCoach').textContent;
+      const coaching = document.querySelector('#hintPill').classList.contains('coaching');
+      for (let i = 0; i < 60 * 25 && game.running; i++) { game.player.invuln = 1; update(1 / 60); }
+      return { first, coaching, done: localStorage.getItem('zombie-room-coached'), hidden: document.querySelector('#hintPill').classList.contains('hide') };
+    })()`);
+    assert.match(coach.first, /^1\/4 · /);
+    assert.deepEqual({ ...coach, first: undefined }, { first: undefined, coaching: true, done: 'true', hidden: true });
+
+    const modes = await cdp.evaluate(`(async () => {
+      const { game, scoreState, saveBestScore } = await import('./src/state.js');
+      const { resetGame } = await import('./src/entities.js');
+      const pickers = [...document.querySelectorAll('[data-difficulty-picker]')];
+      const initial = pickers.map(picker => picker.querySelector('[aria-pressed="true"]').dataset.mode);
+      localStorage.setItem('zombie-room-best', '500');
+      pickers[0].querySelector('[data-mode="nightmare"]').click();
+      const synced = pickers.every(picker => picker.querySelector('[aria-pressed="true"]').dataset.mode === 'nightmare');
+      resetGame();
+      const applied = { run: game.difficulty, director: game.director.mode, best: scoreState.best };
+      saveBestScore(120, 'test');
+      const stored = { nightmare: localStorage.getItem('zombie-room-best-nightmare'), hard: localStorage.getItem('zombie-room-best') };
+      pickers[0].querySelector('[data-mode="hard"]').click();
+      resetGame();
+      return { initial, synced, applied, stored, hardBest: scoreState.best, saved: localStorage.getItem('zombie-room-difficulty') };
+    })()`);
+    assert.deepEqual(modes, {
+      initial: ['hard', 'hard'], synced: true,
+      applied: { run: 'nightmare', director: 'nightmare', best: 0 },
+      stored: { nightmare: '120', hard: '500' }, hardBest: 500, saved: 'hard'
+    });
+
+    const card = await cdp.evaluate(`(async () => {
+      const { drawShareCard, shareCardBlob } = await import('./src/share-card.js');
+      const sample = { title: 'ROOM LOST', rank: 'RANK A · Hard', score: 4321, stats: [{ label: 'Wave', value: 8 }, { label: 'Kills', value: 210 }], build: ['Scatter Cannon', 'Rapid Fire LV.3'], cause: 'Killed by Tank', url: 'example.test' };
+      const canvas = drawShareCard(sample);
+      const blob = await shareCardBlob(sample);
+      return { width: canvas.width, height: canvas.height, png: blob?.type, bytes: blob?.size > 10000 };
+    })()`);
+    assert.deepEqual(card, { width: 1080, height: 1350, png: 'image/png', bytes: true });
+
+    await cdp.send('Page.navigate', { url: `${url}/?playtestSeed=42&playtestManual=1&playtestLimit=0&playtestDifficulty=normal` });
+    await waitFor(cdp.evaluate.bind(cdp), 'typeof window.advanceTime === "function"', Boolean);
+    const recorded = await cdp.evaluate(`import('./src/state.js').then(({ game }) => ({ run: window.__zombieRoomPlaytest.difficulty, director: game.director.mode, coached: document.querySelector('#hintPill').classList.contains('coaching') }))`);
+    assert.deepEqual(recorded, { run: 'normal', director: 'normal', coached: false });
+    assert.deepEqual(cdp.runtimeExceptions, []);
+  });
+});

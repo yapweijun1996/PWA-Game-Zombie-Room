@@ -1,4 +1,5 @@
-import { game, dom, audioState, hapticsState, musicState, autoUpgradeState, upgradeSkipState, setMusicEnabled, setAutoUpgradeEnabled, setUpgradeSkipEnabled } from './state.js';
+import { game, dom, audioState, hapticsState, musicState, autoUpgradeState, upgradeSkipState, difficultyState, setMusicEnabled, setAutoUpgradeEnabled, setUpgradeSkipEnabled, setDifficulty } from './state.js';
+import { DIFFICULTY_IDS } from './wave-director.js';
 import { setPaused, resolveQueuedUpgrades, shouldSkipUpgradeDialog } from './entities.js';
 import { activateFocusTrap } from './focus-trap.js';
 import { t } from './i18n.js';
@@ -44,6 +45,29 @@ export function refreshAutoUpgradeToggleUI() {
   const status = document.getElementById('autoUpgradeStatusText');
   if (status) status.textContent = autoUpgradeState.enabled ? t('soundOn') : t('soundOff');
   if (dom.upgradeAutoToggle) dom.upgradeAutoToggle.checked = autoUpgradeState.enabled;
+}
+
+// Every picker (Settings and the defeat screen) shows the mode the next run will use.
+export function refreshDifficultyPickers() {
+  for (const picker of document.querySelectorAll('[data-difficulty-picker]')) {
+    if (picker.children.length !== DIFFICULTY_IDS.length) {
+      picker.replaceChildren(...DIFFICULTY_IDS.map(mode => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.dataset.mode = mode;
+        button.addEventListener('click', () => {
+          setDifficulty(mode);
+          refreshDifficultyPickers();
+          playUiClick();
+        });
+        return button;
+      }));
+    }
+    for (const button of picker.children) {
+      button.textContent = t('difficulty_' + button.dataset.mode);
+      button.setAttribute('aria-pressed', String(button.dataset.mode === difficultyState.mode));
+    }
+  }
 }
 
 export function refreshUpgradeSkipToggleUI() {
@@ -100,6 +124,7 @@ export function initSettingsMenu() {
     if (hapticsState.enabled) vibrateUi();
   });
 
+  refreshDifficultyPickers();
   refreshUpgradeSkipToggleUI();
   dom.upgradeSkipToggle?.addEventListener('click', () => {
     setUpgradeSkipEnabled(!upgradeSkipState.enabled);

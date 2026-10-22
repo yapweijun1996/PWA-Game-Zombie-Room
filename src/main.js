@@ -6,10 +6,11 @@ import { draw } from './render.js';
 import { initPwa, refreshPwaLabels } from './pwa.js';
 import { initInput, resetInputState } from './input.js';
 import { initI18n } from './i18n-apply.js';
-import { initSettingsMenu, refreshSoundToggleUI, refreshMusicToggleUI, refreshHapticsToggleUI, refreshAutoUpgradeToggleUI, refreshUpgradeSkipToggleUI } from './settings-menu.js';
+import { initSettingsMenu, refreshSoundToggleUI, refreshMusicToggleUI, refreshHapticsToggleUI, refreshAutoUpgradeToggleUI, refreshUpgradeSkipToggleUI, refreshDifficultyPickers } from './settings-menu.js';
 import { flashMessage, updateUI } from './ui.js';
 import { t } from './i18n.js';
 import { initAudio, playUiClick } from './audio.js';
+import { shareCardBlob } from './share-card.js';
 import { initMusic } from './music.js';
 import { advancePlaytestTick, getPlaytestTick, isPlaytestReplaying, playtestConfig, PLAYTEST_FIXED_STEP_SECONDS, preparePlaytestReplay, recordPlaytestReplayMismatch, stopPlaytestReplay, takePlaytestReplayEvents } from './playtest.js';
 import { summarizePlaytestRuns } from './playtest-analysis.js';
@@ -215,6 +216,7 @@ initI18n(() => {
   refreshHapticsToggleUI();
   refreshAutoUpgradeToggleUI();
   refreshUpgradeSkipToggleUI();
+  refreshDifficultyPickers();
   updateUI();
   if (game.upgradeModalOpen && currentUpgradeChoices.length) {
     updateUpgradeDialog(currentUpgradeChoices, game.player, chooseUpgrade);
@@ -237,9 +239,69 @@ dom.resumeButton?.addEventListener('click', () => setPaused(false, true));
 dom.pauseOverlay?.addEventListener('click', e => {
   if (e.target === dom.pauseOverlay) setPaused(false, true);
 });
-dom.shareButton?.addEventListener('click', () => {
+const SHARE_URL = 'https://yapweijun1996.github.io/PWA-Game-Zombie-Room/';
+
+// The card mirrors what the defeat screen shows, so it reads the rendered values.
+function collectShareCard() {
+  const text = selector => document.querySelector(selector)?.textContent.trim() || '';
+  return {
+    title: text('#gameoverTitle'),
+    rank: text('#gameoverRankText'),
+    score: Math.floor(game.score),
+    stats: [
+      { label: t('hudWave'), value: game.wave },
+      { label: t('hudKills'), value: game.kills },
+      { label: t('comboLabel'), value: game.maxCombo || 0 },
+      { label: t('hudTime'), value: text('#gameoverTime') }
+    ],
+    build: [...document.querySelectorAll('#gameoverBuildGrid .build-chip')].map(chip => chip.textContent.trim().replace(/\s+/g, ' ')),
+    cause: document.querySelector('#gameoverCause')?.hidden ? '' : text('#gameoverCause'),
+    url: SHARE_URL.replace(/^https:\/\//, '')
+  };
+}
+
+function shareText() {
   const rank = ui.gameoverRankText ? ui.gameoverRankText.textContent : 'RANK S';
-  const text = `🧟 Zombie Room | ${rank} | Score: ${Math.floor(game.score)} | Wave ${game.wave} | Kills: ${game.kills} | Max Combo: ×${game.maxCombo || 0}\nhttps://yapweijun1996.github.io/PWA-Game-Zombie-Room/`;
+  return `🧟 Zombie Room | ${rank} | Score: ${Math.floor(game.score)} | Wave ${game.wave} | Kills: ${game.kills} | Max Combo: ×${game.maxCombo || 0}\n${SHARE_URL}`;
+}
+
+function canShareImage() {
+  try {
+    return typeof navigator.share === 'function' && typeof navigator.canShare === 'function' && typeof File === 'function' &&
+      navigator.canShare({ files: [new File([''], 'probe.png', { type: 'image/png' })] });
+  } catch (_) {
+    return false;
+  }
+}
+
+async function shareImageCard(text) {
+  const blob = await shareCardBlob(collectShareCard());
+  if (!blob) throw new Error('card-render-failed');
+  await navigator.share({ files: [new File([blob], 'zombie-room-run.png', { type: 'image/png' })], text });
+}
+
+dom.saveImageButton?.addEventListener('click', async () => {
+  const blob = await shareCardBlob(collectShareCard());
+  if (!blob) { flashMessage(t('imageSaveFailed')); return; }
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = 'zombie-room-run.png';
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+  flashMessage(t('imageSaved'));
+});
+
+dom.shareButton?.addEventListener('click', () => {
+  const text = shareText();
+  if (canShareImage()) {
+    // A cancelled share sheet is not a failure; any other error falls back to copying text.
+    shareImageCard(text).catch(error => { if (error?.name !== 'AbortError') copyShareText(text); });
+    return;
+  }
+  copyShareText(text);
+});
+
+function copyShareText(text) {
   if (navigator.clipboard && navigator.clipboard.writeText) {
     try {
       navigator.clipboard.writeText(text).then(() => {
@@ -252,7 +314,7 @@ dom.shareButton?.addEventListener('click', () => {
   } else {
     flashMessage(t('shareFailed'));
   }
-});
+}
 
 if (playtestConfig.enabled && typeof window !== 'undefined') {
   window.render_game_to_text = () => JSON.stringify({

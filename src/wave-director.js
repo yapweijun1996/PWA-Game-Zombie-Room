@@ -7,12 +7,24 @@ export const DIRECTOR_CONFIG = Object.freeze({
   maxEnemies: 90, maxMoveSpeed: 180, maxChargeSpeed: 360,
   phaseRates: Object.freeze([0.82, 1.12, 0.72, 0.55]), recoveryRate: 0.25,
   healthPerWave: 0.11, bossHealthPerWave: 0.19, healthPerStage: 0.3,
-  // Upgrades multiply player damage, so durability also compounds after the opening waves.
-  lateHealthGrowth: 1.24, lateGrowthAfterWave: 1,
-  // Hits must keep mattering as maximum HP grows.
-  damagePerWave: 0.11,
   eliteBase: 0.12, elitePerWave: 0.025, eliteCap: 0.4
 });
+
+// Upgrades multiply player damage, so durability compounds after the opening waves, and hits
+// scale so they keep mattering as maximum HP grows. spawnScale multiplies the spawn rate.
+// Hard is the owner-tuned default (3.8.7); Normal is the 3.8.5 curve with lighter spawns for
+// newcomers; Nightmare adds denser spawns, because Hard already meets a crowd wall near 2:20.
+export const DIFFICULTY_MODES = Object.freeze({
+  normal: Object.freeze({ lateHealthGrowth: 1.16, lateGrowthAfterWave: 2, damagePerWave: 0, spawnScale: 0.9 }),
+  hard: Object.freeze({ lateHealthGrowth: 1.24, lateGrowthAfterWave: 1, damagePerWave: 0.11, spawnScale: 1 }),
+  nightmare: Object.freeze({ lateHealthGrowth: 1.30, lateGrowthAfterWave: 1, damagePerWave: 0.18, spawnScale: 1.5 })
+});
+export const DIFFICULTY_IDS = Object.freeze(Object.keys(DIFFICULTY_MODES));
+export const DEFAULT_DIFFICULTY = 'hard';
+
+export function resolveDifficulty(mode) {
+  return DIFFICULTY_IDS.includes(mode) ? mode : DEFAULT_DIFFICULTY;
+}
 
 export const ENCOUNTERS = Object.freeze({
   rush: Object.freeze({ affix: 'swift', weights: Object.freeze([0.45, 0.40, 0.05, 0.10]) }),
@@ -64,10 +76,11 @@ export function getWaveModifier(seed, wave) {
   return encounter ? ENCOUNTERS[encounter].affix : WAVE_MODIFIER_IDS[hashSeedWave(seed, wave) % 3];
 }
 
-export function getWavePlan(seed, wave) {
+export function getWavePlan(seed, wave, mode = DEFAULT_DIFFICULTY) {
+  const tuning = DIFFICULTY_MODES[resolveDifficulty(mode)];
   const cycle = Math.floor((wave - 1) / DIRECTOR_CONFIG.wavesPerStage);
   const phase = (wave - 1) % DIRECTOR_CONFIG.wavesPerStage;
-  const late = DIRECTOR_CONFIG.lateHealthGrowth ** Math.max(0, wave - DIRECTOR_CONFIG.lateGrowthAfterWave);
+  const late = tuning.lateHealthGrowth ** Math.max(0, wave - tuning.lateGrowthAfterWave);
   return {
     wave, stage: cycle + 1, phase,
     phaseId: ['buildup', 'pressure', 'blackout', 'boss'][phase],
@@ -76,7 +89,7 @@ export function getWavePlan(seed, wave) {
     spawnRate: DIRECTOR_CONFIG.phaseRates[phase],
     healthScale: (1 + DIRECTOR_CONFIG.healthPerWave * (wave - 1) + DIRECTOR_CONFIG.healthPerStage * cycle) * late,
     bossHealthScale: (1 + DIRECTOR_CONFIG.bossHealthPerWave * (wave - 1) + DIRECTOR_CONFIG.healthPerStage * cycle) * late,
-    damageScale: 1 + DIRECTOR_CONFIG.damagePerWave * (wave - 1),
+    damageScale: 1 + tuning.damagePerWave * (wave - 1),
     eliteChance: Math.min(DIRECTOR_CONFIG.eliteCap, DIRECTOR_CONFIG.eliteBase + wave * DIRECTOR_CONFIG.elitePerWave),
     spitterLimit: wave < 5 ? 0 : Math.min(6, cycle + 2)
   };
@@ -115,9 +128,9 @@ export function capEnemySpeed(speed, charging = false) {
   return Math.min(speed, charging ? DIRECTOR_CONFIG.maxChargeSpeed : DIRECTOR_CONFIG.maxMoveSpeed);
 }
 
-export function createDirectorState(seed) {
+export function createDirectorState(seed, mode = DEFAULT_DIFFICULTY) {
   return {
-    seed: seed >>> 0, wave: 0, warningWave: 0, eventHandledWave: 0,
+    seed: seed >>> 0, mode: resolveDifficulty(mode), wave: 0, warningWave: 0, eventHandledWave: 0,
     recoveryUntil: 0, reliefUntil: 0, reliefCooldownUntil: 0, recentDamage: []
   };
 }
@@ -136,7 +149,7 @@ export function advanceDirector(state, context) {
   const { elapsed, maxHp, nearbyEnemies = 0, hasBoss = false, blackoutActive = false } = context;
   const wave = 1 + Math.floor(elapsed / DIRECTOR_CONFIG.waveSeconds);
   const offset = elapsed - (wave - 1) * DIRECTOR_CONFIG.waveSeconds;
-  const plan = getWavePlan(state.seed, wave);
+  const plan = getWavePlan(state.seed, wave, state.mode);
   const events = [];
   const enteredWave = wave !== state.wave;
   if (enteredWave) {
@@ -146,7 +159,7 @@ export function advanceDirector(state, context) {
   let warning = null;
   if (offset >= DIRECTOR_CONFIG.waveSeconds - DIRECTOR_CONFIG.warningSeconds && state.warningWave !== wave + 1) {
     state.warningWave = wave + 1;
-    warning = getWavePlan(state.seed, wave + 1);
+    warning = getWavePlan(state.seed, wave + 1, state.mode);
   }
 
   state.recentDamage = state.recentDamage.filter(hit => elapsed - hit.elapsed <= DIRECTOR_CONFIG.damageWindow);
@@ -172,7 +185,8 @@ export function advanceDirector(state, context) {
     }
   }
   const bossPressure = hasBoss || event === 'boss';
-  const spawnRate = recovering ? DIRECTOR_CONFIG.recoveryRate : Math.min(plan.spawnRate, bossPressure ? 0.68 : 1);
+  const baseRate = recovering ? DIRECTOR_CONFIG.recoveryRate : Math.min(plan.spawnRate, bossPressure ? 0.68 : 1);
+  const spawnRate = baseRate * DIFFICULTY_MODES[state.mode || DEFAULT_DIFFICULTY].spawnScale;
   return {
     plan, enteredWave, warning, event, events, spawnRate,
     pausedSpawns: relieved, walkersOnly: recovering,

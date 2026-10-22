@@ -147,3 +147,21 @@ Original prompt: Implement the approved endless difficulty director plan: 25-sec
 - 10. Path, specialization and evolution picks show a 1.8-second centred banner (icon, kind, title); it replaces the small flash, and the now-unused `msgBuildChosen` string was removed. A per-pick upgrade tray was not added: HUD width is already constrained, the path icon is shown, and the defeat screen lists the full build.
 - 13. Three seconds before a pressure or Boss wave, a red edge vignette pulses (static under reduced motion), a two-tone siren plays, a light haptic fires, and the warning reads "⚠ HORDE INCOMING". The timers are simulation-based, so pausing stops them.
 - Tests: rank target unit test; browser checks for the vignette, warning text, banner show/hide and HUD target, plus HUD clipping now covering `#rankTargetText`. Locally every changed file passed except the known audio-unlock touch test, which times out on DevTools at load around 100.
+
+## Manager follow-up batch B — v3.9.0
+
+- 11. Difficulty modes in `wave-director.js` (`DIFFICULTY_MODES`), applied from the next run:
+  - **Normal:** the 3.8.5 curve with ×0.9 spawns.
+  - **Hard (default):** the 3.8.7 owner tuning, unchanged.
+  - **Nightmare:** ×1.30 health per wave after wave 1, +18% damage per wave, ×1.5 spawns.
+- Mode selection and storage:
+  - Pickers sit in Settings and on the defeat screen, stored as `zombie-room-difficulty`. The defeat rank reads, for example, "RANK B · Hard".
+  - Hard keeps the original best-score keys; Normal and Nightmare have their own.
+  - Seeded sessions default to Hard. `playtestDifficulty=` overrides it, and the mode is recorded in runs, so replays reuse it.
+- Probes (six seeds, world-aware auto-pick, 390×844):
+  - Normal: survived 420 s on seed 42, died at 202 s on seed 160501. The run stopped after two seeds.
+  - Nightmare: first set (×1.28, +14%/wave, ×1.25 spawns) died at 123–179 s, too close to Hard's 129–179 s crowd wall. Final set died at 57–258 s (median about 115 s); no-Dash runs died at 21–54 s.
+- 12. First-run coaching runs once per device, in unseeded sessions only. Four steps (move, auto fire, dash through red charge lines, grab XP gems), each with touch and keyboard text, advance every 6 simulated seconds in the hint pill. `zombie-room-coached` is set after the last step.
+- 13. (shipped in 3.8.9.)
+- 14. `src/share-card.js` draws a 1080×1350 PNG from the defeat screen values. Share uses the Web Share API with the image when `navigator.canShare` accepts files; otherwise it falls back to the truthful clipboard text path (the F10 regression now disables `canShare` explicitly). A "Save image card" button downloads the PNG. The module is in the service-worker precache.
+- Tests: every unit and browser test file passed when run alone locally at load about 41, including the audio-unlock touch test that only timed out at loads above 85.

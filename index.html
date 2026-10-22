@@ -128,6 +128,11 @@
         <p class="settings-note" id="hapticsAvailabilityNote" hidden data-i18n="hapticsUnavailable">This browser cannot vibrate the phone.</p>
       </div>
       <div class="settings-row">
+        <span class="settings-label" data-i18n="difficultyLabel">Difficulty</span>
+        <div class="difficulty-picker" role="group" data-i18n-aria="difficultyLabel" aria-label="Difficulty" data-difficulty-picker></div>
+        <p class="settings-note" data-i18n="difficultyNextRun">Applies from your next run.</p>
+      </div>
+      <div class="settings-row">
         <div class="settings-toggle-row">
           <span class="settings-label" data-i18n="upgradeSkipSettingsLabel">Skip upgrade choices</span>
           <button class="settings-toggle-btn active" id="upgradeSkipToggle" type="button" role="switch" aria-checked="true" data-i18n-aria="upgradeSkipSettingsLabel" aria-label="Skip upgrade choices">
@@ -154,7 +159,7 @@
       </button>
       <button class="update-button settings-action" id="updateButton" type="button" data-i18n-aria="updateAriaCheck" aria-label="Check for Zombie Room updates">
         <span class="update-dot" aria-hidden="true"></span>
-        <span id="updateLabel">Update v3.8.9</span>
+        <span id="updateLabel">Update v3.9.0</span>
       </button>
       <div class="settings-diagnostics">
         <div class="settings-label" data-i18n="hudDiagnostics">Performance</div>
@@ -168,7 +173,7 @@
     <div class="install-tip" id="installTip" role="status" aria-live="polite"></div>
 
     <div class="message" id="message" data-i18n="msgLevelUp">LEVEL UP</div>
-    <div class="hint-pill" id="hintPill"><span class="hint-touch" data-i18n="hintTouch">Hold anywhere to move · Tap DASH to dodge · Grab XP gems</span><span class="hint-keys" data-i18n="hintPill">Auto fire · Grab XP gems · Space dashes through charges</span></div>
+    <div class="hint-pill" id="hintPill"><span class="hint-touch" data-i18n="hintTouch">Hold anywhere to move · Tap DASH to dodge · Grab XP gems</span><span class="hint-keys" data-i18n="hintPill">Auto fire · Grab XP gems · Space dashes through charges</span><span class="hint-coach" id="hintCoach"></span></div>
     <div class="damage-flash" id="damageFlash"></div>
     <div class="surge-vignette" id="surgeVignette" aria-hidden="true"></div>
     <div class="build-banner" id="buildBanner" role="status" hidden><span class="build-banner-icon" aria-hidden="true"></span><span class="build-banner-text"><small></small><b></b></span></div>
@@ -232,10 +237,12 @@
           <div class="gameover-build-title" data-i18n="buildTitle">TACTICAL BUILD</div>
           <div class="gameover-build-grid" id="gameoverBuildGrid"></div>
         </div>
+        <div class="difficulty-picker gameover-difficulty" role="group" data-i18n-aria="difficultyLabel" aria-label="Difficulty" data-difficulty-picker></div>
         <div class="gameover-actions">
           <button class="restart-button" id="restartButton" type="button" data-i18n="restartButtonLabel">RESTART</button>
           <button class="share-button" id="shareButton" type="button" data-i18n="shareButtonLabel">SHARE RUN</button>
         </div>
+        <button class="save-image-button" id="saveImageButton" type="button" data-i18n="saveImageButton">Save image card</button>
         <p class="restart" data-i18n="gameoverRestart">Or press any direction / WASD</p>
       </div>
     </div>

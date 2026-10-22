@@ -147,6 +147,8 @@ test('short viewports, Settings keyboard focus, clipboard feedback, and translat
       player.projectiles = 3;
       showGameOver({ score: 0, combo: 0, wave: 1, kills: 0, elapsed: 0, isNewBest: false, rank: 'C', player, upgrades: UPGRADES, performanceMode: false });
       const maxLevelLabel = document.querySelector('.build-chip-level')?.textContent;
+      // Exercise the text fallback: no image sharing, then no or a rejecting clipboard.
+      Object.defineProperty(navigator, 'canShare', { configurable: true, value: undefined });
       Object.defineProperty(navigator, 'clipboard', { configurable: true, value: undefined });
       document.querySelector('#shareButton').click();
       const missingClipboardFeedback = document.querySelector('#message').textContent;
@@ -216,7 +218,7 @@ test('first-card no-Dash movement runs create pressure without ending inside the
       assert.ok(outcome.elapsed >= 10, `run ended implausibly early: ${JSON.stringify(outcome)}`);
       assert.deepEqual(cdp.runtimeExceptions, []);
     }
-    // 3.8.9 is deliberately hard from wave 2, so this careless policy no longer reaches 300s.
+    // 3.9.0 is deliberately hard from wave 2, so this careless policy no longer reaches 300s.
     // Guard the onboarding instead: every case clears the 25-second first wave and most reach 45 seconds.
     const outlastOpening = outcomes.filter(run => run.elapsed >= 45).length;
     const pressured = outcomes.filter(run => run.elapsed < 300).length;

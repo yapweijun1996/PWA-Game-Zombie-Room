@@ -714,6 +714,10 @@
     }
     .hint-pill { max-width: calc(100vw - 24px); white-space: normal; text-align: center; }
     .hint-keys { display: none; }
+    .hint-coach { display: none; }
+    .hint-pill.coaching { color: #fffaf0; border-color: rgba(255, 214, 102, .55); font-size: 11px; }
+    .hint-pill.coaching .hint-touch, .hint-pill.coaching .hint-keys { display: none; }
+    .hint-pill.coaching .hint-coach { display: inline; }
 
     .message {
       top: 28%;
@@ -1491,6 +1495,20 @@
     .hud-metrics-row .metric .rank-target { color: #ffd666; letter-spacing: 0; text-transform: none; }
     .gameover-next-rank { margin: 8px 0 0; color: #ffd666; font-size: 12px; font-weight: 900; letter-spacing: .02em; text-align: center; }
     .gameover-next-rank[hidden] { display: none; }
+    .difficulty-picker { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin-top: 6px; }
+    .difficulty-picker button {
+      min-height: 36px; padding: 4px 6px; border: 1px solid var(--line-strong); border-radius: 10px;
+      background: rgba(228, 255, 235, .05); color: var(--muted);
+      font: inherit; font-size: 11px; font-weight: 900; letter-spacing: .03em; cursor: pointer; touch-action: manipulation;
+    }
+    .difficulty-picker button[aria-pressed="true"] { border-color: rgba(255, 214, 102, .7); background: rgba(255, 214, 102, .14); color: #ffe39a; }
+    .difficulty-picker button[data-mode="nightmare"][aria-pressed="true"] { border-color: rgba(255, 97, 116, .75); background: rgba(255, 97, 116, .16); color: #ffb4bd; }
+    .gameover-difficulty { width: 100%; margin: 12px 0 0; }
+    .save-image-button {
+      margin-top: 8px; min-height: 36px; padding: 6px 14px; border: 0; background: none;
+      color: var(--muted); font: inherit; font-size: 11px; font-weight: 800; letter-spacing: .04em;
+      text-decoration: underline; text-underline-offset: 3px; cursor: pointer;
+    }
 
     @media (max-width: 500px) {
       .upgrade-card-key { display: none; }

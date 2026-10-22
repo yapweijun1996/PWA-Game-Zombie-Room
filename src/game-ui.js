@@ -324,7 +324,7 @@ function renderDeathCause(killedBy, damageTaken = {}) {
   element.hidden = !lines.length;
 }
 
-export function showGameOver({ score, combo, wave, kills, elapsed, isNewBest, rank, player, upgrades, performanceMode, killedBy = null, damageTaken = {}, nextRank = null }) {
+export function showGameOver({ score, combo, wave, kills, elapsed, isNewBest, rank, player, upgrades, performanceMode, killedBy = null, damageTaken = {}, nextRank = null, difficulty = null }) {
   ui.gameoverScore.textContent = score;
   if (ui.gameoverCombo) ui.gameoverCombo.textContent = combo;
   if (ui.gameoverWave) ui.gameoverWave.textContent = wave;
@@ -333,7 +333,7 @@ export function showGameOver({ score, combo, wave, kills, elapsed, isNewBest, ra
   if (ui.gameoverNewBest) ui.gameoverNewBest.hidden = !isNewBest;
 
   if (ui.gameoverRankBadge && ui.gameoverRankText) {
-    ui.gameoverRankText.textContent = t('rankLabel') + ' ' + rank;
+    ui.gameoverRankText.textContent = t('rankLabel') + ' ' + rank + (difficulty ? ' · ' + t('difficulty_' + difficulty) : '');
     ui.gameoverRankBadge.className = 'gameover-rank-badge rank-' + rank.toLowerCase();
   }
   renderBuildSummary(player, upgrades);

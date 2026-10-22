@@ -1,6 +1,6 @@
-import { APP_VERSION, game, room, ui, dom, input, timers, perf, scoreState, viewport, getActiveBoss, hasActiveBoss, upgradeSkipState } from './state.js';
+import { APP_VERSION, game, room, ui, dom, input, timers, perf, scoreState, viewport, getActiveBoss, hasActiveBoss, upgradeSkipState, difficultyState, loadBestScore, saveBestScore, coachState, markCoached } from './state.js';
 import { clamp, dist2, rand, shuffle } from './utils.js';
-import { beginPlaytestRun, finishPlaytestRun, gameRandom, gameRand, getPlaytestSeed, isPlaytestReplaying, playtestConfig, recordPlaytestAbility, recordPlaytestCheckpoint, recordPlaytestDamage, recordPlaytestInput, recordPlaytestPause, recordPlaytestUpgrade, recordPlaytestWaveModifier, recordPlaytestDirectorEvent } from './playtest.js';
+import { beginPlaytestRun, finishPlaytestRun, getPlaytestDifficulty, gameRandom, gameRand, getPlaytestSeed, isPlaytestReplaying, playtestConfig, recordPlaytestAbility, recordPlaytestCheckpoint, recordPlaytestDamage, recordPlaytestInput, recordPlaytestPause, recordPlaytestUpgrade, recordPlaytestWaveModifier, recordPlaytestDirectorEvent } from './playtest.js';
 import { burst, sprayBlood, makeDecal, particleBudget, spawnDamageText, spawnGore } from './effects.js';
 import { flashMessage, updateUI } from './ui.js';
 import { renderPausePresentation, showUpgradeDialog, updateUpgradeDialog, hideUpgradeDialog, stopAutoUpgradeCountdown, showGameOver, hideGameOver, hideBossBar } from './game-ui.js';
@@ -20,6 +20,9 @@ const SURGE_PHASES = Object.freeze(['pressure', 'boss']);
 const BANNER_SECONDS = 1.8;
 // Long enough to read the controls once; a quick restart restarts the timer.
 const HINT_SECONDS = 7;
+// First-run coaching: one step every few simulated seconds, so pausing also pauses it.
+const COACH_STEPS = Object.freeze(['coachMove', 'coachFire', 'coachDash', 'coachXp']);
+const COACH_STEP_SECONDS = 6;
 let hintTimer = 0;
 const DASH_COOLDOWN_SECONDS = 8;
 const DASH_SPEED_MULTIPLIER = 2.8;
@@ -239,7 +242,9 @@ export function resetGame() {
   game.scenarioSeed = scenarioSeed;
   game.swiftChargeCooldown = 0;
   game.spitCooldown = 0;
-  game.director = createDirectorState(scenarioSeed);
+  game.difficulty = playtestConfig.enabled ? getPlaytestDifficulty() : difficultyState.mode;
+  loadBestScore(game.difficulty);
+  game.director = createDirectorState(scenarioSeed, game.difficulty);
   game.spawnTimer = 0.3;
   game.bullets.length = 0;
   game.enemyProjectiles.length = 0;
@@ -276,7 +281,10 @@ export function resetGame() {
   }
   dom.hintPill.classList.remove('hide');
   clearTimeout(hintTimer);
-  hintTimer = setTimeout(() => dom.hintPill.classList.add('hide'), HINT_SECONDS * 1000);
+  game.coachStep = !coachState.done && !playtestConfig.enabled ? 0 : -1;
+  dom.hintPill.classList.toggle('coaching', game.coachStep >= 0);
+  if (game.coachStep >= 0) showCoachStep(0);
+  else hintTimer = setTimeout(() => dom.hintPill.classList.add('hide'), HINT_SECONDS * 1000);
   updateUI();
 }
 
@@ -524,7 +532,7 @@ function spawnBoss() {
   if (side === 1) { x = room.x + room.w + 44; y = gameRand(room.y + 40, room.y + room.h - 40); }
   if (side === 2) { x = gameRand(room.x + 40, room.x + room.w - 40); y = room.y + room.h + 44; }
   if (side === 3) { x = room.x - 44; y = gameRand(room.y + 40, room.y + room.h - 40); }
-  const plan = getWavePlan(game.scenarioSeed, game.wave);
+  const plan = getWavePlan(game.scenarioSeed, game.wave, game.difficulty);
   const scale = plan.bossHealthScale;
   const z = {
     x, y, type: 'boss', hitFlash: 0, attackFlash: 0, walkTime: 0, facing: 0, pulse: 0, entrance: 1.2,
@@ -779,6 +787,28 @@ export function chooseUpgrade(index, replayEvent = false) {
   closeUpgradeModal();
 }
 
+function showCoachStep(step) {
+  const key = COACH_STEPS[step];
+  const variant = isDesktopControls() && (key === 'coachMove' || key === 'coachDash') ? 'Keys' : '';
+  if (dom.hintCoach) dom.hintCoach.textContent = `${step + 1}/${COACH_STEPS.length} · ${t(key + variant)}`;
+}
+
+function updateCoach() {
+  if (game.coachStep < 0) return;
+  const step = Math.floor(game.elapsed / COACH_STEP_SECONDS);
+  if (step >= COACH_STEPS.length) {
+    game.coachStep = -1;
+    markCoached();
+    dom.hintPill.classList.add('hide');
+    dom.hintPill.classList.remove('coaching');
+    return;
+  }
+  if (step !== game.coachStep) {
+    game.coachStep = step;
+    showCoachStep(step);
+  }
+}
+
 // Path, specialization and evolution picks are run-defining, so they get a short centred banner.
 function showBuildBanner(icon, kind, title) {
   const banner = ui.buildBanner;
@@ -954,15 +984,7 @@ function endGame() {
   playGameOver();
   vibrateDeath();
   const currentScore = Math.floor(game.score);
-  const isNewBest = currentScore > scoreState.best;
-  scoreState.best = Math.max(scoreState.best, currentScore);
-  if (isNewBest) scoreState.bestVersion = APP_VERSION;
-  try {
-    localStorage.setItem('zombie-room-best', String(scoreState.best));
-    if (isNewBest) {
-      localStorage.setItem('zombie-room-best-version', APP_VERSION);
-    }
-  } catch (_) {}
+  const isNewBest = saveBestScore(currentScore, APP_VERSION);
   const rank = calculateRunRank(game.wave);
   showGameOver({
     score: currentScore,
@@ -977,7 +999,8 @@ function endGame() {
     performanceMode: game.performanceMode,
     killedBy: game.killedBy,
     damageTaken: game.damageTaken,
-    nextRank: getNextRankTarget(game.elapsed)
+    nextRank: getNextRankTarget(game.elapsed),
+    difficulty: game.difficulty
   });
   updateUI();
 }
@@ -1027,6 +1050,7 @@ export function update(dt) {
     timers.messageTimer -= dt;
     if (timers.messageTimer <= 0) ui.message.classList.remove('show');
   }
+  updateCoach();
   if (timers.surgeTimer > 0) {
     timers.surgeTimer -= dt;
     if (timers.surgeTimer <= 0) ui.surgeVignette?.classList.remove('show');
@@ -1111,7 +1135,7 @@ export function update(dt) {
     }
   }
 
-  if (!game.director) game.director = createDirectorState(game.scenarioSeed);
+  if (!game.director) game.director = createDirectorState(game.scenarioSeed, game.difficulty);
   const directive = advanceDirector(game.director, {
     elapsed: game.elapsed, maxHp: p.maxHp,
     nearbyEnemies: game.zombies.reduce((count, z) => count + (dist2(p, z) <= DIRECTOR_CONFIG.nearbyRadius ** 2 ? 1 : 0), 0),
