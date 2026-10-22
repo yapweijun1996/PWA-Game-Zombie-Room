@@ -20,10 +20,13 @@ export const DIFFICULTY_MODES = Object.freeze({
   nightmare: Object.freeze({ lateHealthGrowth: 1.30, lateGrowthAfterWave: 1, damagePerWave: 0.18, spawnScale: 1.5 })
 });
 export const DIFFICULTY_IDS = Object.freeze(Object.keys(DIFFICULTY_MODES));
-export const DEFAULT_DIFFICULTY = 'hard';
+// Players start on Nightmare (owner request, 3.9.1). Hard stays the baseline: the tuning that
+// seeded playtests, pre-3.9 replays, legacy best-score keys and the pure-function defaults use.
+export const DEFAULT_DIFFICULTY = 'nightmare';
+export const BASELINE_DIFFICULTY = 'hard';
 
-export function resolveDifficulty(mode) {
-  return DIFFICULTY_IDS.includes(mode) ? mode : DEFAULT_DIFFICULTY;
+export function resolveDifficulty(mode, fallback = DEFAULT_DIFFICULTY) {
+  return DIFFICULTY_IDS.includes(mode) ? mode : fallback;
 }
 
 export const ENCOUNTERS = Object.freeze({
@@ -76,8 +79,8 @@ export function getWaveModifier(seed, wave) {
   return encounter ? ENCOUNTERS[encounter].affix : WAVE_MODIFIER_IDS[hashSeedWave(seed, wave) % 3];
 }
 
-export function getWavePlan(seed, wave, mode = DEFAULT_DIFFICULTY) {
-  const tuning = DIFFICULTY_MODES[resolveDifficulty(mode)];
+export function getWavePlan(seed, wave, mode = BASELINE_DIFFICULTY) {
+  const tuning = DIFFICULTY_MODES[resolveDifficulty(mode, BASELINE_DIFFICULTY)];
   const cycle = Math.floor((wave - 1) / DIRECTOR_CONFIG.wavesPerStage);
   const phase = (wave - 1) % DIRECTOR_CONFIG.wavesPerStage;
   const late = tuning.lateHealthGrowth ** Math.max(0, wave - tuning.lateGrowthAfterWave);
@@ -128,9 +131,9 @@ export function capEnemySpeed(speed, charging = false) {
   return Math.min(speed, charging ? DIRECTOR_CONFIG.maxChargeSpeed : DIRECTOR_CONFIG.maxMoveSpeed);
 }
 
-export function createDirectorState(seed, mode = DEFAULT_DIFFICULTY) {
+export function createDirectorState(seed, mode = BASELINE_DIFFICULTY) {
   return {
-    seed: seed >>> 0, mode: resolveDifficulty(mode), wave: 0, warningWave: 0, eventHandledWave: 0,
+    seed: seed >>> 0, mode: resolveDifficulty(mode, BASELINE_DIFFICULTY), wave: 0, warningWave: 0, eventHandledWave: 0,
     recoveryUntil: 0, reliefUntil: 0, reliefCooldownUntil: 0, recentDamage: []
   };
 }
@@ -186,7 +189,7 @@ export function advanceDirector(state, context) {
   }
   const bossPressure = hasBoss || event === 'boss';
   const baseRate = recovering ? DIRECTOR_CONFIG.recoveryRate : Math.min(plan.spawnRate, bossPressure ? 0.68 : 1);
-  const spawnRate = baseRate * DIFFICULTY_MODES[state.mode || DEFAULT_DIFFICULTY].spawnScale;
+  const spawnRate = baseRate * DIFFICULTY_MODES[resolveDifficulty(state.mode, BASELINE_DIFFICULTY)].spawnScale;
   return {
     plan, enteredWave, warning, event, events, spawnRate,
     pausedSpawns: relieved, walkersOnly: recovering,

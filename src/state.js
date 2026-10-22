@@ -1,6 +1,6 @@
-import { DEFAULT_DIFFICULTY, resolveDifficulty } from './wave-director.js';
+import { DEFAULT_DIFFICULTY, BASELINE_DIFFICULTY, resolveDifficulty } from './wave-director.js';
 
-export const APP_VERSION = '3.9.0';
+export const APP_VERSION = '3.9.1';
 
 export const dom = {
   canvas: document.getElementById('game'),
@@ -144,7 +144,7 @@ export const pwaState = {
 
 // Hard keeps the original keys so best scores from before difficulty modes stay with it.
 function bestScoreKeys(mode) {
-  return mode === DEFAULT_DIFFICULTY
+  return mode === BASELINE_DIFFICULTY
     ? { best: 'zombie-room-best', version: 'zombie-room-best-version' }
     : { best: `zombie-room-best-${mode}`, version: `zombie-room-best-version-${mode}` };
 }

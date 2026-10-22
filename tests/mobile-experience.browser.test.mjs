@@ -361,7 +361,7 @@ test('difficulty modes, first-run coaching and the share image card', browserOpt
       return { initial, synced, applied, stored, hardBest: scoreState.best, saved: localStorage.getItem('zombie-room-difficulty') };
     })()`);
     assert.deepEqual(modes, {
-      initial: ['hard', 'hard'], synced: true,
+      initial: ['nightmare', 'nightmare'], synced: true,
       applied: { run: 'nightmare', director: 'nightmare', best: 0 },
       stored: { nightmare: '120', hard: '500' }, hardBest: 500, saved: 'hard'
     });

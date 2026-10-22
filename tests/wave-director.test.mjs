@@ -36,7 +36,7 @@ test('the active wave modifier favors its elite affix without changing the affix
 const {
   DIRECTOR_CONFIG, getWavePlan, createDirectorState, advanceDirector,
   recordDirectorDamage, startDirectorRecovery, getSpawnInterval, selectEnemyType, capEnemySpeed,
-  calculateRunRank, getNextRankTarget
+  calculateRunRank, getNextRankTarget, DEFAULT_DIFFICULTY, BASELINE_DIFFICULTY, resolveDifficulty
 } = await import('../src/wave-director.js');
 const context = (elapsed, overrides = {}) => ({ elapsed, maxHp: 100, nearbyEnemies: 0, hasBoss: false, blackoutActive: false, ...overrides });
 
@@ -170,4 +170,13 @@ test('survival rank follows the wave reached and names the next target time', ()
   assert.deepEqual(getNextRankTarget(75), { rank: 'A', at: 175 });
   assert.deepEqual(getNextRankTarget(299), { rank: 'S', at: 300 });
   assert.equal(getNextRankTarget(300), null);
+});
+
+test('players default to Nightmare while recordings and fixtures keep the Hard baseline', () => {
+  assert.equal(DEFAULT_DIFFICULTY, 'nightmare');
+  assert.equal(BASELINE_DIFFICULTY, 'hard');
+  assert.equal(resolveDifficulty(null), 'nightmare');
+  assert.equal(resolveDifficulty('bogus', BASELINE_DIFFICULTY), 'hard');
+  assert.equal(createDirectorState(42).mode, 'hard');
+  assert.deepEqual(getWavePlan(42, 8), getWavePlan(42, 8, 'hard'));
 });

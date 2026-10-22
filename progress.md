@@ -165,3 +165,9 @@ Original prompt: Implement the approved endless difficulty director plan: 25-sec
 - 13. (shipped in 3.8.9.)
 - 14. `src/share-card.js` draws a 1080×1350 PNG from the defeat screen values. Share uses the Web Share API with the image when `navigator.canShare` accepts files; otherwise it falls back to the truthful clipboard text path (the F10 regression now disables `canShare` explicitly). A "Save image card" button downloads the PNG. The module is in the service-worker precache.
 - Tests: every unit and browser test file passed when run alone locally at load about 41, including the audio-unlock touch test that only timed out at loads above 85.
+
+## Nightmare by default — v3.9.1
+
+- Owner request: new players start on Nightmare. `DEFAULT_DIFFICULTY` is now `'nightmare'`, and a separate `BASELINE_DIFFICULTY` (`'hard'`) covers the tuning baseline. That baseline drives seeded playtests, pre-3.9 replays, the legacy `zombie-room-best` keys and the pure-function defaults, so fixtures, recordings and existing best scores do not move.
+- Players who already picked a mode keep it. Everyone else starts on Nightmare and sees that mode's (initially empty) best score; the old best remains under Hard.
+- Every unit and browser test file passed when run alone locally at load about 15.
