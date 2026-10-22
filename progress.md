@@ -138,3 +138,4 @@ Original prompt: Implement the approved endless difficulty director plan: 25-sec
 - 7. XP orbs are bobbing white diamonds with an aqua rim, and the XP bar matches; they no longer share blue with shield and frost.
 - 8. The defeat screen names the lethal hit (with elite affix) and the largest damage share, using the playtest recorder's source classification. A regression asserts "Killed by Walker / Most damage: Walker 100%".
 - Verification: every browser test file run alone locally passed except the known audio-unlock touch test, which timed out on DevTools at load 86–150; all unit tests passed. CI `verify` gates deployment.
+- CI caught a Linux-only clip: Thai `#waveText` was wider in the runner's fallback font at 390px. The wave column is now 1.6fr, and the stage label may wrap on narrow screens (higher-specificity rule so the global nowrap does not override it).
