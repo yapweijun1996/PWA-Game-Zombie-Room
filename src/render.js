@@ -6,6 +6,39 @@ import { drawGrid, drawRoomLighting, drawObstacles, drawHazards } from './render
 import { drawPlayer, drawZombie, drawAttackTelegraph, drawRangedThreats } from './render-actors.js';
 import { drawPickups, drawThreatRadar } from './render-hud.js';
 
+const REDUCED_MOTION = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+const LOCATOR_RADIUS = 140;
+const LOCATOR_CROWD = 4;
+
+// Drawn above crowds and blackout lighting so the survivor is always findable.
+function drawPlayerLocator(p) {
+  let near = 0;
+  for (const z of game.zombies) {
+    const dx = z.x - p.x, dy = z.y - p.y;
+    if (dx * dx + dy * dy < LOCATOR_RADIUS * LOCATOR_RADIUS) near++;
+  }
+  const crowded = near >= LOCATOR_CROWD;
+  const pulse = REDUCED_MOTION ? .5 : .5 + .5 * Math.sin(performance.now() / 160);
+  const r = p.r + 9;
+  ctx.save();
+  ctx.globalAlpha = crowded ? .7 + .3 * pulse : .32;
+  ctx.strokeStyle = '#f4fff8';
+  ctx.lineWidth = crowded ? 2.5 : 1.5;
+  ctx.beginPath();
+  ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+  ctx.stroke();
+  if (crowded) {
+    for (let i = 0; i < 4; i++) {
+      const a = i * Math.PI / 2 + Math.PI / 4;
+      ctx.beginPath();
+      ctx.moveTo(p.x + Math.cos(a) * (r + 3), p.y + Math.sin(a) * (r + 3));
+      ctx.lineTo(p.x + Math.cos(a) * (r + 9), p.y + Math.sin(a) * (r + 9));
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+
 const BULLET_TRAIL_SPEC = {
   crit: [[0, 'rgba(255, 214, 102, 0)'], [0.5, 'rgba(255, 180, 50, 0.45)'], [1, '#fff6d6']],
   pierce: [[0, 'rgba(105, 182, 255, 0)'], [0.5, 'rgba(74, 160, 255, 0.45)'], [1, '#e5f3ff']],
@@ -46,16 +79,26 @@ export function draw() {
   drawObstacles();
   drawPickups();
 
+  // XP gems: a bobbing white diamond with an aqua rim, distinct from blue shield/frost rings.
   for (const o of game.orbs) {
     const glow = 1 + Math.sin(o.pulse) * .12;
+    const y = o.y + (REDUCED_MOTION ? 0 : Math.sin(o.pulse * .8) * 1.6);
+    const s = o.r * 1.25 * glow;
     ctx.beginPath();
-    ctx.arc(o.x, o.y, o.r * 2.1 * glow, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(74, 160, 255, .12)';
+    ctx.arc(o.x, y, o.r * 2.2 * glow, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(126, 249, 227, .13)';
     ctx.fill();
     ctx.beginPath();
-    ctx.arc(o.x, o.y, o.r * glow, 0, Math.PI * 2);
-    ctx.fillStyle = '#6eb7ff';
+    ctx.moveTo(o.x, y - s * 1.25);
+    ctx.lineTo(o.x + s, y);
+    ctx.lineTo(o.x, y + s * 1.25);
+    ctx.lineTo(o.x - s, y);
+    ctx.closePath();
+    ctx.fillStyle = '#f4fffb';
     ctx.fill();
+    ctx.lineWidth = 1.6;
+    ctx.strokeStyle = '#7ef9e3';
+    ctx.stroke();
   }
 
   const trailSprites = getBulletTrailSprites();
@@ -190,6 +233,7 @@ export function draw() {
   ctx.globalAlpha = 1;
 
   drawRoomLighting();
+  if (p && game.running) drawPlayerLocator(p);
   drawRangedThreats();
   drawThreatRadar();
   ctx.restore();

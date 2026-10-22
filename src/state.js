@@ -1,4 +1,4 @@
-export const APP_VERSION = '3.8.7';
+export const APP_VERSION = '3.8.8';
 
 export const dom = {
   canvas: document.getElementById('game'),
@@ -216,6 +216,8 @@ export const game = {
   running: true,
   // performance.now() at the last death; input restarts wait out a short grace period.
   endedAt: 0,
+  damageTaken: {},
+  killedBy: null,
   paused: false,
   pendingUpgrades: 0,
   upgradeModalOpen: false,

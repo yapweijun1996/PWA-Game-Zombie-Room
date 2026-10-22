@@ -216,7 +216,7 @@ test('first-card no-Dash movement runs create pressure without ending inside the
       assert.ok(outcome.elapsed >= 10, `run ended implausibly early: ${JSON.stringify(outcome)}`);
       assert.deepEqual(cdp.runtimeExceptions, []);
     }
-    // 3.8.7 is deliberately hard from wave 2, so this careless policy no longer reaches 300s.
+    // 3.8.8 is deliberately hard from wave 2, so this careless policy no longer reaches 300s.
     // Guard the onboarding instead: every case clears the 25-second first wave and most reach 45 seconds.
     const outlastOpening = outcomes.filter(run => run.elapsed >= 45).length;
     const pressured = outcomes.filter(run => run.elapsed < 300).length;

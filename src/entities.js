@@ -221,6 +221,9 @@ export function resetGame() {
   game.elapsed = 0;
   game.score = 0;
   game.kills = 0;
+  // Shield + HP lost per damage source, and the source of the lethal hit, for the defeat screen.
+  game.damageTaken = {};
+  game.killedBy = null;
   game.wave = 1;
   game.waveModifierId = null;
   game.waveModifierWave = 0;
@@ -841,6 +844,11 @@ function killZombie(index, isCrit = false) {
   game.zombies.splice(index, 1);
 }
 
+// One classification for recordings and the defeat screen: hazard, enemy type or spitter projectile.
+function classifyDamageSource(from) {
+  return room.hazards && room.hazards.includes(from) ? 'hazard' : (from.type || 'unknown');
+}
+
 function damagePlayer(amount, from) {
   const p = game.player;
   if (p.invuln > 0 || !game.running) return;
@@ -858,7 +866,7 @@ function damagePlayer(amount, from) {
       p.shield -= amount;
       hpDamage = 0;
       playShieldHit();
-      spawnDamageText(p.x + rand(-4, 4), p.y - p.r - 8, '-' + amount + ' 🛡️', false, true);
+      spawnDamageText(p.x + rand(-4, 4), p.y - p.r - 8, '-' + Math.round(amount) + ' 🛡️', false, true);
       burst(p.x, p.y, '#8ae0ff', 7, 70);
     } else {
       hpDamage = amount - p.shield;
@@ -882,14 +890,17 @@ function damagePlayer(amount, from) {
     sprayBlood(p.x, p.y, .7, '#d95b67');
   }
 
-  recordDirectorDamage(game.director, game.elapsed, Math.max(0, shieldBefore - p.shield) + Math.max(0, hpBefore - Math.max(0, p.hp)));
+  const lost = Math.max(0, shieldBefore - p.shield) + Math.max(0, hpBefore - Math.max(0, p.hp));
+  const source = classifyDamageSource(from);
+  game.damageTaken[source] = (game.damageTaken[source] || 0) + lost;
+  if (p.hp <= 0) game.killedBy = { source, affix: from.affix || null };
+  recordDirectorDamage(game.director, game.elapsed, lost);
 
   if (playtestConfig.enabled) {
-    const sourceIsHazard = room.hazards && room.hazards.includes(from);
     recordPlaytestDamage({
       elapsed: Math.round(game.elapsed * 100) / 100,
       wave: game.wave,
-      source: sourceIsHazard ? 'hazard' : (from.type || 'unknown'),
+      source,
       affix: from.affix || null,
       damage: amount,
       shieldDamage: Math.max(0, Math.round((shieldBefore - p.shield) * 100) / 100),
@@ -949,7 +960,9 @@ function endGame() {
     rank,
     player: p,
     upgrades: UPGRADES,
-    performanceMode: game.performanceMode
+    performanceMode: game.performanceMode,
+    killedBy: game.killedBy,
+    damageTaken: game.damageTaken
   });
   updateUI();
 }

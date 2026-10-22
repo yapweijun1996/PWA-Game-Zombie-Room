@@ -303,7 +303,28 @@ function renderBuildSummary(player, upgrades) {
   });
 }
 
-export function showGameOver({ score, combo, wave, kills, elapsed, isNewBest, rank, player, upgrades, performanceMode }) {
+function damageSourceName(source, affix = null) {
+  const name = t('cause_' + source);
+  return affix ? t('affix' + affix[0].toUpperCase() + affix.slice(1)) + ' ' + name : name;
+}
+
+// Names the lethal hit and the largest damage share so a loss shows what to avoid next run.
+function renderDeathCause(killedBy, damageTaken = {}) {
+  const element = document.getElementById('gameoverCause');
+  if (!element) return;
+  const lines = [];
+  if (killedBy) lines.push(t('deathKilledBy', { cause: damageSourceName(killedBy.source, killedBy.affix) }));
+  const entries = Object.entries(damageTaken).filter(([, value]) => value > 0);
+  const total = entries.reduce((sum, [, value]) => sum + value, 0);
+  if (total > 0) {
+    const [source, value] = entries.reduce((best, entry) => entry[1] > best[1] ? entry : best);
+    lines.push(t('deathTopDamage', { cause: damageSourceName(source), percent: Math.round(value / total * 100) }));
+  }
+  element.textContent = lines.join('\n');
+  element.hidden = !lines.length;
+}
+
+export function showGameOver({ score, combo, wave, kills, elapsed, isNewBest, rank, player, upgrades, performanceMode, killedBy = null, damageTaken = {} }) {
   ui.gameoverScore.textContent = score;
   if (ui.gameoverCombo) ui.gameoverCombo.textContent = combo;
   if (ui.gameoverWave) ui.gameoverWave.textContent = wave;
@@ -316,6 +337,7 @@ export function showGameOver({ score, combo, wave, kills, elapsed, isNewBest, ra
     ui.gameoverRankBadge.className = 'gameover-rank-badge rank-' + rank.toLowerCase();
   }
   renderBuildSummary(player, upgrades);
+  renderDeathCause(killedBy, damageTaken);
   document.getElementById('app')?.classList.add('is-over');
 
   if (dom.canvas) dom.canvas.classList.add(performanceMode ? 'game-dimmed' : 'game-blurred');

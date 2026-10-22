@@ -83,7 +83,12 @@ export function makeDecal(x, y, radius, color = 'rgba(110,24,30,.24)') {
   while (game.decals.length > maxDecals) game.decals.shift();
 }
 
+// Above this many enemies, ordinary hit numbers only add clutter around the player.
+const CROWDED_TEXT_ENEMIES = 25;
+
 export function spawnDamageText(x, y, amount, isCrit = false, isPlayer = false) {
+  const isGain = typeof amount === 'string' && amount.startsWith('+');
+  if (!isPlayer && !isCrit && !isGain && game.zombies.length >= CROWDED_TEXT_ENEMIES) return;
   const maxTexts = game.performanceMode ? 16 : 32;
   if (game.floatingTexts.length >= maxTexts) {
     game.floatingTexts.shift();
@@ -91,7 +96,7 @@ export function spawnDamageText(x, y, amount, isCrit = false, isPlayer = false) 
 
   let text = '';
   if (typeof amount === 'number') {
-    const rounded = Number.isInteger(amount) ? amount : (amount >= 10 ? Math.round(amount) : amount.toFixed(1));
+    const rounded = Number.isInteger(amount) ? amount : (amount >= 10 || isPlayer ? Math.round(amount) : amount.toFixed(1));
     text = String(rounded);
   } else {
     text = String(amount || 0);

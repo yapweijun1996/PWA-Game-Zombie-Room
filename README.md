@@ -45,6 +45,7 @@ Latest review: [Gameplay and Codebase Review — 2026-10-17](GAMEPLAY_REVIEW.md)
 - Explicit pause/resume mechanism: pause button in header, 'P'/'Escape' hotkeys, and auto-pause on opening the settings menu or switching browser tabs.
 - Dedicated pause overlay dialog with blurred/dimmed canvas backdrop.
 - Collapsible settings menu (language, install, update, and FPS/performance diagnostics) behind a single header trigger, with focus trap, outside-click, and Escape handling.
+- Defeat overlay names the lethal hit and the largest damage source; a white locator ring marks the survivor in crowds, XP drops are white diamond gems, and the narrow HUD keeps HP, shield, level and wave readable at 360px.
 - Full-screen defeat overlay: blurred/dimmed backdrop, hero score, S/A/B/C Survival Rank by wave reached (B from wave 4, A from wave 8 at about 3 minutes, S from wave 13 at 5 minutes), tactical build matrix with level chips, wave/kills/combo/time stats, "NEW BEST!" achievement banner, clipboard run sharing, and a dedicated Restart button.
 
 ## Project Structure

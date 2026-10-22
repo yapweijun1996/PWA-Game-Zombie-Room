@@ -196,8 +196,10 @@ test('upgrade choices are skipped by default and the dialog can opt in to skippi
       update(1 / 60);
       const key = repeat => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', repeat, bubbles: true, cancelable: true }));
       key(false); key(true);
-      return { dead: !game.running, stillOnDefeatScreen: !game.running };
+      return { dead: !game.running, stillOnDefeatScreen: !game.running, cause: document.querySelector('#gameoverCause').textContent };
     })()`);
+    assert.equal(death.cause, 'Killed by Walker\nMost damage: Walker 100%', 'the defeat screen names the lethal hit and the largest damage share');
+    delete death.cause;
     assert.deepEqual(death, { dead: true, stillOnDefeatScreen: true }, 'a key pressed at death must not skip the defeat screen');
     await new Promise(resolve => setTimeout(resolve, 1300));
     const restarted = await cdp.evaluate(`(async () => {

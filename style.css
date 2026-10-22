@@ -576,7 +576,7 @@
       transition: width .12s linear;
     }
     #hpFill { background: linear-gradient(90deg, #ff5369, #ff9676); }
-    #xpFill { background: linear-gradient(90deg, #4e9fff, #81d1ff); }
+    #xpFill { background: linear-gradient(90deg, #3fd9c0, #b8fff2); }
     #shieldFill {
       top: 0;
       height: 2px;
@@ -1173,11 +1173,13 @@
     }
     .gameover-stat-icon { font-size: 15px; }
     .gameover-stat-main { display: flex; align-items: center; gap: 5px; }
+    .gameover-cause { margin: 8px 0 0; color: #ffb4bd; font-size: 11px; font-weight: 800; line-height: 1.45; text-align: center; white-space: pre-line; }
+    .gameover-cause[hidden] { display: none; }
     .gameover-stat-label { color: var(--muted); font-size: 9px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
     /* Touch players use the Restart button; the key shortcut line is desktop-only. */
     .gameover .restart { display: none; }
     /* Gameplay controls do nothing on the defeat screen. */
-    .is-over .controls-wrap, .is-over .hint-pill { visibility: hidden; }
+    .is-over .controls-wrap, .is-over .hint-pill, .is-over .message { visibility: hidden; }
 
     .gameover-build-section {
       margin-top: 14px;
