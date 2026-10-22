@@ -139,3 +139,11 @@ Original prompt: Implement the approved endless difficulty director plan: 25-sec
 - 8. The defeat screen names the lethal hit (with elite affix) and the largest damage share, using the playtest recorder's source classification. A regression asserts "Killed by Walker / Most damage: Walker 100%".
 - Verification: every browser test file run alone locally passed except the known audio-unlock touch test, which timed out on DevTools at load 86–150; all unit tests passed. CI `verify` gates deployment.
 - CI caught a Linux-only clip: Thai `#waveText` was wider in the runner's fallback font at 390px. The wave column is now 1.6fr, and the stage label may wrap on narrow screens (higher-specificity rule so the global nowrap does not override it).
+
+## Manager follow-up batch A — v3.8.9
+
+- Owner: "You are manager". Shipping the remaining UI/UX ideas in two batches. Batch A covers items 9, 10 and 13. Batch B covers items 11, 12 and 14.
+- 9. Rank rules moved into `wave-director.js` (`RANK_THRESHOLDS`, `calculateRunRank`, `getNextRankTarget`) so the HUD can use them without importing entities. The time metric shows the next target (for example "→A 2:55", then "S ✓"). The defeat screen says how many more seconds earn the next rank (for example "75s more for RANK B (1:15)"), or that the top rank was reached.
+- 10. Path, specialization and evolution picks show a 1.8-second centred banner (icon, kind, title); it replaces the small flash, and the now-unused `msgBuildChosen` string was removed. A per-pick upgrade tray was not added: HUD width is already constrained, the path icon is shown, and the defeat screen lists the full build.
+- 13. Three seconds before a pressure or Boss wave, a red edge vignette pulses (static under reduced motion), a two-tone siren plays, a light haptic fires, and the warning reads "⚠ HORDE INCOMING". The timers are simulation-based, so pausing stops them.
+- Tests: rank target unit test; browser checks for the vignette, warning text, banner show/hide and HUD target, plus HUD clipping now covering `#rankTargetText`. Locally every changed file passed except the known audio-unlock touch test, which times out on DevTools at load around 100.

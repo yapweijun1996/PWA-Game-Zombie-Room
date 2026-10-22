@@ -1179,7 +1179,7 @@
     /* Touch players use the Restart button; the key shortcut line is desktop-only. */
     .gameover .restart { display: none; }
     /* Gameplay controls do nothing on the defeat screen. */
-    .is-over .controls-wrap, .is-over .hint-pill, .is-over .message { visibility: hidden; }
+    .is-over .controls-wrap, .is-over .hint-pill, .is-over .message, .is-over .build-banner, .is-over .surge-vignette { visibility: hidden; }
 
     .gameover-build-section {
       margin-top: 14px;
@@ -1464,6 +1464,33 @@
       transition: opacity .12s ease;
     }
     .damage-flash.show { opacity: 1; }
+    /* Red edge pulse before a pressure or Boss wave. */
+    .surge-vignette {
+      position: absolute; inset: 0; z-index: 15; pointer-events: none; opacity: 0;
+      box-shadow: inset 0 0 70px 18px rgba(255, 52, 72, .55);
+      transition: opacity .2s ease;
+    }
+    .surge-vignette.show { opacity: .8; animation: surgePulse .75s ease-in-out infinite alternate; }
+    @keyframes surgePulse { from { opacity: .25; } to { opacity: 1; } }
+    .build-banner {
+      position: absolute; z-index: 19; left: 50%; top: 34%;
+      transform: translate(-50%, -50%);
+      display: flex; align-items: center; gap: 12px;
+      max-width: calc(100vw - 32px); padding: 12px 18px;
+      border: 1px solid rgba(255, 214, 102, .55); border-radius: 16px;
+      background: rgba(14, 18, 10, .92);
+      box-shadow: 0 10px 34px rgba(0, 0, 0, .5), 0 0 24px rgba(255, 214, 102, .22);
+      pointer-events: none; animation: bannerIn .32s cubic-bezier(.16, 1, .3, 1);
+    }
+    .build-banner[hidden] { display: none; }
+    .build-banner-icon { font-size: 30px; line-height: 1; }
+    .build-banner-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+    .build-banner-text small { color: #ffd666; font-size: 10px; font-weight: 900; letter-spacing: .12em; text-transform: uppercase; }
+    .build-banner-text b { color: #fffaf0; font-size: 18px; font-weight: 950; letter-spacing: .02em; overflow-wrap: anywhere; }
+    @keyframes bannerIn { from { opacity: 0; transform: translate(-50%, -50%) scale(.82); } to { opacity: 1; transform: translate(-50%, -50%) scale(1); } }
+    .hud-metrics-row .metric .rank-target { color: #ffd666; letter-spacing: 0; text-transform: none; }
+    .gameover-next-rank { margin: 8px 0 0; color: #ffd666; font-size: 12px; font-weight: 900; letter-spacing: .02em; text-align: center; }
+    .gameover-next-rank[hidden] { display: none; }
 
     @media (max-width: 500px) {
       .upgrade-card-key { display: none; }
@@ -1502,7 +1529,7 @@
         position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
         overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
       }
-      .hud-metrics-row { grid-template-columns: 1.6fr 1fr .9fr; }
+      .hud-metrics-row { grid-template-columns: 1.5fr .95fr 1fr; }
       /* Fonts differ per platform: wrap a long localized stage label rather than clip it. */
       .hud-bar .hud-metrics-row .wave-metric b { white-space: normal; overflow-wrap: anywhere; }
       /* HP carries HP and shield numbers; XP only carries the level. */

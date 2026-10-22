@@ -6,15 +6,18 @@ import { flashMessage, updateUI } from './ui.js';
 import { renderPausePresentation, showUpgradeDialog, updateUpgradeDialog, hideUpgradeDialog, stopAutoUpgradeCountdown, showGameOver, hideGameOver, hideBossBar } from './game-ui.js';
 import { t } from './i18n.js';
 import { createTelegraphedCharge, updateTelegraphedCharge } from './telegraphed-charge.js';
-import { DIRECTOR_CONFIG, createDirectorState, getWavePlan, advanceDirector, recordDirectorDamage, startDirectorRecovery, selectEliteAffix, selectEnemyType, getSpawnInterval, capEnemySpeed } from './wave-director.js';
+import { DIRECTOR_CONFIG, calculateRunRank, getNextRankTarget, createDirectorState, getWavePlan, advanceDirector, recordDirectorDamage, startDirectorRecovery, selectEliteAffix, selectEnemyType, getSpawnInterval, capEnemySpeed } from './wave-director.js';
 import { SPITTER_CONFIG, createSpitAttack, advanceSpitter, createEnemyProjectile, advanceEnemyProjectile, tracePlayerBulletStep, hasClearShot } from './ranged-combat.js';
 import { getEnemySteering } from './enemy-navigation.js';
 import { createBuildState, getBuildChoices, getBuildProfile, BUILD_EVOLUTIONS, canUnlockEvolution, applyEvolution } from './builds.js';
 
-import { playShoot, playCrit, playKill, playXp, playLevelUp, playUpgradeSelect, playPlayerHit, playGameOver, playUiClick, playNuke, playOverdrive, playHeal, playMagnet, playShieldHit, playShieldBreak, playShieldRecharge, playBossRoar, playElectricZap, playComboMilestone, playBlackoutAlarm, playPowerRestored } from './audio.js';
+import { playShoot, playCrit, playKill, playXp, playLevelUp, playUpgradeSelect, playPlayerHit, playGameOver, playUiClick, playNuke, playOverdrive, playHeal, playMagnet, playShieldHit, playShieldBreak, playShieldRecharge, playBossRoar, playElectricZap, playComboMilestone, playBlackoutAlarm, playPowerRestored, playSurgeWarning } from './audio.js';
 import { vibrateHit, vibrateCrit, vibrateLevelUp, vibrateBoss, vibrateDeath, vibrateUi, vibrateNuke, vibrateOverdrive, vibrateCombo } from './haptics.js';
 
 const DASH_DURATION_SECONDS = 0.24;
+// Waves whose spawn pressure or Boss arrival earns a red edge warning.
+const SURGE_PHASES = Object.freeze(['pressure', 'boss']);
+const BANNER_SECONDS = 1.8;
 // Long enough to read the controls once; a quick restart restarts the timer.
 const HINT_SECONDS = 7;
 let hintTimer = 0;
@@ -221,6 +224,10 @@ export function resetGame() {
   game.elapsed = 0;
   game.score = 0;
   game.kills = 0;
+  timers.surgeTimer = 0;
+  timers.bannerTimer = 0;
+  ui.surgeVignette?.classList.remove('show');
+  if (ui.buildBanner) ui.buildBanner.hidden = true;
   // Shield + HP lost per damage source, and the source of the lethal hit, for the defeat screen.
   game.damageTaken = {};
   game.killedBy = null;
@@ -746,10 +753,11 @@ export function chooseUpgrade(index, replayEvent = false) {
   vibrateUi();
 
   if (chosen.isBuild) {
-    flashMessage(t('msgBuildChosen', { build: t(chosen.titleKey) }));
+    // The banner replaces the small flash message for run-defining picks.
+    showBuildBanner(chosen.icon, t(chosen.isSpecialization ? 'buildSpecBadge' : 'buildPathBadge'), t(chosen.titleKey));
     burst(p.x, p.y, '#81d1ff', 20, 120);
   } else if (chosen.isEvolution) {
-    flashMessage('⚡ ' + t(chosen.titleKey) + ' · ' + t('evoBadge'));
+    showBuildBanner(chosen.icon, t('evoBadge'), t(chosen.titleKey));
     burst(p.x, p.y, '#ffd700', 30, 160);
     game.cameraShake = Math.max(game.cameraShake, .4);
   } else {
@@ -769,6 +777,20 @@ export function chooseUpgrade(index, replayEvent = false) {
   }
 
   closeUpgradeModal();
+}
+
+// Path, specialization and evolution picks are run-defining, so they get a short centred banner.
+function showBuildBanner(icon, kind, title) {
+  const banner = ui.buildBanner;
+  if (!banner) return;
+  banner.querySelector('.build-banner-icon').textContent = icon;
+  banner.querySelector('small').textContent = kind;
+  banner.querySelector('b').textContent = title;
+  banner.hidden = false;
+  banner.style.animation = 'none';
+  void banner.offsetWidth;
+  banner.style.animation = '';
+  timers.bannerTimer = BANNER_SECONDS;
 }
 
 export function closeUpgradeModal() {
@@ -920,14 +942,6 @@ function damagePlayer(amount, from) {
   if (p.hp <= 0) endGame();
 }
 
-// Survival rank by the wave reached: B after 75s, A after 175s (the 3-minute wall), S after 300s.
-export function calculateRunRank(wave) {
-  if (wave >= 13) return 'S';
-  if (wave >= 8) return 'A';
-  if (wave >= 4) return 'B';
-  return 'C';
-}
-
 function endGame() {
   const p = game.player;
   p.hp = 0;
@@ -962,7 +976,8 @@ function endGame() {
     upgrades: UPGRADES,
     performanceMode: game.performanceMode,
     killedBy: game.killedBy,
-    damageTaken: game.damageTaken
+    damageTaken: game.damageTaken,
+    nextRank: getNextRankTarget(game.elapsed)
   });
   updateUI();
 }
@@ -986,7 +1001,14 @@ function applyDirector(directive) {
     const next = directive.warning;
     game.preparedWave = next.wave;
     game.pendingWaveModifierId = next.modifierId;
-    flashMessage(t('msgDirectorWarning', { wave: next.wave, stage: next.stage, encounter: waveLabel(next) }));
+    const surge = SURGE_PHASES.includes(next.phaseId) && next.wave > 1;
+    flashMessage(t(surge ? 'msgSurgeWarning' : 'msgDirectorWarning', { wave: next.wave, stage: next.stage, encounter: waveLabel(next) }));
+    if (surge) {
+      timers.surgeTimer = DIRECTOR_CONFIG.warningSeconds;
+      ui.surgeVignette?.classList.add('show');
+      playSurgeWarning();
+      vibrateUi();
+    }
   }
   for (const event of directive.events) recordPlaytestDirectorEvent(event);
   if (directive.event === 'boss') spawnBoss();
@@ -1004,6 +1026,14 @@ export function update(dt) {
   if (timers.messageTimer > 0) {
     timers.messageTimer -= dt;
     if (timers.messageTimer <= 0) ui.message.classList.remove('show');
+  }
+  if (timers.surgeTimer > 0) {
+    timers.surgeTimer -= dt;
+    if (timers.surgeTimer <= 0) ui.surgeVignette?.classList.remove('show');
+  }
+  if (timers.bannerTimer > 0) {
+    timers.bannerTimer -= dt;
+    if (timers.bannerTimer <= 0 && ui.buildBanner) ui.buildBanner.hidden = true;
   }
   if (timers.damageTimer > 0) {
     timers.damageTimer -= dt;

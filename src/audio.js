@@ -338,6 +338,13 @@ export function playBlackoutAlarm() {
   [0.15, 0.42].forEach(at => tone(ac, { type: 'square', from: 880, at, dur: 0.12, vol: 0.1, lp: 3000 }));
 }
 
+// Rising two-tone siren for an incoming pressure or Boss wave.
+export function playSurgeWarning() {
+  const ac = ready();
+  if (!ac) return;
+  [0, 0.22, 0.44].forEach(at => tone(ac, { type: 'square', from: 440, to: 660, at, dur: 0.16, vol: 0.08, lp: 2400 }));
+}
+
 export function playPowerRestored() {
   const ac = ready();
   if (!ac) return;

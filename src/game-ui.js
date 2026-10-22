@@ -324,7 +324,7 @@ function renderDeathCause(killedBy, damageTaken = {}) {
   element.hidden = !lines.length;
 }
 
-export function showGameOver({ score, combo, wave, kills, elapsed, isNewBest, rank, player, upgrades, performanceMode, killedBy = null, damageTaken = {} }) {
+export function showGameOver({ score, combo, wave, kills, elapsed, isNewBest, rank, player, upgrades, performanceMode, killedBy = null, damageTaken = {}, nextRank = null }) {
   ui.gameoverScore.textContent = score;
   if (ui.gameoverCombo) ui.gameoverCombo.textContent = combo;
   if (ui.gameoverWave) ui.gameoverWave.textContent = wave;
@@ -338,6 +338,13 @@ export function showGameOver({ score, combo, wave, kills, elapsed, isNewBest, ra
   }
   renderBuildSummary(player, upgrades);
   renderDeathCause(killedBy, damageTaken);
+  if (ui.gameoverNextRank) {
+    // A concrete next goal turns a loss into "one more run".
+    ui.gameoverNextRank.textContent = nextRank
+      ? t('rankNextTarget', { seconds: Math.max(1, Math.ceil(nextRank.at - elapsed)), rank: nextRank.rank, time: formatTime(nextRank.at) })
+      : t('rankTopReached');
+    ui.gameoverNextRank.hidden = false;
+  }
   document.getElementById('app')?.classList.add('is-over');
 
   if (dom.canvas) dom.canvas.classList.add(performanceMode ? 'game-dimmed' : 'game-blurred');

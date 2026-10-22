@@ -55,7 +55,7 @@
           <div class="hud-metrics-row">
             <div class="metric wave-metric"><span data-i18n="hudWave">Wave</span><b id="waveText">1</b><span id="encounterText" class="encounter-label"></span></div>
             <div class="metric"><span data-i18n="hudKills">Kills</span><b id="killsText">0</b></div>
-            <div class="metric"><span data-i18n="hudTime">Time</span><b id="timeText">0:00</b></div>
+            <div class="metric time-metric"><span data-i18n="hudTime">Time</span><b id="timeText">0:00</b><span id="rankTargetText" class="encounter-label rank-target"></span></div>
           </div>
         </div>
 
@@ -154,7 +154,7 @@
       </button>
       <button class="update-button settings-action" id="updateButton" type="button" data-i18n-aria="updateAriaCheck" aria-label="Check for Zombie Room updates">
         <span class="update-dot" aria-hidden="true"></span>
-        <span id="updateLabel">Update v3.8.8</span>
+        <span id="updateLabel">Update v3.8.9</span>
       </button>
       <div class="settings-diagnostics">
         <div class="settings-label" data-i18n="hudDiagnostics">Performance</div>
@@ -170,6 +170,8 @@
     <div class="message" id="message" data-i18n="msgLevelUp">LEVEL UP</div>
     <div class="hint-pill" id="hintPill"><span class="hint-touch" data-i18n="hintTouch">Hold anywhere to move · Tap DASH to dodge · Grab XP gems</span><span class="hint-keys" data-i18n="hintPill">Auto fire · Grab XP gems · Space dashes through charges</span></div>
     <div class="damage-flash" id="damageFlash"></div>
+    <div class="surge-vignette" id="surgeVignette" aria-hidden="true"></div>
+    <div class="build-banner" id="buildBanner" role="status" hidden><span class="build-banner-icon" aria-hidden="true"></span><span class="build-banner-text"><small></small><b></b></span></div>
 
     <div class="center-overlay">
       <div class="card upgrade-modal" id="upgradeModal" role="dialog" aria-modal="true" aria-labelledby="upgradeTitle" hidden tabindex="-1">
@@ -210,6 +212,7 @@
         <div class="gameover-rank-badge rank-b" id="gameoverRankBadge">
           <span id="gameoverRankText">RANK B</span>
         </div>
+        <p class="gameover-next-rank" id="gameoverNextRank" hidden></p>
         <p class="gameover-cause" id="gameoverCause" hidden></p>
         <div class="gameover-stat-row">
           <div class="gameover-stat" data-i18n-aria="hudWave" aria-label="Wave">

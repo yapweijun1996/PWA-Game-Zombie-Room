@@ -1,4 +1,4 @@
-export const APP_VERSION = '3.8.8';
+export const APP_VERSION = '3.8.9';
 
 export const dom = {
   canvas: document.getElementById('game'),
@@ -68,6 +68,10 @@ export const ui = {
   legacyBestNote: document.getElementById('legacyBestNote'),
   message: document.getElementById('message'),
   damageFlash: document.getElementById('damageFlash'),
+  surgeVignette: document.getElementById('surgeVignette'),
+  buildBanner: document.getElementById('buildBanner'),
+  rankTargetText: document.getElementById('rankTargetText'),
+  gameoverNextRank: document.getElementById('gameoverNextRank'),
   gameover: document.getElementById('gameover'),
   gameoverScore: document.getElementById('gameoverScore'),
   gameoverWave: document.getElementById('gameoverWave'),
@@ -122,6 +126,8 @@ perf.perfWarmupUntil = perf.last + 3000;
 export const timers = {
   messageTimer: 0,
   damageTimer: 0,
+  surgeTimer: 0,
+  bannerTimer: 0,
   installTipTimer: 0,
   updateResetTimer: 0
 };

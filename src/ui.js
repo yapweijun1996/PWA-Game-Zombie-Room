@@ -1,7 +1,7 @@
 import { APP_VERSION, dom, ui, game, timers, scoreState, getActiveBoss } from './state.js';
 import { clamp, formatTime } from './utils.js';
 import { t } from './i18n.js';
-import { getWavePlan } from './wave-director.js';
+import { getWavePlan, getNextRankTarget } from './wave-director.js';
 import { BUILD_PATHS } from './builds.js';
 
 export function flashMessage(text) {
@@ -43,6 +43,10 @@ export function updateUI() {
   ui.waveText.setAttribute('aria-label', ui.waveText.title);
   ui.killsText.textContent = game.kills;
   ui.timeText.textContent = formatTime(game.elapsed);
+  if (ui.rankTargetText) {
+    const target = getNextRankTarget(game.elapsed);
+    ui.rankTargetText.textContent = target ? '→' + target.rank + ' ' + formatTime(target.at) : 'S ✓';
+  }
   ui.scoreText.textContent = Math.floor(game.score);
   const legacyBest = scoreState.best > 0 && scoreState.bestVersion !== APP_VERSION;
   ui.bestText.textContent = scoreState.best + (legacyBest ? '*' : '');

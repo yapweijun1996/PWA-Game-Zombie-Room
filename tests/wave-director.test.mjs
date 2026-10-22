@@ -35,7 +35,8 @@ test('the active wave modifier favors its elite affix without changing the affix
 
 const {
   DIRECTOR_CONFIG, getWavePlan, createDirectorState, advanceDirector,
-  recordDirectorDamage, startDirectorRecovery, getSpawnInterval, selectEnemyType, capEnemySpeed
+  recordDirectorDamage, startDirectorRecovery, getSpawnInterval, selectEnemyType, capEnemySpeed,
+  calculateRunRank, getNextRankTarget
 } = await import('../src/wave-director.js');
 const context = (elapsed, overrides = {}) => ({ elapsed, maxHp: 100, nearbyEnemies: 0, hasBoss: false, blackoutActive: false, ...overrides });
 
@@ -161,4 +162,12 @@ test('spitter quotas fall back immediately and special phases cannot add spitter
   assert.equal(advanceDirector(director, context(150)).allowSpitter, false);
   assert.equal(advanceDirector(director, context(175)).allowSpitter, false);
   assert.equal(advanceDirector(director, context(200, { hasBoss: true })).allowSpitter, true);
+});
+
+test('survival rank follows the wave reached and names the next target time', () => {
+  assert.equal([3, 4, 7, 8, 12, 13].map(calculateRunRank).join(''), 'CBBAAS');
+  assert.deepEqual(getNextRankTarget(0), { rank: 'B', at: 75 });
+  assert.deepEqual(getNextRankTarget(75), { rank: 'A', at: 175 });
+  assert.deepEqual(getNextRankTarget(299), { rank: 'S', at: 300 });
+  assert.equal(getNextRankTarget(300), null);
 });

@@ -183,8 +183,6 @@ test('upgrade choices are skipped by default and the dialog can opt in to skippi
       return { path, towardEvolution, evolutionFirst, autoToggleDisabled: document.querySelector('#autoUpgradeToggle').disabled };
     })()`);
     assert.ok(['arc', 'scatter', 'mobility'].includes(smartPicks.path), 'skipping a path choice must still pick a path');
-    const ranks = await cdp.evaluate(`import('./src/entities.js').then(({ calculateRunRank }) => [3, 4, 7, 8, 12, 13].map(calculateRunRank).join(''))`);
-    assert.equal(ranks, 'CBBAAS', 'survival rank follows the wave reached, not inflated score');
 
     const death = await cdp.evaluate(`(async () => {
       const { game } = await import('./src/state.js');
@@ -196,8 +194,10 @@ test('upgrade choices are skipped by default and the dialog can opt in to skippi
       update(1 / 60);
       const key = repeat => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', repeat, bubbles: true, cancelable: true }));
       key(false); key(true);
-      return { dead: !game.running, stillOnDefeatScreen: !game.running, cause: document.querySelector('#gameoverCause').textContent };
+      return { dead: !game.running, stillOnDefeatScreen: !game.running, cause: document.querySelector('#gameoverCause').textContent, nextRank: document.querySelector('#gameoverNextRank').textContent };
     })()`);
+    assert.equal(death.nextRank, '75s more for RANK B (1:15)', 'the defeat screen names the next rank target');
+    delete death.nextRank;
     assert.equal(death.cause, 'Killed by Walker\nMost damage: Walker 100%', 'the defeat screen names the lethal hit and the largest damage share');
     delete death.cause;
     assert.deepEqual(death, { dead: true, stillOnDefeatScreen: true }, 'a key pressed at death must not skip the defeat screen');
@@ -267,7 +267,7 @@ test('narrow HUD keeps every visible value whole, badges clear the HUD, and the 
           game.player.build.path = 'scatter';
           updateUI();
           await new Promise(requestAnimationFrame);
-          for (const selector of ['#hpText', '#shieldText', '#levelText', '#waveText', '#encounterText', '#killsText', '#timeText', '#scoreText']) {
+          for (const selector of ['#hpText', '#shieldText', '#levelText', '#waveText', '#encounterText', '#killsText', '#timeText', '#rankTargetText', '#scoreText']) {
             const element = document.querySelector(selector);
             if (element.scrollWidth > element.clientWidth + 1) problems.push(locale + ' ' + selector + ' clipped');
           }
@@ -293,6 +293,35 @@ test('narrow HUD keeps every visible value whole, badges clear the HUD, and the 
       return { hidden, label: Boolean(label), restored: getComputedStyle(document.querySelector('#controlsWrap')).visibility === 'visible' };
     })()`);
     assert.deepEqual(defeat, { hidden: true, label: true, restored: true });
+    assert.deepEqual(cdp.runtimeExceptions, []);
+  });
+});
+
+test('pressure waves get a red edge warning and build picks get a centred banner', browserOptions, async () => {
+  await withBrowser(async (cdp, url) => {
+    await cdp.send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+    await cdp.send('Page.navigate', { url: `${url}/?playtestSeed=42&playtestManual=1&playtestLimit=0` });
+    await waitFor(cdp.evaluate.bind(cdp), 'typeof window.advanceTime === "function"', Boolean);
+    const result = await cdp.evaluate(`(async () => {
+      const { game } = await import('./src/state.js');
+      const { openUpgradeModal, chooseUpgrade } = await import('./src/entities.js');
+      game.player.invuln = 100;
+      // Wave 2 is a pressure wave; its warning starts three seconds before it.
+      game.elapsed = 22.2;
+      window.advanceTime(100);
+      const vignette = document.querySelector('#surgeVignette').classList.contains('show');
+      const message = document.querySelector('#message').textContent;
+      window.advanceTime(3500);
+      const cleared = !document.querySelector('#surgeVignette').classList.contains('show');
+      game.player.level = 4; game.pendingUpgrades = 1;
+      openUpgradeModal();
+      chooseUpgrade(0);
+      const banner = document.querySelector('#buildBanner');
+      const shown = !banner.hidden && banner.querySelector('small').textContent === 'PATH';
+      window.advanceTime(2200);
+      return { vignette, surgeText: message.startsWith('⚠'), cleared, shown, hiddenAgain: banner.hidden, rankTarget: document.querySelector('#rankTargetText').textContent };
+    })()`);
+    assert.deepEqual(result, { vignette: true, surgeText: true, cleared: true, shown: true, hiddenAgain: true, rankTarget: '→B 1:15' });
     assert.deepEqual(cdp.runtimeExceptions, []);
   });
 });

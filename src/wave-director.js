@@ -179,3 +179,21 @@ export function advanceDirector(state, context) {
     allowSpitter: plan.phase < 2 && !blackoutActive && !recovering && !relieved
   };
 }
+
+// Survival rank by the wave reached: B after 75s, A after 175s (the 3-minute wall), S after 300s.
+export const RANK_THRESHOLDS = Object.freeze([
+  Object.freeze({ rank: 'S', wave: 13 }),
+  Object.freeze({ rank: 'A', wave: 8 }),
+  Object.freeze({ rank: 'B', wave: 4 })
+]);
+
+export function calculateRunRank(wave) {
+  return RANK_THRESHOLDS.find(threshold => wave >= threshold.wave)?.rank || 'C';
+}
+
+// The next rank and the elapsed time that earns it, or null once S is reached.
+export function getNextRankTarget(elapsed) {
+  const wave = 1 + Math.floor(elapsed / DIRECTOR_CONFIG.waveSeconds);
+  const next = [...RANK_THRESHOLDS].reverse().find(threshold => wave < threshold.wave);
+  return next ? { rank: next.rank, at: (next.wave - 1) * DIRECTOR_CONFIG.waveSeconds } : null;
+}
